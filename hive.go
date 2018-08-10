@@ -165,6 +165,10 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 			return
 		}
 		fmt.Println("Back from polling")
+		// No rows where found when fetching
+		if !c.HasMore() {
+			return false, nil
+		}
 	}
 
 	if len(c.queue) != len(dests) {
@@ -236,56 +240,47 @@ func (c *Cursor) HasMore() bool{
 	if c.response == nil {
 		return true
 	}
-	return *c.response.HasMoreRows || len(c.queue) > 0
+	return *c.response.HasMoreRows || c.totalRows != c.columnIndex
 }
 
 func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
-	ticker := time.NewTicker(time.Duration(pollIntervalInMillis) * time.Millisecond)
-	quit := make(chan struct{})
 	rowsAvailable := make(chan error)
-	
-	defer close(quit)
 	defer close(rowsAvailable)
 
-
 	go func() {
-		for {
-		    select {
-			case <- ticker.C:
-				fmt.Println("Sending request")
-				fetchRequest := hiveserver.NewTFetchResultsReq()
-				fetchRequest.OperationHandle = c.operationHandle
-				fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
-				fetchRequest.MaxRows = c.conn.RequestSize
+		for true {
+			fmt.Println("Sending request")
+			fetchRequest := hiveserver.NewTFetchResultsReq()
+			fetchRequest.OperationHandle = c.operationHandle
+			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
+			fetchRequest.MaxRows = c.conn.RequestSize
 
-				responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
-				c.response = responseFetch
-				if err != nil {
-					fmt.Println("Error fecthing the response:", err)
-					rowsAvailable <- err
-					return
-				}
-
-				if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-					fmt.Println("Request code is not sucess my friend")
-					fmt.Println(responseFetch)
-					rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
-					return
-				}
-
-				err = c.parseResults(responseFetch)
-				if err != nil {
-					rowsAvailable <- err
-					return
-				}
-
-				if len(c.queue) > 0 {
-					rowsAvailable <- nil
-				}
-			case <- quit:
-				ticker.Stop()
+			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
+			if err != nil {
+				fmt.Println("Error fecthing the response:", err)
+				rowsAvailable <- err
 				return
 			}
+			c.response = responseFetch
+
+			if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
+				fmt.Println("Request code is not sucess my friend")
+				fmt.Println(responseFetch)
+				rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
+				return
+			}
+
+			err = c.parseResults(responseFetch)
+			if err != nil {
+				rowsAvailable <- err
+				return
+			}
+
+			if len(c.queue) > 0 {
+				rowsAvailable <- nil
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
 	 }()
 

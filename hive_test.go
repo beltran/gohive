@@ -116,43 +116,36 @@ func TestSelectGSSAPI(t *testing.T) {
 		t.Fatal(errExecute)
 	}
 
-	errExecute = cursor.Execute("SELECT * FROM pokes")
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
 	var i int32
 	var s string
-	
-	hasMore := true;
-	for ; hasMore; hasMore, errExecute = cursor.FetchOne(&i, &s){
-		if errExecute != nil {
-			t.Fatal(errExecute)
-		}
-	}
-	if i != 2 || s != "2" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-	if cursor.HasMore() {
-		log.Fatal("Shouldn't have any more values")
-	}
+	var j int
+	var z int
 
-	// Verify we can read again
-	errExecute = cursor.Execute("SELECT * FROM pokes")
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
-	
-	hasMore = true;
-	for ; hasMore; hasMore, errExecute = cursor.FetchOne(&i, &s){
+	for z, j = 0, 0; z < 10; z, j, i, s = z + 1, 0, 0, "-1" {
+		fmt.Println("=====================================")
+		errExecute = cursor.Execute("SELECT * FROM pokes")
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
-	}
-	if i != 2 || s != "2" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-	if cursor.HasMore() {
-		log.Fatal("Shouldn't have any more values")
+
+		for ; cursor.HasMore(); {
+			_, errExecute = cursor.FetchOne(&i, &s)
+			if errExecute != nil {
+				t.Fatal(errExecute)
+			}
+			fmt.Println("Printing rows")
+			fmt.Println(i, s, j)
+			j++
+		}
+		if i != 2 || s != "2" {
+			log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+		}
+		if cursor.HasMore() {
+			log.Fatal("Shouldn't have any more values")
+		}
+		if j != 2 {
+			t.Fatal("Two rows expected here")
+		}
 	}
 }
 
