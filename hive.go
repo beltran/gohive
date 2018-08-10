@@ -10,6 +10,7 @@ import (
 )
 
 const pollIntervalInMillis int = 100
+const DEFAULT_FETCH_SIZE int64 = 1000
 
 // Connection holds the information for getting a cursor to hive
 type Connection struct {
@@ -23,6 +24,7 @@ type Connection struct {
 	sessionHandle *hiveserver.TSessionHandle
 	client *hiveserver.TCLIServiceClient
 	configuration map[string]string
+	RequestSize int64
 }
 
 // Connect to hive server
@@ -98,6 +100,7 @@ func Connect(host string, port int, auth string,
 		sessionHandle: response.SessionHandle,
 		client: client,
 		configuration: configuration,
+		RequestSize: DEFAULT_FETCH_SIZE,
 	}, nil
 }
 
@@ -114,6 +117,7 @@ type Cursor struct {
 	conn *Connection
 	operationHandle *hiveserver.TOperationHandle
 	queue []interface{}
+	response *hiveserver.TFetchResultsResp
 }
 
 // Execute sends a query to hive for execution
@@ -127,48 +131,76 @@ func (c *Cursor) Execute(query string) (err error) {
         fmt.Println("Error executing statement:", err)
         return
 	}
+	if !success(responseExecute.GetStatus()) {
+		return fmt.Errorf("Error while executing query: %s", responseExecute.Status.String())
+	}
+
 	c.operationHandle = responseExecute.OperationHandle
 	fmt.Println(responseExecute, err)
 	return nil
 }
 
+func success(status *hiveserver.TStatus) bool {
+	statusCode := status.GetStatusCode()
+	return statusCode == hiveserver.TStatusCode_SUCCESS_STATUS || statusCode == hiveserver.TStatusCode_SUCCESS_WITH_INFO_STATUS
+}
+
 // FetchOne returns one row
 func (c *Cursor) FetchOne() (row interface{}, err error) {
-	c.pollUntilData(context.Background())
+	fmt.Println("Polling until data")
+	err = c.pollUntilData(context.Background(), 1)
+	if err != nil {
+		return
+	}
+	fmt.Println("Back from polling")
 	nextRow := c.queue[0]
 	c.queue = c.queue[1:]
 
 	return nextRow, nil
 }
 
-func (c *Cursor) pollUntilData(ctx context.Context) error {
+func (c *Cursor) HasMore() bool{
+	return *c.response.HasMoreRows
+}
+
+func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 	ticker := time.NewTicker(time.Duration(pollIntervalInMillis) * time.Millisecond)
 	quit := make(chan struct{})
+	rowsAvailable := make(chan error)
+	
 	defer close(quit)
+	defer close(rowsAvailable)
 
-	rowsAvailable := make(chan struct{})
 
 	go func() {
 		for {
 		    select {
 			case <- ticker.C:
+				fmt.Println("Sending request")
 				fetchRequest := hiveserver.NewTFetchResultsReq()
 				fetchRequest.OperationHandle = c.operationHandle
 				fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
-				fetchRequest.MaxRows = 10
+				fetchRequest.MaxRows = c.conn.RequestSize
 
-				responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
+				responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
+				c.response = responseFetch
 				if err != nil {
 					fmt.Println("Error fecthing the response:", err)
+					rowsAvailable <- err
 					return
 				}
 
 				if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
+					fmt.Println("Request code is not sucess my friend")
+					fmt.Println(responseFetch)
+					rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
 					return
 				}
 
 				c.parseResults(responseFetch)
-				close(rowsAvailable)
+				if len(c.queue) >= n {
+					rowsAvailable <- nil
+				}
 			case <- quit:
 				ticker.Stop()
 				return
@@ -177,11 +209,16 @@ func (c *Cursor) pollUntilData(ctx context.Context) error {
 	 }()
 
 	select {
-	case <-rowsAvailable:
+	case err = <- rowsAvailable:
 	case <-ctx.Done(): 
 	}
-	if len(c.queue) == 0 {
-		return fmt.Errorf("No rows where received")
+
+	if err != nil {
+		return err
+	}
+
+	if len(c.queue) < n {
+		return fmt.Errorf("Only %d rows where received", len(c.queue))
 	}
 	return nil
 }
@@ -192,3 +229,4 @@ func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) {
 		c.queue = append(c.queue, element)
 	}
 }
+

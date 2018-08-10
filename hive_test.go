@@ -38,7 +38,7 @@ func TestWriteAndFetchData(t *testing.T) {
 		t.Fatal(errConn)
 	}
 	cursor := connection.Cursor()
-	errExecute := cursor.Execute("CREATE TABLE IF NOT EXISTS pokes (foo INT, bar STRING);")
+	errExecute := cursor.Execute("CREATE TABLE pokes4 (foo INT, bar INT)")
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -77,17 +77,22 @@ func TestCreateTablePlainGSSAPI(t *testing.T) {
 		"service": "hive",
 		"realm": "EXAMPLE.COM",
 	}
-	
+
 	cursor := makeConnection(t, configuration)
-	errExecute := cursor.Execute("CREATE TABLE IF NOT EXISTS pokes (foo INT, bar STRING)")
+	errExecute := cursor.Execute("DROP TABLE IF EXISTS pokes6")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	
+	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	row, errCursor := cursor.FetchOne()
-	fmt.Println(row)
-	if errCursor != nil {
-		t.Fatal(errCursor)
+	// Now it should fail because the table already exists
+	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
+	if errExecute == nil {
+		t.Fatal(errExecute)
 	}
 }
 
