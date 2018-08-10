@@ -108,7 +108,7 @@ func Connect(host string, port int, auth string,
 func (c *Connection) Cursor() *Cursor {
 	return &Cursor{
 		conn: c,
-		queue: make([]interface{}, 0),
+		queue: make([]*hiveserver.TColumn, 0),
 	}
 }
 
@@ -116,8 +116,10 @@ func (c *Connection) Cursor() *Cursor {
 type Cursor struct {
 	conn *Connection
 	operationHandle *hiveserver.TOperationHandle
-	queue []interface{}
+	queue []*hiveserver.TColumn
 	response *hiveserver.TFetchResultsResp
+	columnIndex int
+	totalRows int
 }
 
 // Execute sends a query to hive for execution
@@ -136,7 +138,12 @@ func (c *Cursor) Execute(query string) (err error) {
 	}
 
 	c.operationHandle = responseExecute.OperationHandle
+	c.response = nil
+	c.queue = nil
+	c.columnIndex = 0
+	c.totalRows = 0
 	fmt.Println(responseExecute, err)
+
 	return nil
 }
 
@@ -146,21 +153,90 @@ func success(status *hiveserver.TStatus) bool {
 }
 
 // FetchOne returns one row
-func (c *Cursor) FetchOne() (row interface{}, err error) {
-	fmt.Println("Polling until data")
-	err = c.pollUntilData(context.Background(), 1)
-	if err != nil {
-		return
+func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
+	if c.totalRows == c.columnIndex {
+		c.queue = nil
+		if !c.HasMore() {
+			return false, nil
+		}
+		fmt.Println("Polling until data")
+		err = c.pollUntilData(context.Background(), 1)
+		if err != nil {
+			return
+		}
+		fmt.Println("Back from polling")
 	}
-	fmt.Println("Back from polling")
-	nextRow := c.queue[0]
-	c.queue = c.queue[1:]
 
-	return nextRow, nil
+	if len(c.queue) != len(dests) {
+		return false, fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
+	}
+	fmt.Println("c.columnIndex")
+	fmt.Println(c.columnIndex)
+	for i := 0; i < len(c.queue); i++ {
+		if c.queue[i].IsSetBinaryVal() {
+			// TODO revisit this
+			d, ok := dests[i].(*[]byte)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
+			}
+			*d = c.queue[i].BinaryVal.Values[c.columnIndex]
+		} else if c.queue[i].IsSetByteVal() {
+			d, ok := dests[i].(*int8)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+			}
+			*d = c.queue[i].ByteVal.Values[c.columnIndex]
+		}  else if c.queue[i].IsSetI16Val() {
+			d, ok := dests[i].(*int16)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+			}
+			*d = c.queue[i].I16Val.Values[c.columnIndex]
+		} else if c.queue[i].IsSetI32Val() {
+			d, ok := dests[i].(*int32)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+			}
+			*d = c.queue[i].I32Val.Values[c.columnIndex]
+		} else if c.queue[i].IsSetI64Val() {
+			d, ok := dests[i].(*int64)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+			}
+			*d = c.queue[i].I64Val.Values[c.columnIndex]
+		}  else if c.queue[i].IsSetStringVal() {
+			d, ok := dests[i].(*string)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+			}
+			*d = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if c.queue[i].IsSetDoubleVal() {
+			d, ok := dests[i].(*float64)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+			}
+			*d = c.queue[i].DoubleVal.Values[c.columnIndex]
+		} else if c.queue[i].IsSetStringVal() {
+			d, ok := dests[i].(*string)
+			if !ok {
+				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+			}
+			*d = c.queue[i].StringVal.Values[c.columnIndex]
+		} else {
+			return true, fmt.Errorf("Empty column %v", c.queue[i])
+		}
+	}
+	c.columnIndex++
+	
+	return c.HasMore(), nil
 }
 
+// HasMore returns weather more rows can be fetched from the server
 func (c *Cursor) HasMore() bool{
-	return *c.response.HasMoreRows
+	if c.response == nil {
+		return true
+	}
+	return *c.response.HasMoreRows || len(c.queue) > 0
 }
 
 func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
@@ -197,8 +273,13 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 					return
 				}
 
-				c.parseResults(responseFetch)
-				if len(c.queue) >= n {
+				err = c.parseResults(responseFetch)
+				if err != nil {
+					rowsAvailable <- err
+					return
+				}
+
+				if len(c.queue) > 0 {
 					rowsAvailable <- nil
 				}
 			case <- quit:
@@ -223,10 +304,36 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 	return nil
 }
 
-func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) {
-	for _, element := range response.Results.GetColumns() {
-		// row = make([]interface{}, *responseFetch.Results.ColumnCount)
-		c.queue = append(c.queue, element)
+func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error){
+	fmt.Println(response.Results.GetColumns())
+	c.queue = response.Results.GetColumns()
+	c.columnIndex = 0
+	c.totalRows, err = getTotalRows(c.queue)
+	return
+}
+
+func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
+	for _, el := range columns {
+		if el.IsSetBinaryVal(){
+			return len(el.BinaryVal.Values), nil
+		} else if el.IsSetByteVal() {
+			return len(el.ByteVal.Values), nil
+		} else if el.IsSetI16Val() {
+			return len(el.I16Val.Values), nil
+		} else if el.IsSetI32Val() {
+			return len(el.I32Val.Values), nil
+		} else if el.IsSetI64Val() {
+			return len(el.I64Val.Values), nil
+		} else if el.IsSetBoolVal() {
+			return len(el.BoolVal.Values), nil
+		} else if el.IsSetDoubleVal () {
+			return len(el.DoubleVal.Values), nil
+		} else if el.IsSetStringVal () {
+			return len(el.StringVal.Values), nil
+		} else {
+			return -1, fmt.Errorf("Unrecognized column type %T", el)
+		}
 	}
+	return 0, fmt.Errorf("All columns seem empty")
 }
 

@@ -1,9 +1,11 @@
 package gohive
 
 import (
+	"log"
 	"testing"
 	"fmt"
 	"time"
+	"os"
 	//"os"
 )
 
@@ -77,7 +79,6 @@ func TestCreateTablePlainGSSAPI(t *testing.T) {
 		"service": "hive",
 		"realm": "EXAMPLE.COM",
 	}
-
 	cursor := makeConnection(t, configuration)
 	errExecute := cursor.Execute("DROP TABLE IF EXISTS pokes6")
 	if errExecute != nil {
@@ -93,6 +94,65 @@ func TestCreateTablePlainGSSAPI(t *testing.T) {
 	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
 	if errExecute == nil {
 		t.Fatal(errExecute)
+	}
+}
+
+func TestSelectGSSAPI(t *testing.T) {
+	os.Setenv("KRB5CCNAME", "/tmp/krb5cc_502")
+	configuration := map[string]string{
+		"service": "hive",
+		"realm": "EXAMPLE.COM",
+	}
+	cursor := makeConnection(t, configuration)
+	cursor.Execute("DROP TABLE IF EXISTS pokes")
+	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	cursor.Execute("INSERT INTO pokes VALUES(1, '1')")
+	errExecute = cursor.Execute("INSERT INTO pokes VALUES(2, '2')")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	errExecute = cursor.Execute("SELECT * FROM pokes")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	var i int32
+	var s string
+	
+	hasMore := true;
+	for ; hasMore; hasMore, errExecute = cursor.FetchOne(&i, &s){
+		if errExecute != nil {
+			t.Fatal(errExecute)
+		}
+	}
+	if i != 2 || s != "2" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+	if cursor.HasMore() {
+		log.Fatal("Shouldn't have any more values")
+	}
+
+	// Verify we can read again
+	errExecute = cursor.Execute("SELECT * FROM pokes")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	
+	hasMore = true;
+	for ; hasMore; hasMore, errExecute = cursor.FetchOne(&i, &s){
+		if errExecute != nil {
+			t.Fatal(errExecute)
+		}
+	}
+	if i != 2 || s != "2" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+	if cursor.HasMore() {
+		log.Fatal("Shouldn't have any more values")
 	}
 }
 
