@@ -22,18 +22,19 @@ const DEFAULT_MAX_LENGTH = 16384000
 
 // TSaslTransport is a tranport thrift struct that uses SASL
 type TSaslTransport struct {
-	service      string
-	saslClient   *gosasl.Client
-	tp           thrift.TTransport
-	tpFramed     thrift.TFramedTransport
-	mechanism    string
-	writeBuf     bytes.Buffer
-	readBuf      bytes.Buffer
-	buffer       [4]byte
-	rawFrameSize uint32 //Current remaining size of the frame. if ==0 read next frame header
-	frameSize    int    //Current remaining size of the frame. if ==0 read next frame header
-	maxLength    uint32
-	principal    string
+	service        string
+	saslClient     *gosasl.Client
+	tp             thrift.TTransport
+	tpFramed       thrift.TFramedTransport
+	mechanism      string
+	writeBuf       bytes.Buffer
+	readBuf        bytes.Buffer
+	buffer         [4]byte
+	rawFrameSize   uint32 //Current remaining size of the frame. if ==0 read next frame header
+	frameSize      int    //Current remaining size of the frame. if ==0 read next frame header
+	maxLength      uint32
+	principal      string
+	OpeningContext context.Context
 }
 
 // NewTSaslTransport return a TSaslTransport
@@ -53,11 +54,12 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 	client := gosasl.NewSaslClient(host, mechanism)
 
 	return &TSaslTransport{
-		saslClient: client,
-		tp:         trans,
-		mechanism:  mechanismName,
-		maxLength:  DEFAULT_MAX_LENGTH,
-		principal:  configuration["principal"],
+		saslClient:     client,
+		tp:             trans,
+		mechanism:      mechanismName,
+		maxLength:      DEFAULT_MAX_LENGTH,
+		principal:      configuration["principal"],
+		OpeningContext: context.Background(),
 	}, nil
 }
 
@@ -74,8 +76,7 @@ func (p *TSaslTransport) Open() (err error) {
 			return err
 		}
 	}
-	context := context.Background()
-	if err = p.sendSaslMsg(context, START, []byte(p.mechanism)); err != nil {
+	if err = p.sendSaslMsg(p.OpeningContext, START, []byte(p.mechanism)); err != nil {
 		return nil
 	}
 
@@ -84,18 +85,18 @@ func (p *TSaslTransport) Open() (err error) {
 		return
 	}
 
-	if err = p.sendSaslMsg(context, OK, proccessed); err != nil {
+	if err = p.sendSaslMsg(p.OpeningContext, OK, proccessed); err != nil {
 		return nil
 	}
 
 	for true {
-		status, challenge := p.recvSaslMsg(context)
+		status, challenge := p.recvSaslMsg(p.OpeningContext)
 		if status == OK {
 			proccessed, err = p.saslClient.Step(challenge)
 			if err != nil {
 				return
 			}
-			p.sendSaslMsg(context, OK, proccessed)
+			p.sendSaslMsg(p.OpeningContext, OK, proccessed)
 		} else if status == COMPLETE {
 			if !p.saslClient.Complete() {
 				return thrift.NewTTransportException(thrift.NOT_OPEN, "The server erroneously indicated that SASL negotiation was complete")

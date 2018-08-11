@@ -1,9 +1,11 @@
 package gohive
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestConnect(t *testing.T) {
@@ -46,7 +48,7 @@ func TestCreateTable(t *testing.T) {
 	}
 }
 
-func TestSelectGSSAPI(t *testing.T) {
+func TestSelect(t *testing.T) {
 	cursor := makeConnection(t, 1000)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
@@ -157,6 +159,23 @@ func TestSmallFetchSize(t *testing.T) {
 	}
 	if cursor.HasMore() {
 		t.Fatal("No more rows should be left")
+	}
+}
+
+func TestWithContext(t *testing.T) {
+	cursor := makeConnection(t, 1000)
+	cursor.Execute("DROP TABLE IF EXISTS pokes")
+	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	errExecute = cursor.ExecuteWithContext(ctx, "INSERT INTO pokes VALUES(1, '1'), (2, '2')")
+	if errExecute == nil {
+		t.Fatal("Context should have been done")
 	}
 }
 

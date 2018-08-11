@@ -50,8 +50,8 @@ func NewConnectConfiguration() *ConnectConfiguration {
 	}
 }
 
-// Connect to hive server
-func Connect(host string, port int, auth string,
+// ConnectWithContext to hive server
+func ConnectWithContext(ctx context.Context, host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 	socket, err := thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
 	if err = socket.Open(); err != nil {
@@ -106,7 +106,7 @@ func Connect(host string, port int, auth string,
 	openSession.Configuration = configuration.HiveConfiguration
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
-	response, err := client.OpenSession(context.Background(), openSession)
+	response, err := client.OpenSession(ctx, openSession)
 
 	if err != nil {
 		return
@@ -122,6 +122,12 @@ func Connect(host string, port int, auth string,
 		client:              client,
 		configuration:       configuration,
 	}, nil
+}
+
+// Connect is ConnectWithContext with the background context
+func Connect(host string, port int, auth string,
+	configuration *ConnectConfiguration) (conn *Connection, err error) {
+	return ConnectWithContext(context.Background(), host, port, auth, configuration)
 }
 
 // Cursor creates a cursor from a connection
@@ -142,13 +148,27 @@ type Cursor struct {
 	totalRows       int
 }
 
-// Execute sends a query to hive for execution
-func (c *Cursor) Execute(query string) (err error) {
+// ExecuteWithContext sends a query to hive for execution with a context
+func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err error) {
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
 
-	responseExecute, err := c.conn.client.ExecuteStatement(context.Background(), executeReq)
+	// The context from thrift doesn't seem to work
+	done := make(chan interface{})
+	defer close(done)
+	var responseExecute *hiveserver.TExecuteStatementResp
+	go func() {
+		responseExecute, err = c.conn.client.ExecuteStatement(ctx, executeReq)
+		done <- nil
+	}()
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return fmt.Errorf("Context was done before the query was executed")
+	}
+
 	if err != nil {
 		return
 	}
@@ -165,19 +185,25 @@ func (c *Cursor) Execute(query string) (err error) {
 	return nil
 }
 
+// Execute is like ExecuteC setting the backgroun
+func (c *Cursor) Execute(query string) error {
+	return c.ExecuteWithContext(context.Background(), query)
+}
+
 func success(status *hiveserver.TStatus) bool {
 	statusCode := status.GetStatusCode()
 	return statusCode == hiveserver.TStatusCode_SUCCESS_STATUS || statusCode == hiveserver.TStatusCode_SUCCESS_WITH_INFO_STATUS
 }
 
-// FetchOne returns one row
-func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
+// FetchOneWithContext returns one row
+// TODO, check if this context is honored, which probably is not, and do something similar to Exec
+func (c *Cursor) FetchOneWithContext(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore() {
 			return false, nil
 		}
-		err = c.pollUntilData(context.Background(), 1)
+		err = c.pollUntilData(ctx, 1)
 		if err != nil {
 			return
 		}
@@ -247,6 +273,11 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 	c.columnIndex++
 
 	return c.HasMore(), nil
+}
+
+// FetchOne is FetchOneWithContext with the background context
+func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
+	return c.FetchOneWithContext(context.Background(), dests...)
 }
 
 // HasMore returns weather more rows can be fetched from the server
