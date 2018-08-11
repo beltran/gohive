@@ -24,7 +24,7 @@ type Connection struct {
 	sessionHandle *hiveserver.TSessionHandle
 	client *hiveserver.TCLIServiceClient
 	configuration map[string]string
-	RequestSize int64
+	FetchSize int64
 }
 
 // Connect to hive server
@@ -37,7 +37,6 @@ func Connect(host string, port int, auth string,
 	}
 	
 	if err = socket.Open(); err != nil {
-		fmt.Println("Error opening socket:", err)
         return
 	}
 	
@@ -55,7 +54,6 @@ func Connect(host string, port int, auth string,
 	if auth == "NOSASL" {
 		transport = thrift.NewTBufferedTransport(socket, 4096)
 		if transport == nil {
-			fmt.Println("Error opening socket:", transport)
 			return
 		}
 	} else if auth == "NONE" {
@@ -64,13 +62,11 @@ func Connect(host string, port int, auth string,
 		}
 		transport, err = NewTSaslTransport(socket, host, "PLAIN", configuration)
 		if err != nil {
-			fmt.Println("Error opening socket:", transport)
 			return
 		}
 	} else if auth == "KERBEROS" {
 		transport, err = NewTSaslTransport(socket, host, "GSSAPI", configuration)
 		if err != nil {
-			fmt.Println("Error opening socket:", transport)
 			return
 		}
 	} else {
@@ -87,7 +83,6 @@ func Connect(host string, port int, auth string,
 	response, err := client.OpenSession(context.Background(), openSession)
 
 	if (err != nil) {
-		fmt.Println("Error opening session:", err)
         return
 	}
 
@@ -100,7 +95,7 @@ func Connect(host string, port int, auth string,
 		sessionHandle: response.SessionHandle,
 		client: client,
 		configuration: configuration,
-		RequestSize: DEFAULT_FETCH_SIZE,
+		FetchSize: DEFAULT_FETCH_SIZE,
 	}, nil
 }
 
@@ -130,7 +125,6 @@ func (c *Cursor) Execute(query string) (err error) {
 
 	responseExecute, err := c.conn.client.ExecuteStatement(context.Background(), executeReq)
 	if err != nil {
-        fmt.Println("Error executing statement:", err)
         return
 	}
 	if !success(responseExecute.GetStatus()) {
@@ -142,7 +136,6 @@ func (c *Cursor) Execute(query string) (err error) {
 	c.queue = nil
 	c.columnIndex = 0
 	c.totalRows = 0
-	fmt.Println(responseExecute, err)
 
 	return nil
 }
@@ -159,12 +152,10 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 		if !c.HasMore() {
 			return false, nil
 		}
-		fmt.Println("Polling until data")
 		err = c.pollUntilData(context.Background(), 1)
 		if err != nil {
 			return
 		}
-		fmt.Println("Back from polling")
 		// No rows where found when fetching
 		if !c.HasMore() {
 			return false, nil
@@ -174,8 +165,6 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 	if len(c.queue) != len(dests) {
 		return false, fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
 	}
-	fmt.Println("c.columnIndex")
-	fmt.Println(c.columnIndex)
 	for i := 0; i < len(c.queue); i++ {
 		if c.queue[i].IsSetBinaryVal() {
 			// TODO revisit this
@@ -249,23 +238,19 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 
 	go func() {
 		for true {
-			fmt.Println("Sending request")
 			fetchRequest := hiveserver.NewTFetchResultsReq()
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
-			fetchRequest.MaxRows = c.conn.RequestSize
+			fetchRequest.MaxRows = c.conn.FetchSize
 
 			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
 			if err != nil {
-				fmt.Println("Error fecthing the response:", err)
 				rowsAvailable <- err
 				return
 			}
 			c.response = responseFetch
 
 			if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-				fmt.Println("Request code is not sucess my friend")
-				fmt.Println(responseFetch)
 				rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
 				return
 			}
@@ -300,7 +285,6 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 }
 
 func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error){
-	fmt.Println(response.Results.GetColumns())
 	c.queue = response.Results.GetColumns()
 	c.columnIndex = 0
 	c.totalRows, err = getTotalRows(c.queue)
@@ -331,4 +315,3 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 	}
 	return 0, fmt.Errorf("All columns seem empty")
 }
-
