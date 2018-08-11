@@ -216,7 +216,7 @@ func closeAll(t *testing.T, connection *Connection, cursor *Cursor) {
 
 func getAuth() string {
 	auth := os.Getenv("AUTH")
-	os.Setenv("KRB5CCNAME", "/tmp/krb5cc_502")
+	os.Setenv("KRB5CCNAME", "/tmp/krb5_gohive")
 	if auth == "" {
 		auth = "KERBEROS"
 	}
