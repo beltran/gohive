@@ -1,55 +1,76 @@
 package gohive
 
 import (
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"fmt"
-	"hiveserver"
 	"context"
-	"time"
+	"fmt"
+	"git.apache.org/thrift.git/lib/go/thrift"
+	"hiveserver"
 	"os/user"
+	"time"
 )
 
-const pollIntervalInMillis int = 100
 const DEFAULT_FETCH_SIZE int64 = 1000
 
 // Connection holds the information for getting a cursor to hive
 type Connection struct {
-	host string
-	port int
-	username string
-	database string
-	auth string
+	host                string
+	port                int
+	username            string
+	database            string
+	auth                string
 	kerberosServiceName string
-	password string
-	sessionHandle *hiveserver.TSessionHandle
-	client *hiveserver.TCLIServiceClient
-	configuration map[string]string
-	FetchSize int64
+	password            string
+	sessionHandle       *hiveserver.TSessionHandle
+	client              *hiveserver.TCLIServiceClient
+	configuration       *ConnectConfiguration
+}
+
+// ConnectConfiguration is the configuration for the connection
+// The fields have to be filled manually but not all of them are required
+// Depends on the auth and kind of connection.
+type ConnectConfiguration struct {
+	Username             string
+	Principal            string
+	Password             string
+	Service              string
+	HiveConfiguration    map[string]string
+	PollIntervalInMillis int
+	FetchSize            int64
+}
+
+// NewConnectConfiguration returns a connect configuration, all with empty fields
+func NewConnectConfiguration() *ConnectConfiguration {
+	return &ConnectConfiguration{
+		Username:             "",
+		Password:             "",
+		Service:              "",
+		HiveConfiguration:    nil,
+		PollIntervalInMillis: 200,
+		FetchSize:            DEFAULT_FETCH_SIZE,
+	}
 }
 
 // Connect to hive server
-func Connect(host string, port int, auth string, 
-		configuration map[string]string) (conn *Connection, err error) {
+func Connect(host string, port int, auth string,
+	configuration *ConnectConfiguration) (conn *Connection, err error) {
 	socket, err := thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
-	
-	if configuration == nil {
-		configuration = make(map[string]string)
-	}
-	
 	if err = socket.Open(); err != nil {
-        return
+		return
 	}
-	
+
 	var transport thrift.TTransport
 
-	if _, ok := configuration["username"]; !ok {
+	if configuration == nil {
+		configuration = NewConnectConfiguration()
+	}
+	if configuration.Username == "" {
 		_user, err := user.Current()
 		if err != nil {
 			return nil, fmt.Errorf("Can't determine the username")
 		}
-		configuration["username"] = _user.Name
+		configuration.Username = _user.Name
 	}
-	
+
 	// password doesn't matter but can't be empty
 	if auth == "NOSASL" {
 		transport = thrift.NewTBufferedTransport(socket, 4096)
@@ -57,15 +78,17 @@ func Connect(host string, port int, auth string,
 			return
 		}
 	} else if auth == "NONE" {
-		if _, ok := configuration["password"]; !ok {
-			configuration["password"] = "x"
+		if configuration.Password == "" {
+			configuration.Password = "x"
 		}
-		transport, err = NewTSaslTransport(socket, host, "PLAIN", configuration)
+		saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
+		transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration)
 		if err != nil {
 			return
 		}
 	} else if auth == "KERBEROS" {
-		transport, err = NewTSaslTransport(socket, host, "GSSAPI", configuration)
+		saslConfiguration := map[string]string{"service": configuration.Service}
+		transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration)
 		if err != nil {
 			return
 		}
@@ -80,41 +103,43 @@ func Connect(host string, port int, auth string,
 
 	openSession := hiveserver.NewTOpenSessionReq()
 	openSession.ClientProtocol = hiveserver.TProtocolVersion_HIVE_CLI_SERVICE_PROTOCOL_V6
+	openSession.Configuration = configuration.HiveConfiguration
+	openSession.Username = &configuration.Username
+	openSession.Password = &configuration.Password
 	response, err := client.OpenSession(context.Background(), openSession)
 
-	if (err != nil) {
-        return
+	if err != nil {
+		return
 	}
 
-	return &Connection {
-		host: host,
-		port: port,
-		database: "default",
-		auth: auth,
+	return &Connection{
+		host:                host,
+		port:                port,
+		database:            "default",
+		auth:                auth,
 		kerberosServiceName: "",
-		sessionHandle: response.SessionHandle,
-		client: client,
-		configuration: configuration,
-		FetchSize: DEFAULT_FETCH_SIZE,
+		sessionHandle:       response.SessionHandle,
+		client:              client,
+		configuration:       configuration,
 	}, nil
 }
 
 // Cursor creates a cursor from a connection
 func (c *Connection) Cursor() *Cursor {
 	return &Cursor{
-		conn: c,
+		conn:  c,
 		queue: make([]*hiveserver.TColumn, 0),
 	}
 }
 
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
-	conn *Connection
+	conn            *Connection
 	operationHandle *hiveserver.TOperationHandle
-	queue []*hiveserver.TColumn
-	response *hiveserver.TFetchResultsResp
-	columnIndex int
-	totalRows int
+	queue           []*hiveserver.TColumn
+	response        *hiveserver.TFetchResultsResp
+	columnIndex     int
+	totalRows       int
 }
 
 // Execute sends a query to hive for execution
@@ -125,7 +150,7 @@ func (c *Cursor) Execute(query string) (err error) {
 
 	responseExecute, err := c.conn.client.ExecuteStatement(context.Background(), executeReq)
 	if err != nil {
-        return
+		return
 	}
 	if !success(responseExecute.GetStatus()) {
 		return fmt.Errorf("Error while executing query: %s", responseExecute.Status.String())
@@ -179,7 +204,7 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
 			}
 			*d = c.queue[i].ByteVal.Values[c.columnIndex]
-		}  else if c.queue[i].IsSetI16Val() {
+		} else if c.queue[i].IsSetI16Val() {
 			d, ok := dests[i].(*int16)
 			if !ok {
 				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
@@ -197,7 +222,7 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
 			}
 			*d = c.queue[i].I64Val.Values[c.columnIndex]
-		}  else if c.queue[i].IsSetStringVal() {
+		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
 				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
@@ -220,19 +245,19 @@ func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
 		}
 	}
 	c.columnIndex++
-	
+
 	return c.HasMore(), nil
 }
 
 // HasMore returns weather more rows can be fetched from the server
-func (c *Cursor) HasMore() bool{
+func (c *Cursor) HasMore() bool {
 	if c.response == nil {
 		return true
 	}
 	return *c.response.HasMoreRows || c.totalRows != c.columnIndex
 }
 
-func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
+func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	rowsAvailable := make(chan error)
 	defer close(rowsAvailable)
 
@@ -241,7 +266,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 			fetchRequest := hiveserver.NewTFetchResultsReq()
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
-			fetchRequest.MaxRows = c.conn.FetchSize
+			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 
 			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
 			if err != nil {
@@ -265,13 +290,13 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 				rowsAvailable <- nil
 				return
 			}
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(time.Duration(c.conn.configuration.PollIntervalInMillis) * time.Millisecond)
 		}
-	 }()
+	}()
 
 	select {
-	case err = <- rowsAvailable:
-	case <-ctx.Done(): 
+	case err = <-rowsAvailable:
+	case <-ctx.Done():
 	}
 
 	if err != nil {
@@ -284,7 +309,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int)  (err error) {
 	return nil
 }
 
-func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error){
+func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error) {
 	c.queue = response.Results.GetColumns()
 	c.columnIndex = 0
 	c.totalRows, err = getTotalRows(c.queue)
@@ -293,7 +318,7 @@ func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error
 
 func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 	for _, el := range columns {
-		if el.IsSetBinaryVal(){
+		if el.IsSetBinaryVal() {
 			return len(el.BinaryVal.Values), nil
 		} else if el.IsSetByteVal() {
 			return len(el.ByteVal.Values), nil
@@ -305,9 +330,9 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 			return len(el.I64Val.Values), nil
 		} else if el.IsSetBoolVal() {
 			return len(el.BoolVal.Values), nil
-		} else if el.IsSetDoubleVal () {
+		} else if el.IsSetDoubleVal() {
 			return len(el.DoubleVal.Values), nil
-		} else if el.IsSetStringVal () {
+		} else if el.IsSetStringVal() {
 			return len(el.StringVal.Values), nil
 		} else {
 			return -1, fmt.Errorf("Unrecognized column type %T", el)

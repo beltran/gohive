@@ -2,8 +2,8 @@ package gohive
 
 import (
 	"log"
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestConnect(t *testing.T) {
@@ -11,18 +11,13 @@ func TestConnect(t *testing.T) {
 }
 
 func TestFetchDatabase(t *testing.T) {
-	configuration := map[string]string{
-		"service": "hive",
-		"realm": "EXAMPLE.COM",
-	}
-	
-	cursor := makeConnection(t, configuration, 1000)
+	cursor := makeConnection(t, 1000)
 	errExecute := cursor.Execute("SHOW DATABASES")
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	var s string;
+	var s string
 	_, errCursor := cursor.FetchOne(&s)
 	if errCursor != nil {
 		t.Fatal(errCursor)
@@ -33,16 +28,12 @@ func TestFetchDatabase(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
-	configuration := map[string]string{
-		"service": "hive",
-		"realm": "EXAMPLE.COM",
-	}
-	cursor := makeConnection(t, configuration, 1000)
+	cursor := makeConnection(t, 1000)
 	errExecute := cursor.Execute("DROP TABLE IF EXISTS pokes6")
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
-	
+
 	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
 	if errExecute != nil {
 		t.Fatal(errExecute)
@@ -56,11 +47,7 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestSelectGSSAPI(t *testing.T) {
-	configuration := map[string]string{
-		"service": "hive",
-		"realm": "EXAMPLE.COM",
-	}
-	cursor := makeConnection(t, configuration, 1000)
+	cursor := makeConnection(t, 1000)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
 	if errExecute != nil {
@@ -77,13 +64,13 @@ func TestSelectGSSAPI(t *testing.T) {
 	var j int
 	var z int
 
-	for z, j = 0, 0; z < 10; z, j, i, s = z + 1, 0, 0, "-1" {
+	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
 		errExecute = cursor.Execute("SELECT * FROM pokes")
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
 
-		for ; cursor.HasMore(); {
+		for cursor.HasMore() {
 			_, errExecute = cursor.FetchOne(&i, &s)
 			if errExecute != nil {
 				t.Fatal(errExecute)
@@ -103,11 +90,7 @@ func TestSelectGSSAPI(t *testing.T) {
 }
 
 func TestSmallFetchSize(t *testing.T) {
-	configuration := map[string]string{
-		"service": "hive",
-		"realm": "EXAMPLE.COM",
-	}
-	cursor := makeConnection(t, configuration, 2)
+	cursor := makeConnection(t, 2)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
 	if errExecute != nil {
@@ -129,7 +112,7 @@ func TestSmallFetchSize(t *testing.T) {
 	}
 
 	// Fetch first two rows
-	for j= 0; cursor.HasMore(); {
+	for j = 0; cursor.HasMore(); {
 		_, errExecute = cursor.FetchOne(&i, &s)
 		if errExecute != nil {
 			t.Fatal(errExecute)
@@ -152,7 +135,7 @@ func TestSmallFetchSize(t *testing.T) {
 		t.Fatal(errExecute)
 	}
 
-	for j= 0; cursor.HasMore(); {
+	for j = 0; cursor.HasMore(); {
 		_, errExecute = cursor.FetchOne(&i, &s)
 		if errExecute != nil {
 			t.Fatal(errExecute)
@@ -177,14 +160,16 @@ func TestSmallFetchSize(t *testing.T) {
 	}
 }
 
-
-func makeConnection(t *testing.T, configuration map[string]string, fetchSize int64) *Cursor {
+func makeConnection(t *testing.T, fetchSize int64) *Cursor {
 	os.Setenv("KRB5CCNAME", "/tmp/krb5cc_502")
+
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	configuration.FetchSize = fetchSize
 	connection, errConn := Connect("hs2.example.com", 10000, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}
-	connection.FetchSize = fetchSize
 	cursor := connection.Cursor()
 	return cursor
 }
