@@ -138,6 +138,25 @@ func (c *Connection) Cursor() *Cursor {
 	}
 }
 
+// CloseWithContext closes a session
+func (c *Connection) CloseWithContext(ctx context.Context) error {
+	closeRequest := hiveserver.NewTCloseSessionReq()
+	closeRequest.SessionHandle = c.sessionHandle
+	responseClose, err := c.client.CloseSession(ctx, closeRequest)
+	if err != nil {
+		return err
+	}
+	if !success(responseClose.GetStatus()) {
+		return fmt.Errorf("Error closing the session: %s", responseClose.Status.String())
+	}
+	return nil
+}
+
+// Close is CloseWithContext with the background context
+func (c *Connection) Close() error {
+	return c.CloseWithContext(context.Background())
+}
+
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
 	conn            *Connection
@@ -150,6 +169,9 @@ type Cursor struct {
 
 // ExecuteWithContext sends a query to hive for execution with a context
 func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err error) {
+	
+	c.resetState(ctx)
+	
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
@@ -166,6 +188,7 @@ func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err erro
 	select {
 	case <-done:
 	case <-ctx.Done():
+		go c.Cancel()
 		return fmt.Errorf("Context was done before the query was executed")
 	}
 
@@ -177,10 +200,6 @@ func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err erro
 	}
 
 	c.operationHandle = responseExecute.OperationHandle
-	c.response = nil
-	c.queue = nil
-	c.columnIndex = 0
-	c.totalRows = 0
 
 	return nil
 }
@@ -336,6 +355,56 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 
 	if len(c.queue) < n {
 		return fmt.Errorf("Only %d rows where received", len(c.queue))
+	}
+	return nil
+}
+
+// CancelWithContext tries to cancel the current operation
+func (c *Cursor) CancelWithContext(ctx context.Context) error {
+	cancelRequest := hiveserver.NewTCancelOperationReq()
+	cancelRequest.OperationHandle = c.operationHandle
+	responseCancel, err := c.conn.client.CancelOperation(ctx, cancelRequest)
+	if err != nil {
+		return err
+	}
+	if !success(responseCancel.GetStatus()) {
+		return fmt.Errorf("Error closing the operation: %s", responseCancel.Status.String())
+	}
+	return nil
+}
+
+// Cancel is CancelWithContext with the context set to the background context
+func (c *Cursor) Cancel() error {
+	return c.CancelWithContext(context.Background())
+}
+
+// CloseWithContext close the cursor
+func (c *Cursor) CloseWithContext(ctx context.Context) error {
+	return c.resetState(ctx)
+}
+
+// Close is CloseWithContext accepting a background context
+func (c *Cursor) Close() error {
+	return c.CloseWithContext(context.Background())
+}
+
+func (c *Cursor) resetState(ctx context.Context) error {
+	c.response = nil
+	c.queue = nil
+	c.columnIndex = 0
+	c.totalRows = 0
+	if c.operationHandle != nil {
+		closeRequest := hiveserver.NewTCloseOperationReq()
+		closeRequest.OperationHandle = c.operationHandle
+		responseClose, err := c.conn.client.CloseOperation(ctx, closeRequest)
+		c.operationHandle = nil
+		if err != nil {
+			return err
+		}
+		if !success(responseClose.GetStatus()) {
+			return fmt.Errorf("Error closing the operation: %s", responseClose.Status.String())
+		}
+		return nil
 	}
 	return nil
 }

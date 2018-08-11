@@ -9,11 +9,17 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	Connect("127.0.0.1", 10000, getAuth(), nil)
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.Close()
 }
 
 func TestFetchDatabase(t *testing.T) {
-	cursor := makeConnection(t, 1000)
+	connection, cursor := makeConnection(t, 1000)
 	errExecute := cursor.Execute("SHOW DATABASES")
 	if errExecute != nil {
 		t.Fatal(errExecute)
@@ -27,10 +33,11 @@ func TestFetchDatabase(t *testing.T) {
 	if s != "default" {
 		t.Fatalf("Unrecognized dabase found: %s", s)
 	}
+	closeAll(t, connection, cursor)
 }
 
 func TestCreateTable(t *testing.T) {
-	cursor := makeConnection(t, 1000)
+	connection, cursor := makeConnection(t, 1000)
 	errExecute := cursor.Execute("DROP TABLE IF EXISTS pokes6")
 	if errExecute != nil {
 		t.Fatal(errExecute)
@@ -46,10 +53,11 @@ func TestCreateTable(t *testing.T) {
 	if errExecute == nil {
 		t.Fatal(errExecute)
 	}
+	closeAll(t, connection, cursor)
 }
 
 func TestSelect(t *testing.T) {
-	cursor := makeConnection(t, 1000)
+	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
 	if errExecute != nil {
@@ -89,10 +97,11 @@ func TestSelect(t *testing.T) {
 			t.Fatal("Two rows expected here")
 		}
 	}
+	closeAll(t, connection, cursor)
 }
 
 func TestSmallFetchSize(t *testing.T) {
-	cursor := makeConnection(t, 2)
+	connection, cursor := makeConnection(t, 2)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
 	if errExecute != nil {
@@ -160,27 +169,28 @@ func TestSmallFetchSize(t *testing.T) {
 	if cursor.HasMore() {
 		t.Fatal("No more rows should be left")
 	}
+	closeAll(t, connection, cursor)
 }
 
 func TestWithContext(t *testing.T) {
-	cursor := makeConnection(t, 1000)
+	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute("DROP TABLE IF EXISTS pokes")
 	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	errExecute = cursor.ExecuteWithContext(ctx, "INSERT INTO pokes VALUES(1, '1'), (2, '2')")
+	errExecute = cursor.ExecuteWithContext(ctx, "")
 	if errExecute == nil {
 		t.Fatal("Context should have been done")
 	}
+	closeAll(t, connection, cursor)
 }
 
-func makeConnection(t *testing.T, fetchSize int64) *Cursor {
-	os.Setenv("KRB5CCNAME", "/tmp/krb5cc_502")
+func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
@@ -190,11 +200,23 @@ func makeConnection(t *testing.T, fetchSize int64) *Cursor {
 		t.Fatal(errConn)
 	}
 	cursor := connection.Cursor()
-	return cursor
+	return connection, cursor
+}
+
+func closeAll(t *testing.T, connection *Connection, cursor *Cursor) {
+	err := cursor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = connection.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func getAuth() string {
 	auth := os.Getenv("AUTH")
+	os.Setenv("KRB5CCNAME", "/tmp/krb5cc_502")
 	if auth == "" {
 		auth = "KERBEROS"
 	}

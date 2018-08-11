@@ -9,3 +9,7 @@ gen-go
 
 # Visual studio code generated files
 .vscode
+
+# Testing generated files
+hdfs.keytab
+dhive
