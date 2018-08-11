@@ -1,0 +1,11 @@
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Thrift generated files
+gen-go
+
+# Visual studio code generated files
+.vscode
