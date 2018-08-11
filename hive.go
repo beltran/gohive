@@ -169,9 +169,9 @@ type Cursor struct {
 
 // ExecuteWithContext sends a query to hive for execution with a context
 func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err error) {
-	
+
 	c.resetState(ctx)
-	
+
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query

@@ -7,11 +7,30 @@
   name = "git.apache.org/thrift.git"
   packages = ["lib/go/thrift"]
   pruneopts = "UT"
-  revision = "f2867c24984aa53edec54a138c03db934221bdea"
+  revision = "6e67faa92827ece022380b211c2caaadd6145bf5"
+
+[[projects]]
+  branch = "master"
+  digest = "1:cc2734a6c300cf150d19fa7b0ee33e6ca72b206ba0cc6743f05c9f26eccbf87b"
+  name = "github.com/beltran/gosasl"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1f9fb373d2687b89a9a2ff1b1ce7c7eb7221ccde"
+
+[[projects]]
+  branch = "compile_mac"
+  digest = "1:160e1a5fd0ad0ab45b8436c367432d7ab36b874c3d49501a7adfa81ea54faa77"
+  name = "github.com/beltran/gssapi"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "598f9f3b287808b0e16f37ebfad6c1bd09737a67"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = ["git.apache.org/thrift.git/lib/go/thrift"]
+  input-imports = [
+    "git.apache.org/thrift.git/lib/go/thrift",
+    "github.com/beltran/gosasl",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1

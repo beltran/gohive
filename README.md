@@ -47,4 +47,4 @@ Tests can be run with
 ```
 ./scripts/integration
 ```
-This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with hive and kerberos and test against that. kinit, klist, kdestroy have to be installed locally. hs2.example.com will have to be an alias for 127.0.0.1 in `/etc/hosts`
+This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with hive and kerberos and test against that. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`
