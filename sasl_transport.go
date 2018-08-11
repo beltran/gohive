@@ -1,39 +1,39 @@
 package gohive
 
 import (
-	"fmt"
-	"gosasl"
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"encoding/binary"
-	"context"
-	"io"
 	"bytes"
+	"context"
+	"encoding/binary"
+	"fmt"
+	"git.apache.org/thrift.git/lib/go/thrift"
+	"gosasl"
+	"io"
 )
 
 const (
-	START = 1
-    OK = 2
-    BAD = 3
-    ERROR = 4
-    COMPLETE = 5
+	START    = 1
+	OK       = 2
+	BAD      = 3
+	ERROR    = 4
+	COMPLETE = 5
 )
 
 const DEFAULT_MAX_LENGTH = 16384000
 
 // TSaslTransport is a tranport thrift struct that uses SASL
 type TSaslTransport struct {
-	service 	string
-	saslClient 	*gosasl.Client
-	tp 			thrift.TTransport
-	tpFramed	thrift.TFramedTransport
-	mechanism 	string
-	writeBuf 	bytes.Buffer
-	readBuf 	bytes.Buffer
-	buffer    	[4]byte
-	rawFrameSize	uint32 //Current remaining size of the frame. if ==0 read next frame header
-	frameSize 	int //Current remaining size of the frame. if ==0 read next frame header
-	maxLength 	uint32
-	principal string
+	service      string
+	saslClient   *gosasl.Client
+	tp           thrift.TTransport
+	tpFramed     thrift.TFramedTransport
+	mechanism    string
+	writeBuf     bytes.Buffer
+	readBuf      bytes.Buffer
+	buffer       [4]byte
+	rawFrameSize uint32 //Current remaining size of the frame. if ==0 read next frame header
+	frameSize    int    //Current remaining size of the frame. if ==0 read next frame header
+	maxLength    uint32
+	principal    string
 }
 
 // NewTSaslTransport return a TSaslTransport
@@ -44,7 +44,7 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 	} else if mechanismName == "GSSAPI" {
 		var err error
 		mechanism, err = gosasl.NewGSSAPIMechanism(configuration["service"])
-		if (err != nil) {
+		if err != nil {
 			return nil, err
 		}
 	} else {
@@ -54,10 +54,10 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 
 	return &TSaslTransport{
 		saslClient: client,
-		tp: trans,
-		mechanism: mechanismName,
-		maxLength: DEFAULT_MAX_LENGTH,
-		principal: configuration["principal"],
+		tp:         trans,
+		mechanism:  mechanismName,
+		maxLength:  DEFAULT_MAX_LENGTH,
+		principal:  configuration["principal"],
 	}, nil
 }
 
@@ -70,17 +70,17 @@ func (p *TSaslTransport) IsOpen() bool {
 func (p *TSaslTransport) Open() (err error) {
 	if !p.tp.IsOpen() {
 		err = p.tp.Open()
-		if (err != nil) {
+		if err != nil {
 			return err
 		}
 	}
 	context := context.Background()
-	if err = p.sendSaslMsg(context, START, []byte(p.mechanism)); err !=nil {
+	if err = p.sendSaslMsg(context, START, []byte(p.mechanism)); err != nil {
 		return nil
 	}
 
 	proccessed, err := p.saslClient.Start()
-	if (err != nil) {
+	if err != nil {
 		return
 	}
 
@@ -92,7 +92,7 @@ func (p *TSaslTransport) Open() (err error) {
 		status, challenge := p.recvSaslMsg(context)
 		if status == OK {
 			proccessed, err = p.saslClient.Step(challenge)
-			if (err != nil) {
+			if err != nil {
 				return
 			}
 			p.sendSaslMsg(context, OK, proccessed)
@@ -116,36 +116,36 @@ func (p *TSaslTransport) Close() (err error) {
 
 func (p *TSaslTransport) sendSaslMsg(ctx context.Context, status uint8, body []byte) error {
 	header := make([]byte, 5)
-	header[0] = status;
+	header[0] = status
 	length := uint32(len(body))
 	binary.BigEndian.PutUint32(header[1:], length)
-	
+
 	_, err := p.tp.Write(append(header[:], body[:]...))
-	if (err != nil) {
-		return err;
+	if err != nil {
+		return err
 	}
-	
+
 	err = p.tp.Flush(ctx)
-	if (err != nil) {
-		return err;
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-func (p *TSaslTransport) recvSaslMsg(ctx context.Context) (int8,  []byte) {
+func (p *TSaslTransport) recvSaslMsg(ctx context.Context) (int8, []byte) {
 	header := make([]byte, 5)
-	_, err  := io.ReadFull(p.tp, header)
-	if (err != nil) {
-		return ERROR, nil;
+	_, err := io.ReadFull(p.tp, header)
+	if err != nil {
+		return ERROR, nil
 	}
 
 	status := int8(header[0])
 	length := binary.BigEndian.Uint32(header[1:])
-	
-	if (length > 0) {
+
+	if length > 0 {
 		payload := make([]byte, length)
 		_, err = io.ReadFull(p.tp, payload)
-		if (err != nil) {
+		if err != nil {
 			return ERROR, nil
 		}
 		return status, payload
@@ -169,7 +169,7 @@ func (p *TSaslTransport) Read(buf []byte) (l int, err error) {
 			return
 		}
 		p.rawFrameSize = p.rawFrameSize - uint32(got)
-		
+
 		var unwrappedBuf []byte
 		unwrappedBuf, err = p.saslClient.Decode(rawBuf)
 		if err != nil {
@@ -182,12 +182,12 @@ func (p *TSaslTransport) Read(buf []byte) (l int, err error) {
 	// totalBytes := p.readBuf.Len()
 	got, err = p.readBuf.Read(buf)
 	p.frameSize = p.frameSize - got
-	
+
 	/*
-	if p.readBuf.Len() > 0 {
-		err = thrift.NewTTransportExceptionFromError(fmt.Errorf("Not enough frame size %d to read %d bytes", p.frameSize, totalBytes))
-		return
-	}
+		if p.readBuf.Len() > 0 {
+			err = thrift.NewTTransportExceptionFromError(fmt.Errorf("Not enough frame size %d to read %d bytes", p.frameSize, totalBytes))
+			return
+		}
 	*/
 	if p.frameSize < 0 {
 		return 0, thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, "Negative frame size")
@@ -225,11 +225,11 @@ func (p *TSaslTransport) Flush(ctx context.Context) (err error) {
 	buf := p.buffer[:4]
 	binary.BigEndian.PutUint32(buf, uint32(size))
 	_, err = p.tp.Write(buf)
-	
+
 	if err != nil {
 		return thrift.NewTTransportExceptionFromError(err)
 	}
-	
+
 	if size > 0 {
 		if n, err := p.tp.Write(wrappedBuf); err != nil {
 			print("Error while flushing write buffer of size ", size, " to transport, only wrote ", n, " bytes: ", err.Error(), "\n")
@@ -244,4 +244,3 @@ func (p *TSaslTransport) Flush(ctx context.Context) (err error) {
 func (p *TSaslTransport) RemainingBytes() uint64 {
 	return uint64(p.frameSize)
 }
-

@@ -1,8 +1,8 @@
 package gohive
 
 import (
-	"testing"
 	"git.apache.org/thrift.git/lib/go/thrift"
+	"testing"
 )
 
 func TestSaslTransport(t *testing.T) {
@@ -11,7 +11,7 @@ func TestSaslTransport(t *testing.T) {
 	}
 	trans, err := NewTSaslTransport(thrift.NewTMemoryBuffer(), "localhost", "PLAIN", configuration)
 	if err != nil {
-		t.Fatal("Erro creating transport")
+		t.Fatal("Error creating transport")
 	}
 	trans.IsOpen()
 }
