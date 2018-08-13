@@ -2,11 +2,12 @@
 
 GoHive is a driver for Hive in go that supports mechanisms KERBEROS(GSSAPI SASL), NONE(PLAIN SASL) and NOSASL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
-## Usage
+## Quickstart
 
 ```go 
     configuration := NewConnectConfiguration()
     configuration.Service = "hive"
+    // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
     connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
     if errConn != nil {
         log.Fatal(errConn)
@@ -42,10 +43,10 @@ GoHive is a driver for Hive in go that supports mechanisms KERBEROS(GSSAPI SASL)
     connection.Close()
 ```
 
-# Context
+## WithContext API
 A similar API is available a passing `context.Context`(`ExecuteWithContext`, `FetchOneWithContext`, `OpenWithContext`, `CloseWithContext`, `CancelWithContext`)
 
-# Tests
+## Running tests
 Tests need an instance of hive listening at `hs2.example.com`. This can be set up with:
 ```
 ./scripts/integration
