@@ -55,6 +55,7 @@ function run_tests() {
     kinit -c $KRB5CCNAME -kt ./hdfs.keytab hive/hs2.example.com@EXAMPLE.COM
     klist
 
+    export TRANSPORT="binary"
     export AUTH="KERBEROS"
     go test -v -run .
 

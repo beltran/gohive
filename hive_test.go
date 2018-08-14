@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-func TestConnect(t *testing.T) {
+func TestConnectDefault(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	auth := os.Getenv("TRANSPORT")
+	if auth != "KERBEROS" || transport != "binary" {
+		return
+	}
+
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
@@ -191,11 +197,17 @@ func TestWithContext(t *testing.T) {
 }
 
 func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
-
+	mode := getTransport()
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	configuration.FetchSize = fetchSize
-	connection, errConn := Connect("hs2.example.com", 10000, getAuth(), configuration)
+	configuration.TransportMode = mode
+	var port int = 10000
+	if mode == "http" {
+		port = 10001
+		configuration.HttpPath = "cliservice"
+	}
+	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}
@@ -221,4 +233,12 @@ func getAuth() string {
 		auth = "KERBEROS"
 	}
 	return auth
+}
+
+func getTransport() string {
+	transport := os.Getenv("TRANSPORT")
+	if transport == "" {
+		transport = "binary"
+	}
+	return transport
 }
