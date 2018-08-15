@@ -17,22 +17,23 @@ func TestConnectDefault(t *testing.T) {
 
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
-	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
-	connection.Close()
+	connection.Close(context.Background())
 }
 
 func TestFetchDatabase(t *testing.T) {
+	async := false
 	connection, cursor := makeConnection(t, 1000)
-	errExecute := cursor.Execute("SHOW DATABASES")
+	errExecute := cursor.Execute(context.Background(), "SHOW DATABASES", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
 	var s string
-	_, errCursor := cursor.FetchOne(&s)
+	_, errCursor := cursor.FetchOne(context.Background(), &s)
 	if errCursor != nil {
 		t.Fatal(errCursor)
 	}
@@ -43,19 +44,20 @@ func TestFetchDatabase(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
+	async := false
 	connection, cursor := makeConnection(t, 1000)
-	errExecute := cursor.Execute("DROP TABLE IF EXISTS pokes6")
+	errExecute := cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
+	errExecute = cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
 	// Now it should fail because the table already exists
-	errExecute = cursor.Execute("CREATE TABLE pokes6 (foo INT, bar INT)")
+	errExecute = cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
 	if errExecute == nil {
 		t.Fatal(errExecute)
 	}
@@ -63,14 +65,15 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
+	async := false
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute("DROP TABLE IF EXISTS pokes")
-	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", async)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	errExecute = cursor.Execute("INSERT INTO pokes VALUES(1, '1'), (2, '2')")
+	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1'), (2, '2')", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -81,13 +84,13 @@ func TestSelect(t *testing.T) {
 	var z int
 
 	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
-		errExecute = cursor.Execute("SELECT * FROM pokes")
+		errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
 
 		for cursor.HasMore() {
-			_, errExecute = cursor.FetchOne(&i, &s)
+			_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 			if errExecute != nil {
 				t.Fatal(errExecute)
 			}
@@ -107,14 +110,15 @@ func TestSelect(t *testing.T) {
 }
 
 func TestSmallFetchSize(t *testing.T) {
+	async := false
 	connection, cursor := makeConnection(t, 2)
-	cursor.Execute("DROP TABLE IF EXISTS pokes")
-	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", async)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	errExecute = cursor.Execute("INSERT INTO pokes VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
+	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -123,14 +127,14 @@ func TestSmallFetchSize(t *testing.T) {
 	var s string
 	var j int
 
-	errExecute = cursor.Execute("SELECT * FROM pokes")
+	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
 	// Fetch first two rows
 	for j = 0; cursor.HasMore(); {
-		_, errExecute = cursor.FetchOne(&i, &s)
+		_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
@@ -147,13 +151,13 @@ func TestSmallFetchSize(t *testing.T) {
 	}
 
 	// Fext next two rows
-	errExecute = cursor.Execute("SELECT * FROM pokes")
+	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
 	for j = 0; cursor.HasMore(); {
-		_, errExecute = cursor.FetchOne(&i, &s)
+		_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
@@ -168,7 +172,7 @@ func TestSmallFetchSize(t *testing.T) {
 	if j != 2 {
 		t.Fatal("Fetch size was set to 2")
 	}
-	_, errExecute = cursor.FetchOne(&i, &s)
+	_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -180,8 +184,8 @@ func TestSmallFetchSize(t *testing.T) {
 
 func TestWithContext(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute("DROP TABLE IF EXISTS pokes")
-	errExecute := cursor.Execute("CREATE TABLE pokes (a INT, b STRING)")
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -189,7 +193,7 @@ func TestWithContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	errExecute = cursor.ExecuteWithContext(ctx, "")
+	errExecute = cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
 	if errExecute == nil {
 		t.Fatal("Context should have been done")
 	}
@@ -207,7 +211,7 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 		port = 10001
 		configuration.HttpPath = "cliservice"
 	}
-	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
+	connection, errConn := Connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}
@@ -216,11 +220,11 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 }
 
 func closeAll(t *testing.T, connection *Connection, cursor *Cursor) {
-	err := cursor.Close()
+	err := cursor.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = connection.Close()
+	err = connection.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

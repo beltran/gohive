@@ -5,26 +5,28 @@ GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl)
 ## Quickstart
 
 ```go 
+async := false
+ctx = context.Background()
 configuration := NewConnectConfiguration()
 configuration.Service = "hive"
 // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
 if errConn != nil {
     log.Fatal(errConn)
 }
 cursor := connection.Cursor()
 
-err := cursor.Execute("CREATE TABLE myTable (a INT, b STRING)")
+err := cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
 if err != nil {
     log.Fatal(err)
 }
 
-err = cursor.Execute("INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
+err = cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
 if err != nil {
     log.Fatal(err)
 }
 
-err = cursor.Execute("SELECT * FROM myTable")
+err = cursor.Execute(ctx, "SELECT * FROM myTable", async)
 if errExecute != nil {
     log.Fatal(err)
 }
@@ -32,19 +34,16 @@ if errExecute != nil {
 var i int32
 var s string
 for ; cursor.HasMore(); {
-    _, errExecute = cursor.FetchOne(&i, &s)
+    _, errExecute = cursor.FetchOne(ctx, &i, &s)
     if errExecute != nil {
         log.Fatal(err)
     }
     fmt.Println(i, s)
 }
 
-cursor.Close()
-connection.Close()
+cursor.Close(ctx)
+connection.Close(ctx)
 ```
-
-## WithContext API
-A similar API is available a passing `context.Context`(`ExecuteWithContext`, `FetchOneWithContext`, `OpenWithContext`, `CloseWithContext`, `CancelWithContext`)
 
 ## Supported connections
 ### Connect with Sasl kerberos:
@@ -52,7 +51,7 @@ A similar API is available a passing `context.Context`(`ExecuteWithContext`, `Fe
 configuration := NewConnectConfiguration()
 configuration.Service = "hive"
 // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
 ```
 This implies setting in hive-site.xml:
 - `hive.server2.authentication = KERBEROS`
@@ -66,7 +65,7 @@ configuration := NewConnectConfiguration()
 configuration.Username = "myUsername"
 // This may not be necessary
 configuration.Username = "myPassword"
-connection, errConn := Connect("hs2.example.com", 10000, "PLAIN", configuration)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "NONE", configuration)
 ```
 This implies setting in hive-site.xml:
 
@@ -74,7 +73,7 @@ This implies setting in hive-site.xml:
 
 ### Connnect using No Sasl:
 ``` go
-connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", nil)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "NOSASL", nil)
 ```
 This implies setting in hive-site.xml:
 
@@ -88,7 +87,7 @@ configuration.Port = 10001 // or the chosen port
 configuration.HttpPath = "cliservice" // this is the default path although in hive
 configuration.TransportMode = "http"
 
-connection, errConn := Connect("hs2.example.com", 10000, "PLAIN", configuration)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "PLAIN", configuration)
 ```
 This implies setting in hive-site.xml:
 

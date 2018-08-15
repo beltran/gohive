@@ -56,8 +56,8 @@ func NewConnectConfiguration() *ConnectConfiguration {
 	}
 }
 
-// ConnectWithContext to hive server
-func ConnectWithContext(ctx context.Context, host string, port int, auth string,
+// Connect to hive server
+func Connect(ctx context.Context, host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 	socket, err := thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
 	if err = socket.Open(); err != nil {
@@ -140,12 +140,6 @@ func ConnectWithContext(ctx context.Context, host string, port int, auth string,
 	}, nil
 }
 
-// Connect is ConnectWithContext with the background context
-func Connect(host string, port int, auth string,
-	configuration *ConnectConfiguration) (conn *Connection, err error) {
-	return ConnectWithContext(context.Background(), host, port, auth, configuration)
-}
-
 // Cursor creates a cursor from a connection
 func (c *Connection) Cursor() *Cursor {
 	return &Cursor{
@@ -154,8 +148,8 @@ func (c *Connection) Cursor() *Cursor {
 	}
 }
 
-// CloseWithContext closes a session
-func (c *Connection) CloseWithContext(ctx context.Context) error {
+// Close closes a session
+func (c *Connection) Close(ctx context.Context) error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
 	closeRequest.SessionHandle = c.sessionHandle
 	responseClose, err := c.client.CloseSession(ctx, closeRequest)
@@ -168,11 +162,6 @@ func (c *Connection) CloseWithContext(ctx context.Context) error {
 	return nil
 }
 
-// Close is CloseWithContext with the background context
-func (c *Connection) Close() error {
-	return c.CloseWithContext(context.Background())
-}
-
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
 	conn            *Connection
@@ -183,8 +172,8 @@ type Cursor struct {
 	totalRows       int
 }
 
-// ExecuteWithContext sends a query to hive for execution with a context
-func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err error) {
+// Execute sends a query to hive for execution with a context
+func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err error) {
 
 	c.resetState(ctx)
 
@@ -204,7 +193,8 @@ func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err erro
 	select {
 	case <-done:
 	case <-ctx.Done():
-		go c.Cancel()
+		// TODO revisit this context
+		go c.Cancel(context.Background())
 		return fmt.Errorf("Context was done before the query was executed")
 	}
 
@@ -220,19 +210,15 @@ func (c *Cursor) ExecuteWithContext(ctx context.Context, query string) (err erro
 	return nil
 }
 
-// Execute is like ExecuteC setting the backgroun
-func (c *Cursor) Execute(query string) error {
-	return c.ExecuteWithContext(context.Background(), query)
-}
 
 func success(status *hiveserver.TStatus) bool {
 	statusCode := status.GetStatusCode()
 	return statusCode == hiveserver.TStatusCode_SUCCESS_STATUS || statusCode == hiveserver.TStatusCode_SUCCESS_WITH_INFO_STATUS
 }
 
-// FetchOneWithContext returns one row
+// FetchOne returns one row
 // TODO, check if this context is honored, which probably is not, and do something similar to Exec
-func (c *Cursor) FetchOneWithContext(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
+func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore() {
@@ -310,11 +296,6 @@ func (c *Cursor) FetchOneWithContext(ctx context.Context, dests ...interface{}) 
 	return c.HasMore(), nil
 }
 
-// FetchOne is FetchOneWithContext with the background context
-func (c *Cursor) FetchOne(dests ...interface{}) (isRow bool, err error) {
-	return c.FetchOneWithContext(context.Background(), dests...)
-}
-
 // HasMore returns weather more rows can be fetched from the server
 func (c *Cursor) HasMore() bool {
 	if c.response == nil {
@@ -375,8 +356,8 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	return nil
 }
 
-// CancelWithContext tries to cancel the current operation
-func (c *Cursor) CancelWithContext(ctx context.Context) error {
+// Cancel tries to cancel the current operation
+func (c *Cursor) Cancel(ctx context.Context) error {
 	cancelRequest := hiveserver.NewTCancelOperationReq()
 	cancelRequest.OperationHandle = c.operationHandle
 	responseCancel, err := c.conn.client.CancelOperation(ctx, cancelRequest)
@@ -389,19 +370,10 @@ func (c *Cursor) CancelWithContext(ctx context.Context) error {
 	return nil
 }
 
-// Cancel is CancelWithContext with the context set to the background context
-func (c *Cursor) Cancel() error {
-	return c.CancelWithContext(context.Background())
-}
 
-// CloseWithContext close the cursor
-func (c *Cursor) CloseWithContext(ctx context.Context) error {
+// Close close the cursor
+func (c *Cursor) Close(ctx context.Context) error {
 	return c.resetState(ctx)
-}
-
-// Close is CloseWithContext accepting a background context
-func (c *Cursor) Close() error {
-	return c.CloseWithContext(context.Background())
 }
 
 func (c *Cursor) resetState(ctx context.Context) error {
