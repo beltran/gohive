@@ -2,6 +2,7 @@ package gohive
 
 import (
 	"context"
+	"fmt"
 	"hiveserver"
 	"log"
 	"os"
@@ -67,22 +68,13 @@ func TestCreateTable(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	async := false
-	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", async)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", async)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
-
-	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1'), (2, '2')", async)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
+	connection, cursor := prepareTable(t, 2, 1000)
 
 	var i int32
 	var s string
 	var j int
 	var z int
+	var errExecute error
 
 	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
 		errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
@@ -90,7 +82,7 @@ func TestSelect(t *testing.T) {
 			t.Fatal(errExecute)
 		}
 
-		for cursor.HasMore() {
+		for cursor.HasMore(context.Background()) {
 			_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 			if errExecute != nil {
 				t.Fatal(errExecute)
@@ -100,7 +92,7 @@ func TestSelect(t *testing.T) {
 		if i != 2 || s != "2" {
 			log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
 		}
-		if cursor.HasMore() {
+		if cursor.HasMore(context.Background()) {
 			log.Fatal("Shouldn't have any more values")
 		}
 		if j != 2 {
@@ -112,89 +104,47 @@ func TestSelect(t *testing.T) {
 
 func TestSmallFetchSize(t *testing.T) {
 	async := false
-	connection, cursor := makeConnection(t, 2)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", async)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", async)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
-
-	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
+	connection, cursor := prepareTable(t, 4, 2)
 
 	var i int32
 	var s string
 	var j int
 
-	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
+	errExecute := cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	// Fetch first two rows
-	for j = 0; cursor.HasMore(); {
+	// Fetch all rows
+	// The query happens behind the scenes
+	// The other rows are discarted
+	for j = 0; cursor.HasMore(context.Background()); {
 		_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
 		if errExecute != nil {
 			t.Fatal(errExecute)
 		}
 		j++
 	}
-	if i != 2 || s != "2" {
+	if i != 4 || s != "4" {
 		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
 	}
-	if cursor.HasMore() {
+	if cursor.HasMore(context.Background()) {
 		log.Fatal("Shouldn't have any more values")
 	}
-	if j != 2 {
-		t.Fatal("Fetch size was set to 2")
+	if j != 4 {
+		t.Fatalf("Fetch size was set to 4 but had %d iterations", j)
 	}
 
-	// Fext next two rows
-	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
-
-	for j = 0; cursor.HasMore(); {
-		_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
-		if errExecute != nil {
-			t.Fatal(errExecute)
-		}
-		j++
-	}
-	if i != 2 || s != "2" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-	if cursor.HasMore() {
-		log.Fatal("Shouldn't have any more values")
-	}
-	if j != 2 {
-		t.Fatal("Fetch size was set to 2")
-	}
-	_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
-	if cursor.HasMore() {
-		t.Fatal("No more rows should be left")
-	}
 	closeAll(t, connection, cursor)
 }
 
 func TestWithContext(t *testing.T) {
-	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
+	connection, cursor := prepareTable(t, 0, 1000)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	errExecute = cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
+	errExecute := cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
 	if errExecute == nil {
 		t.Fatal("Context should have been done")
 	}
@@ -202,14 +152,9 @@ func TestWithContext(t *testing.T) {
 }
 
 func TestAsync(t *testing.T) {
-	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
+	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
-	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	errExecute := cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -219,12 +164,12 @@ func TestAsync(t *testing.T) {
 		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
 	}
 
-	errStatus, status := cursor.Poll(context.Background())
+	status, errStatus := cursor.Poll(context.Background())
 	if errStatus != nil {
 		t.Fatal(errStatus)
 	}
 	for *status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE {
-		errStatus, status = cursor.Poll(context.Background())
+		status, errStatus = cursor.Poll(context.Background())
 		if errStatus != nil {
 			t.Fatal(errStatus)
 		}
@@ -243,7 +188,7 @@ func TestAsync(t *testing.T) {
 		t.Fatal(errExecute)
 	}
 
-	if cursor.HasMore() {
+	if cursor.HasMore(context.Background()) {
 		t.Fatal("All rows should have been read")
 	}
 
@@ -255,14 +200,9 @@ func TestAsync(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
-	if errExecute != nil {
-		t.Fatal(errExecute)
-	}
+	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
-	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	errExecute := cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -275,7 +215,63 @@ func TestCancel(t *testing.T) {
 	if errExecute != nil {
 		t.Fatal(errCancel)
 	}
+
+	status, errStatus := cursor.Poll(context.Background())
+	if errStatus != nil {
+		t.Fatal(errStatus)
+	}
+	for *status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE {
+		status, errStatus = cursor.Poll(context.Background())
+		if errStatus != nil {
+			t.Fatal(errStatus)
+		}
+		time.Sleep(time.Duration(100 * time.Millisecond))
+	}
+
+	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	var i int32
+	var s string
+	isRow, errExecute := cursor.FetchOne(context.Background(), &i, &s)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	if isRow {
+		t.Fatal("Table should be empty")
+	}
+
+	if cursor.HasMore(context.Background()) {
+		t.Fatal("All rows should have been read")
+	}
+
 	closeAll(t, connection, cursor)
+}
+
+func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {
+	connection, cursor := makeConnection(t, fetchSize)
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	if rowsToInsert > 0 {
+		values := ""
+		for i := 1; i <= rowsToInsert; i++ {
+			values += fmt.Sprintf("(%d, '%d')", i, i)
+			if i != rowsToInsert {
+				values += ","
+			}
+		}
+		errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES "+values, false)
+		if errExecute != nil {
+			t.Fatal(errExecute)
+		}
+	}
+	return connection, cursor
 }
 
 func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {

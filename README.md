@@ -33,7 +33,7 @@ if errExecute != nil {
 
 var i int32
 var s string
-for ; cursor.HasMore(); {
+for ; cursor.HasMore(ctx); {
     _, errExecute = cursor.FetchOne(ctx, &i, &s)
     if errExecute != nil {
         log.Fatal(err)

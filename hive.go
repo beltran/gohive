@@ -162,6 +162,10 @@ func (c *Connection) Close(ctx context.Context) error {
 	return nil
 }
 
+const _RUNNING = 0
+const _FINISHED = 1
+const _NONE = 2
+
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
 	conn            *Connection
@@ -170,6 +174,8 @@ type Cursor struct {
 	response        *hiveserver.TFetchResultsResp
 	columnIndex     int
 	totalRows       int
+	state           int
+	newData         bool
 }
 
 // Execute sends a query to hive for execution with a context
@@ -177,6 +183,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 
 	c.resetState(ctx)
 
+	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
@@ -220,19 +227,19 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 }
 
 // Poll returns the current status of the last operation
-func (c *Cursor) Poll(ctx context.Context) (err error, status *hiveserver.TOperationState) {
+func (c *Cursor) Poll(ctx context.Context) (status *hiveserver.TOperationState, err error) {
 	progressGet := true
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
 	pollRequest.GetProgressUpdate = &progressGet
 	responsePoll, err := c.conn.client.GetOperationStatus(ctx, pollRequest)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	if !success(responsePoll.GetStatus()) {
-		return fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String()), nil
+		return nil, fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String())
 	}
-	return nil, responsePoll.OperationState
+	return responsePoll.OperationState, nil
 
 }
 
@@ -246,15 +253,16 @@ func success(status *hiveserver.TStatus) bool {
 func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
-		if !c.HasMore() {
+		if !c.HasMore(ctx) {
 			return false, nil
 		}
 		err = c.pollUntilData(ctx, 1)
 		if err != nil {
 			return
 		}
+
 		// No rows where found when fetching
-		if !c.HasMore() {
+		if !c.HasMore(ctx) {
 			return false, nil
 		}
 	}
@@ -318,15 +326,20 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 	}
 	c.columnIndex++
 
-	return c.HasMore(), nil
+	return c.HasMore(ctx), nil
 }
 
 // HasMore returns weather more rows can be fetched from the server
-func (c *Cursor) HasMore() bool {
+func (c *Cursor) HasMore(ctx context.Context) bool {
 	if c.response == nil {
 		return true
 	}
-	return *c.response.HasMoreRows || c.totalRows != c.columnIndex
+	// *c.response.HasMoreRows is always false
+	// so it can be checked and another roundtrip has to be done if etra data has been added
+	if c.totalRows == c.columnIndex && c.state != _FINISHED {
+		c.pollUntilData(ctx, 1)
+	}
+	return c.state != _FINISHED || c.totalRows != c.columnIndex
 }
 
 func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
@@ -339,7 +352,6 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
-
 			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
 			if err != nil {
 				rowsAvailable <- err
@@ -405,6 +417,8 @@ func (c *Cursor) resetState(ctx context.Context) error {
 	c.queue = nil
 	c.columnIndex = 0
 	c.totalRows = 0
+	c.state = _NONE
+	c.newData = false
 	if c.operationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()
 		closeRequest.OperationHandle = c.operationHandle
@@ -425,6 +439,10 @@ func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error
 	c.queue = response.Results.GetColumns()
 	c.columnIndex = 0
 	c.totalRows, err = getTotalRows(c.queue)
+	c.newData = c.totalRows > 0
+	if !c.newData {
+		c.state = _FINISHED
+	}
 	return
 }
 
