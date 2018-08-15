@@ -180,12 +180,13 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
+	executeReq.RunAsync = async
 
 	// The context from thrift doesn't seem to work
 	done := make(chan interface{})
-	defer close(done)
 	var responseExecute *hiveserver.TExecuteStatementResp
 	go func() {
+		defer close(done)
 		responseExecute, err = c.conn.client.ExecuteStatement(ctx, executeReq)
 		done <- nil
 	}()
@@ -194,7 +195,15 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 	case <-done:
 	case <-ctx.Done():
 		// TODO revisit this context
-		go c.Cancel(context.Background())
+		go func() {
+			// This can only be cancelled if it was async?
+			/*
+				err := c.Cancel(context.Background())
+				if err != nil {
+						panic (err)
+				}
+			*/
+		}()
 		return fmt.Errorf("Context was done before the query was executed")
 	}
 
@@ -210,6 +219,22 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 	return nil
 }
 
+// Poll returns the current status of the last operation
+func (c *Cursor) Poll(ctx context.Context) (err error, status *hiveserver.TOperationState) {
+	progressGet := true
+	pollRequest := hiveserver.NewTGetOperationStatusReq()
+	pollRequest.OperationHandle = c.operationHandle
+	pollRequest.GetProgressUpdate = &progressGet
+	responsePoll, err := c.conn.client.GetOperationStatus(ctx, pollRequest)
+	if err != nil {
+		return err, nil
+	}
+	if !success(responsePoll.GetStatus()) {
+		return fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String()), nil
+	}
+	return nil, responsePoll.OperationState
+
+}
 
 func success(status *hiveserver.TStatus) bool {
 	statusCode := status.GetStatusCode()
@@ -369,7 +394,6 @@ func (c *Cursor) Cancel(ctx context.Context) error {
 	}
 	return nil
 }
-
 
 // Close close the cursor
 func (c *Cursor) Close(ctx context.Context) error {

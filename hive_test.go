@@ -2,6 +2,7 @@ package gohive
 
 import (
 	"context"
+	"hiveserver"
 	"log"
 	"os"
 	"testing"
@@ -196,6 +197,83 @@ func TestWithContext(t *testing.T) {
 	errExecute = cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
 	if errExecute == nil {
 		t.Fatal("Context should have been done")
+	}
+	closeAll(t, connection, cursor)
+}
+
+func TestAsync(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	start := time.Now()
+	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	stop := time.Now()
+	elapsed := stop.Sub(start)
+	if elapsed > time.Duration(time.Second*5) {
+		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
+	}
+
+	errStatus, status := cursor.Poll(context.Background())
+	if errStatus != nil {
+		t.Fatal(errStatus)
+	}
+	for *status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE {
+		errStatus, status = cursor.Poll(context.Background())
+		if errStatus != nil {
+			t.Fatal(errStatus)
+		}
+		time.Sleep(time.Duration(100 * time.Millisecond))
+	}
+
+	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	var i int32
+	var s string
+	_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	if cursor.HasMore() {
+		t.Fatal("All rows should have been read")
+	}
+
+	if i != 1 || s != "1" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestCancel(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
+	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	start := time.Now()
+	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+	stop := time.Now()
+	elapsed := stop.Sub(start)
+	if elapsed > time.Duration(time.Second*5) {
+		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
+	}
+	errCancel := cursor.Cancel(context.Background())
+	if errExecute != nil {
+		t.Fatal(errCancel)
 	}
 	closeAll(t, connection, cursor)
 }
