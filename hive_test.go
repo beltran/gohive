@@ -228,24 +228,23 @@ func TestCancel(t *testing.T) {
 		time.Sleep(time.Duration(100 * time.Millisecond))
 	}
 
-	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	errExecute = cursor.Execute(context.Background(), "SELECT count(*) FROM pokes", false)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
 
-	var i int32
-	var s string
-	isRow, errExecute := cursor.FetchOne(context.Background(), &i, &s)
+	var i int64 = 10
+	_, errExecute = cursor.FetchOne(context.Background(), &i)
 	if errExecute != nil {
 		t.Fatal(errExecute)
-	}
-
-	if isRow {
-		t.Fatal("Table should be empty")
 	}
 
 	if cursor.HasMore(context.Background()) {
 		t.Fatal("All rows should have been read")
+	}
+
+	if i != 0 {
+		t.Fatal("Table should have zero rows")
 	}
 
 	closeAll(t, connection, cursor)
