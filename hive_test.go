@@ -6,13 +6,14 @@ import (
 	"hiveserver"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestConnectDefault(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
-	auth := os.Getenv("TRANSPORT")
+	auth := os.Getenv("AUTH")
 	if auth != "KERBEROS" || transport != "binary" {
 		return
 	}
@@ -24,6 +25,34 @@ func TestConnectDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	connection.Close(context.Background())
+}
+
+func TestConnectHttpKerberos(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	auth := os.Getenv("AUTH")
+	if auth != "KERBEROS" || transport != "http" {
+		return
+	}
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	configuration.TransportMode = transport
+	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.Close(context.Background())
+}
+
+func TestClosedPort(t *testing.T) {
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	_, err := Connect(context.Background(), "hs2.example.com", 12345, getAuth(), configuration)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(err.Error(), "connection refused") {
+		t.Fatalf("Wrong error: %s, it should contain connection refused", err.Error())
+	}
 }
 
 func TestFetchDatabase(t *testing.T) {
@@ -151,6 +180,56 @@ func TestWithContext(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestWithContextAndExecute(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	auth := os.Getenv("AUTH")
+	if auth == "KERBEROS" && transport == "http" || true {
+		return
+	}
+
+	connection, cursor := prepareTable(t, 0, 1000)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	errExecute := cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
+	if errExecute == nil {
+		t.Fatal("Context should have been done")
+	}
+
+	errCancel := cursor.Cancel(context.Background())
+	if errExecute != nil {
+		t.Fatal(errCancel)
+	}
+
+	errExecute = cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(2, '2')", true)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	errExecute = cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	var i int32
+	var s string
+	_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	if cursor.HasMore(context.Background()) {
+		t.Fatal("All rows should have been read")
+	}
+
+	if i != 2 || s != "2" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestAsync(t *testing.T) {
 	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
@@ -252,8 +331,12 @@ func TestCancel(t *testing.T) {
 
 func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {
 	connection, cursor := makeConnection(t, fetchSize)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
-	errExecute := cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
+	errExecute := cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
+	if errExecute != nil {
+		t.Fatal(errExecute)
+	}
+
+	errExecute = cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -279,9 +362,10 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 	configuration.Service = "hive"
 	configuration.FetchSize = fetchSize
 	configuration.TransportMode = mode
+
 	var port int = 10000
 	if mode == "http" {
-		port = 10001
+		port = 10000
 		configuration.HttpPath = "cliservice"
 	}
 	connection, errConn := Connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)

@@ -80,14 +80,14 @@ This implies setting in hive-site.xml:
 - `hive.server2.authentication = NOSASL`
 
 ### Connect using Http transport mode
-Binary transport mode is supported for this three options. Http transport(at the moment) is supported for PLAIN:
+Binary transport mode is supported for this three options. Http transport is supported for PLAIN and KERBEROS:
 ``` go
 configuration := NewConnectConfiguration()
-configuration.Port = 10001 // or the chosen port
 configuration.HttpPath = "cliservice" // this is the default path although in hive
 configuration.TransportMode = "http"
+configuration.Service = "hive"
 
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "PLAIN", configuration)
+connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
 ```
 This implies setting in hive-site.xml:
 

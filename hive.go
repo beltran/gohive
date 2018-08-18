@@ -2,10 +2,13 @@ package gohive
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/beltran/gosasl"
 	"hiveserver"
 	"net/http"
+	"net/url"
 	"os/user"
 	"strings"
 	"time"
@@ -52,7 +55,7 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		PollIntervalInMillis: 200,
 		FetchSize:            DEFAULT_FETCH_SIZE,
 		TransportMode:        "binary",
-		HttpPath:             "",
+		HttpPath:             "cliservice",
 	}
 }
 
@@ -82,11 +85,39 @@ func Connect(ctx context.Context, host string, port int, auth string,
 	}
 
 	if configuration.TransportMode == "http" {
-		httpClient := http.DefaultClient
-		httpOptions := thrift.THttpClientOptions{Client: httpClient}
-		transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf("http://%s:%s@%s:%d/"+configuration.HttpPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
-		if err != nil {
-			return
+		if auth == "NONE" {
+			httpClient := http.DefaultClient
+			httpOptions := thrift.THttpClientOptions{Client: httpClient}
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf("http://%s:%s@%s:%d/"+configuration.HttpPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
+			if err != nil {
+				return
+			}
+		} else if auth == "KERBEROS" {
+			mechanism, err := gosasl.NewGSSAPIMechanism(configuration.Service)
+			if err != nil {
+				return nil, err
+			}
+			saslClient := gosasl.NewSaslClient(host, mechanism)
+			token, err := saslClient.Start()
+			if err != nil {
+				return nil, err
+			}
+			httpClient := http.DefaultClient
+			httpClient.Jar = newCookieJar()
+			httpOptions := thrift.THttpClientOptions{
+				Client: httpClient,
+			}
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf("http://%s:%d/"+configuration.HttpPath, host, port), httpOptions).GetTransport(socket)
+			httpTransport, ok := transport.(*thrift.THttpClient)
+			if ok {
+				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
+				httpTransport.SetHeader("X-XSRF-HEADER", "true ")
+			}
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			panic("Unrecognized auth")
 		}
 	} else {
 		if auth == "NOSASL" {
@@ -123,7 +154,6 @@ func Connect(ctx context.Context, host string, port int, auth string,
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
 	response, err := client.OpenSession(ctx, openSession)
-
 	if err != nil {
 		return
 	}
@@ -179,8 +209,9 @@ type Cursor struct {
 }
 
 // Execute sends a query to hive for execution with a context
+// If the context is Done it may not be possible to cancel the opeartion
+// Use async = true
 func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err error) {
-
 	c.resetState(ctx)
 
 	c.state = _RUNNING
@@ -469,4 +500,31 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("All columns seem empty")
+}
+
+type InMemoryCookieJar struct {
+	storage map[string][]http.Cookie
+}
+
+func (jar InMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	for _, cookie := range cookies {
+		jar.storage["cliservice"] = []http.Cookie{*cookie}
+	}
+}
+
+func (jar InMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
+	cookiesArray := []*http.Cookie{}
+	for pattern, cookies := range jar.storage {
+		if strings.Contains(u.String(), pattern) {
+			for i := range cookies {
+				cookiesArray = append(cookiesArray, &cookies[i])
+			}
+		}
+	}
+	return cookiesArray
+}
+
+func newCookieJar() InMemoryCookieJar {
+	storage := make(map[string][]http.Cookie)
+	return InMemoryCookieJar{storage}
 }
