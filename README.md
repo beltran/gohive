@@ -1,6 +1,6 @@
 # GoHive
 
-GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl) and NOSASL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
+GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
 ## Quickstart
 
@@ -9,6 +9,7 @@ async := false
 ctx = context.Background()
 configuration := NewConnectConfiguration()
 configuration.Service = "hive"
+configuration.FetchSize = 1000
 // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
 connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
 if errConn != nil {
@@ -44,6 +45,10 @@ for ; cursor.HasMore(ctx); {
 cursor.Close(ctx)
 connection.Close(ctx)
 ```
+
+`cursor.HasMore` may query hive for more rows if not all of them have been received. Once the row is
+read is discarded from memory so as long as the fetch size is not too big there's no limit to how much
+data can be queried.
 
 ## Supported connections
 ### Connect with Sasl kerberos:
@@ -91,7 +96,7 @@ connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", config
 ```
 This implies setting in hive-site.xml:
 
-- `hive.server2.authentication = NONE`
+- `hive.server2.authentication = KERBEROS` // or NONE
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
 

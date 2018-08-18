@@ -125,7 +125,7 @@ func Connect(ctx context.Context, host string, port int, auth string,
 			if transport == nil {
 				return nil, fmt.Errorf("BufferedTransport was nil")
 			}
-		} else if auth == "NONE" {
+		} else if auth == "NONE" || auth == "LDAP" || auth == "CUSTOM" {
 			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
 			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration)
 			if err != nil {
