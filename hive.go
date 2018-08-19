@@ -44,8 +44,7 @@ type ConnectConfiguration struct {
 	FetchSize            int64
 	TransportMode        string
 	HttpPath             string
-	SslPemPath           string
-	SslKeyPath           string
+	TlsConfig            *tls.Config
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -59,8 +58,7 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		FetchSize:            DEFAULT_FETCH_SIZE,
 		TransportMode:        "binary",
 		HttpPath:             "cliservice",
-		SslPemPath:           "",
-		SslKeyPath:           "",
+		TlsConfig:            nil,
 	}
 }
 
@@ -69,7 +67,11 @@ func Connect(ctx context.Context, host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 
 	var socket thrift.TTransport
-	socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
+	if configuration.TlsConfig != nil {
+		socket, err = thrift.NewTSSLSocket(fmt.Sprintf("%s:%d", host, port), configuration.TlsConfig)
+	} else {
+		socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
+	}
 
 	if err = socket.Open(); err != nil {
 		return
@@ -138,7 +140,7 @@ func Connect(ctx context.Context, host string, port int, auth string,
 		} else {
 			panic("Unrecognized auth")
 		}
-	} else {
+	} else if configuration.TransportMode == "binary" {
 		if auth == "NOSASL" {
 			transport = thrift.NewTBufferedTransport(socket, 4096)
 			if transport == nil {
@@ -162,6 +164,8 @@ func Connect(ctx context.Context, host string, port int, auth string,
 		if err = transport.Open(); err != nil {
 			return
 		}
+	} else {
+		panic(fmt.Sprintf("Unrecognized transport mode %s", configuration.TransportMode))
 	}
 
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
@@ -190,34 +194,14 @@ func Connect(ctx context.Context, host string, port int, auth string,
 }
 
 func getHttpClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
-	if configuration.SslPemPath != "" {
-		var tlsConfig *tls.Config
-		tlsConfig, err = getTlsConfiguration(configuration)
-		if err != nil {
-			return
-		}
-		transport := &http.Transport{TLSClientConfig: tlsConfig}
+	if configuration.TlsConfig != nil {
+		transport := &http.Transport{TLSClientConfig: configuration.TlsConfig}
 		httpClient = &http.Client{Transport: transport}
 		protocol = "https"
 	} else {
 		httpClient = http.DefaultClient
 		protocol = "http"
 	}
-	return
-}
-
-func getTlsConfiguration(configuration *ConnectConfiguration) (tlsConfig *tls.Config, err error) {
-	var cert tls.Certificate
-	cert, err = tls.LoadX509KeyPair(configuration.SslPemPath, configuration.SslKeyPath)
-	if err != nil {
-		return
-	}
-
-	tlsConfig = &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true,
-	}
-	tlsConfig.BuildNameToCertificate()
 	return
 }
 

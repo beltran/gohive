@@ -83,7 +83,7 @@ function run_tests() {
     export TRANSPORT="binary"
     export AUTH="KERBEROS"
     export SSL="0"
-    go test -v -run .
+    go test -v -run . || exit 2
 
     # Tests with http transport and kerberos authentication
     setHttpTransport
@@ -94,7 +94,7 @@ function run_tests() {
     export TRANSPORT="http"
     export AUTH="KERBEROS"
     export SSL="1"
-    go test -v -run .
+    go test -v -run . || exit 2
 
     # Tests with binary transport and none authentication
     setHive config/hive.cfg
@@ -103,7 +103,7 @@ function run_tests() {
     export TRANSPORT="binary"
     export AUTH="NONE"
     export SSL="0"
-    go test -v -run .
+    go test -v -run . || exit 2
 
 }
 

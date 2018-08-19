@@ -2,6 +2,7 @@ package gohive
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"hiveserver"
 	"log"
@@ -14,7 +15,8 @@ import (
 func TestConnectDefault(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	auth := os.Getenv("AUTH")
-	if auth != "KERBEROS" || transport != "binary" {
+	ssl := os.Getenv("SSL")
+	if auth != "KERBEROS" || transport != "binary" || ssl == "1" {
 		return
 	}
 
@@ -37,8 +39,34 @@ func TestConnectHttp(t *testing.T) {
 	configuration.TransportMode = transport
 	configuration.Service = "hive"
 	if ssl == "1" {
-		configuration.SslKeyPath = "client.cer.key"
-		configuration.SslPemPath = "client.cer.pem"
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TlsConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.Close(context.Background())
+}
+
+func TestConnectSasl(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	ssl := os.Getenv("SSL")
+	if transport != "binary" {
+		return
+	}
+	configuration := NewConnectConfiguration()
+	configuration.TransportMode = "binary"
+	configuration.Service = "hive"
+	if ssl == "1" {
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TlsConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
@@ -369,8 +397,11 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 	configuration.TransportMode = mode
 
 	if ssl {
-		configuration.SslKeyPath = "client.cer.key"
-		configuration.SslPemPath = "client.cer.pem"
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TlsConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	var port int = 10000
@@ -420,4 +451,19 @@ func getSsl() bool {
 		return true
 	}
 	return false
+}
+
+func getTlsConfiguration(SslPemPath, SslKeyPath string) (tlsConfig *tls.Config, err error) {
+	var cert tls.Certificate
+	cert, err = tls.LoadX509KeyPair(SslPemPath, SslKeyPath)
+	if err != nil {
+		return
+	}
+
+	tlsConfig = &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+	}
+	tlsConfig.BuildNameToCertificate()
+	return
 }
