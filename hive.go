@@ -2,6 +2,7 @@ package gohive
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
@@ -43,6 +44,8 @@ type ConnectConfiguration struct {
 	FetchSize            int64
 	TransportMode        string
 	HttpPath             string
+	SslPemPath           string
+	SslKeyPath           string
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -56,13 +59,18 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		FetchSize:            DEFAULT_FETCH_SIZE,
 		TransportMode:        "binary",
 		HttpPath:             "cliservice",
+		SslPemPath:           "",
+		SslKeyPath:           "",
 	}
 }
 
 // Connect to hive server
 func Connect(ctx context.Context, host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
-	socket, err := thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
+
+	var socket thrift.TTransport
+	socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
+
 	if err = socket.Open(); err != nil {
 		return
 	}
@@ -86,11 +94,14 @@ func Connect(ctx context.Context, host string, port int, auth string,
 
 	if configuration.TransportMode == "http" {
 		if auth == "NONE" {
-			httpClient := http.DefaultClient
-			httpOptions := thrift.THttpClientOptions{Client: httpClient}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf("http://%s:%s@%s:%d/"+configuration.HttpPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
+			httpClient, protocol, err := getHttpClient(configuration)
 			if err != nil {
-				return
+				return nil, err
+			}
+			httpOptions := thrift.THttpClientOptions{Client: httpClient}
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HttpPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
+			if err != nil {
+				return nil, err
 			}
 		} else if auth == "KERBEROS" {
 			mechanism, err := gosasl.NewGSSAPIMechanism(configuration.Service)
@@ -102,12 +113,20 @@ func Connect(ctx context.Context, host string, port int, auth string,
 			if err != nil {
 				return nil, err
 			}
-			httpClient := http.DefaultClient
+			if len(token) == 0 {
+				return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
+			}
+
+			httpClient, protocol, err := getHttpClient(configuration)
+			if err != nil {
+				return nil, err
+			}
 			httpClient.Jar = newCookieJar()
+
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
 			}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf("http://%s:%d/"+configuration.HttpPath, host, port), httpOptions).GetTransport(socket)
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HttpPath, host, port), httpOptions).GetTransport(socket)
 			httpTransport, ok := transport.(*thrift.THttpClient)
 			if ok {
 				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
@@ -168,6 +187,38 @@ func Connect(ctx context.Context, host string, port int, auth string,
 		client:              client,
 		configuration:       configuration,
 	}, nil
+}
+
+func getHttpClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
+	if configuration.SslPemPath != "" {
+		var tlsConfig *tls.Config
+		tlsConfig, err = getTlsConfiguration(configuration)
+		if err != nil {
+			return
+		}
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		httpClient = &http.Client{Transport: transport}
+		protocol = "https"
+	} else {
+		httpClient = http.DefaultClient
+		protocol = "http"
+	}
+	return
+}
+
+func getTlsConfiguration(configuration *ConnectConfiguration) (tlsConfig *tls.Config, err error) {
+	var cert tls.Certificate
+	cert, err = tls.LoadX509KeyPair(configuration.SslPemPath, configuration.SslKeyPath)
+	if err != nil {
+		return
+	}
+
+	tlsConfig = &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+	}
+	tlsConfig.BuildNameToCertificate()
+	return
 }
 
 // Cursor creates a cursor from a connection

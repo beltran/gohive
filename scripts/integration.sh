@@ -38,10 +38,39 @@ function install_deps() {
     popd
 }
 
+function setHttpTransport() {
+    pushd dhive
+    echo "hive.server2.transport.mode = http" >> ./config/hive_and_kerberos.cfg
+    echo "hive.server2.thrift.http.port = 10000" >> ./config/hive_and_kerberos.cfg
+    echo "hive.server2.use.SSL = true" >> ./config/hive_and_kerberos.cfg
+    echo "hive.server2.keystore.path = /var/keytabs/hive.jks" >> ./config/hive_and_kerberos.cfg
+    echo "hive.server2.keystore.password = changeme" >> ./config/hive_and_kerberos.cfg
+    popd
+}
+
 function setHive() {
     pushd dhive
     DHIVE_CONFIG_FILE=$1 make dclean all
     popd
+}
+
+function bringCredentials() {
+    kdestroy
+    docker cp kerberos.example:/var/keytabs/hdfs.keytab .
+    export KRB5CCNAME=/tmp/krb5_gohive
+    kinit -c $KRB5CCNAME -kt ./hdfs.keytab hive/hs2.example.com@EXAMPLE.COM
+    # kinit -t ./hdfs.keytab hive/localhost@EXAMPLE.COM
+    klist
+
+    docker cp hs2.example:/var/keytabs/hive.jks .
+
+    rm -rf /tmp/hostname-keystore.p12 client.cer.pem client.cer.key
+    keytool -importkeystore -srckeystore hive.jks \
+    -srcstorepass changeme -srckeypass changeme -destkeystore /tmp/hostname-keystore.p12 \
+    -deststoretype PKCS12 -srcalias hs2.example.com -deststorepass changeme -destkeypass changeme
+
+    openssl pkcs12 -in /tmp/hostname-keystore.p12 -out client.cer.pem -clcerts -nokeys -passin pass:changeme
+    openssl pkcs12 -in /tmp/hostname-keystore.p12 -out client.cer.key -nocerts -nodes -passin pass:changeme
 }
 
 function run_tests() {
@@ -49,20 +78,31 @@ function run_tests() {
     setHive config/hive_and_kerberos.cfg
     wait_for_hive || exit 1
 
-    export KRB5CCNAME=/tmp/krb5_gohive
-    kdestroy || echo ""
-    docker cp kerberos.example:/var/keytabs/hdfs.keytab .
-    kinit -c $KRB5CCNAME -kt ./hdfs.keytab hive/hs2.example.com@EXAMPLE.COM
-    klist
-
+    # Tests with binary transport and kerberos authentication
+    bringCredentials
     export TRANSPORT="binary"
     export AUTH="KERBEROS"
+    export SSL="0"
     go test -v -run .
 
+    # Tests with http transport and kerberos authentication
+    setHttpTransport
+    setHive config/hive_and_kerberos.cfg
+    wait_for_hive || exit 1
+
+    bringCredentials
+    export TRANSPORT="http"
+    export AUTH="KERBEROS"
+    export SSL="1"
+    go test -v -run .
+
+    # Tests with binary transport and none authentication
     setHive config/hive.cfg
     wait_for_hive || exit 1
 
+    export TRANSPORT="binary"
     export AUTH="NONE"
+    export SSL="0"
     go test -v -run .
 
 }

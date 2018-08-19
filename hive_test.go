@@ -27,15 +27,19 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close(context.Background())
 }
 
-func TestConnectHttpKerberos(t *testing.T) {
+func TestConnectHttp(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
-	auth := os.Getenv("AUTH")
-	if auth != "KERBEROS" || transport != "http" {
+	ssl := os.Getenv("SSL")
+	if transport != "http" {
 		return
 	}
 	configuration := NewConnectConfiguration()
-	configuration.Service = "hive"
 	configuration.TransportMode = transport
+	configuration.Service = "hive"
+	if ssl == "1" {
+		configuration.SslKeyPath = "client.cer.key"
+		configuration.SslPemPath = "client.cer.pem"
+	}
 	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
@@ -358,10 +362,16 @@ func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection,
 
 func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 	mode := getTransport()
+	ssl := getSsl()
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	configuration.FetchSize = fetchSize
 	configuration.TransportMode = mode
+
+	if ssl {
+		configuration.SslKeyPath = "client.cer.key"
+		configuration.SslPemPath = "client.cer.pem"
+	}
 
 	var port int = 10000
 	if mode == "http" {
@@ -402,4 +412,12 @@ func getTransport() string {
 		transport = "binary"
 	}
 	return transport
+}
+
+func getSsl() bool {
+	ssl := os.Getenv("SSL")
+	if ssl == "1" {
+		return true
+	}
+	return false
 }
