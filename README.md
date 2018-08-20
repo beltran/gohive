@@ -35,6 +35,9 @@ if cursor.Err != nil {
 var i int32
 var s string
 for ; cursor.HasMore(ctx); {
+    if cursor.Err != nil {
+        log.Fatal(cursor.Err)
+    }
     cursor.FetchOne(ctx, &i, &s)
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
