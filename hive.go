@@ -241,12 +241,13 @@ type Cursor struct {
 	totalRows       int
 	state           int
 	newData         bool
+	Err             error
 }
 
 // Execute sends a query to hive for execution with a context
 // If the context is Done it may not be possible to cancel the opeartion
 // Use async = true
-func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err error) {
+func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 	c.resetState(ctx)
 
 	c.state = _RUNNING
@@ -260,7 +261,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 	var responseExecute *hiveserver.TExecuteStatementResp
 	go func() {
 		defer close(done)
-		responseExecute, err = c.conn.client.ExecuteStatement(ctx, executeReq)
+		responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 		done <- nil
 	}()
 
@@ -277,19 +278,24 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) (err err
 				}
 			*/
 		}()
-		return fmt.Errorf("Context was done before the query was executed")
+		// Mark the operation as finished
+		c.state = _FINISHED
+		c.Err = fmt.Errorf("Context was done before the query was executed")
+		return
 	}
 
-	if err != nil {
+	if c.Err != nil {
 		return
 	}
 	if !success(responseExecute.GetStatus()) {
-		return fmt.Errorf("Error while executing query: %s", responseExecute.Status.String())
+		c.Err = fmt.Errorf("Error while executing query: %s", responseExecute.Status.String())
+		return
 	}
 
 	c.operationHandle = responseExecute.OperationHandle
-
-	return nil
+	if !responseExecute.OperationHandle.HasResultSet {
+		c.state = _FINISHED
+	}
 }
 
 // Poll returns the current status of the last operation
@@ -317,17 +323,9 @@ func success(status *hiveserver.TStatus) bool {
 // FetchOne returns one row
 // TODO, check if this context is honored, which probably is not, and do something similar to Exec
 func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
+	c.Err = nil
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
-		if !c.HasMore(ctx) {
-			return false, nil
-		}
-		err = c.pollUntilData(ctx, 1)
-		if err != nil {
-			return
-		}
-
-		// No rows where found when fetching
 		if !c.HasMore(ctx) {
 			return false, nil
 		}
@@ -397,21 +395,27 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 
 // HasMore returns weather more rows can be fetched from the server
 func (c *Cursor) HasMore(ctx context.Context) bool {
-	if c.response == nil {
-		return true
+	c.Err = nil
+	if c.response == nil && c.state != _FINISHED {
+		c.Err = c.pollUntilData(ctx, 1)
+		return c.state != _FINISHED || c.totalRows != c.columnIndex
 	}
 	// *c.response.HasMoreRows is always false
 	// so it can be checked and another roundtrip has to be done if etra data has been added
 	if c.totalRows == c.columnIndex && c.state != _FINISHED {
-		c.pollUntilData(ctx, 1)
+		c.Err = c.pollUntilData(ctx, 1)
 	}
+
 	return c.state != _FINISHED || c.totalRows != c.columnIndex
+}
+
+func (c *Cursor) Error() error {
+	return c.Err
 }
 
 func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	rowsAvailable := make(chan error)
 	defer close(rowsAvailable)
-
 	go func() {
 		for true {
 			fetchRequest := hiveserver.NewTFetchResultsReq()
@@ -429,7 +433,6 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 				rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
 				return
 			}
-
 			err = c.parseResults(responseFetch)
 			if err != nil {
 				rowsAvailable <- err
@@ -461,6 +464,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 
 // Cancel tries to cancel the current operation
 func (c *Cursor) Cancel(ctx context.Context) error {
+	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
 	cancelRequest.OperationHandle = c.operationHandle
 	responseCancel, err := c.conn.client.CancelOperation(ctx, cancelRequest)
@@ -480,6 +484,7 @@ func (c *Cursor) Close(ctx context.Context) error {
 
 func (c *Cursor) resetState(ctx context.Context) error {
 	c.response = nil
+	c.Err = nil
 	c.queue = nil
 	c.columnIndex = 0
 	c.totalRows = 0
