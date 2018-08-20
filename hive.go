@@ -337,13 +337,14 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore(ctx) {
-			return false
+			c.Err = fmt.Errorf("No more rows are left")
+			return
 		}
 	}
 
 	if len(c.queue) != len(dests) {
 		c.Err = fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
-		return false
+		return
 	}
 	for i := 0; i < len(c.queue); i++ {
 		if c.queue[i].IsSetBinaryVal() {
@@ -351,66 +352,66 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 			d, ok := dests[i].(*[]byte)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].BinaryVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetByteVal() {
 			d, ok := dests[i].(*int8)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].ByteVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI16Val() {
 			d, ok := dests[i].(*int16)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].I16Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI32Val() {
 			d, ok := dests[i].(*int32)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].I32Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI64Val() {
 			d, ok := dests[i].(*int64)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].I64Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].StringVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetDoubleVal() {
 			d, ok := dests[i].(*float64)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].DoubleVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
-				return false
+				return
 			}
 			*d = c.queue[i].StringVal.Values[c.columnIndex]
 		} else {
 			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
-			return true
+			return
 		}
 	}
 	c.columnIndex++
 
-	return false
+	return
 }
 
 // HasMore returns weather more rows can be fetched from the server

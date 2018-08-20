@@ -167,6 +167,44 @@ func TestSelect(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestIsRow(t *testing.T) {
+	connection, cursor := prepareTable(t, 1, 1000)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	var i int32
+	var s string
+
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if i != 1 || s != "1" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+	if cursor.HasMore(context.Background()) {
+		log.Fatal("Shouldn't have any more values")
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	for i := 0; i < 10; i++ {
+		cursor.FetchOne(context.Background(), &i, &s)
+		if cursor.Error() == nil {
+			t.Fatal("Error shouldn't be nil")
+		}
+		if cursor.Err.Error() != "No more rows are left" {
+			t.Fatal("Error should be No more rows are left")
+		}
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestSmallFetchSize(t *testing.T) {
 	async := false
 	connection, cursor := prepareTable(t, 4, 2)
