@@ -17,27 +17,27 @@ if errConn != nil {
 }
 cursor := connection.Cursor()
 
-err := cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
-if err != nil {
-    log.Fatal(err)
+cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
+if cursor.Err != nil {
+    log.Fatal(cursor.Err)
 }
 
-err = cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
-if err != nil {
-    log.Fatal(err)
+cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
+if cursor.Err != nil {
+    log.Fatal(cursor.Err)
 }
 
-err = cursor.Execute(ctx, "SELECT * FROM myTable", async)
-if errExecute != nil {
-    log.Fatal(err)
+cursor.Execute(ctx, "SELECT * FROM myTable", async)
+if cursor.Err != nil {
+    log.Fatal(cursor.Err)
 }
 
 var i int32
 var s string
 for ; cursor.HasMore(ctx); {
-    _, errExecute = cursor.FetchOne(ctx, &i, &s)
-    if errExecute != nil {
-        log.Fatal(err)
+    cursor.FetchOne(ctx, &i, &s)
+    if cursor.Err != nil {
+        log.Fatal(cursor.Err)
     }
     fmt.Println(i, s)
 }

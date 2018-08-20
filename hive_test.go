@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"hiveserver"
 	"log"
 	"os"
 	"strings"
@@ -96,9 +95,9 @@ func TestFetchDatabase(t *testing.T) {
 	}
 
 	var s string
-	_, errCursor := cursor.FetchOne(context.Background(), &s)
-	if errCursor != nil {
-		t.Fatal(errCursor)
+	cursor.FetchOne(context.Background(), &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 	if s != "default" {
 		t.Fatalf("Unrecognized dabase found: %s", s)
@@ -135,7 +134,6 @@ func TestSelect(t *testing.T) {
 	var s string
 	var j int
 	var z int
-	var errExecute error
 
 	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
 		cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
@@ -147,9 +145,9 @@ func TestSelect(t *testing.T) {
 			if cursor.Error() != nil {
 				t.Fatal(cursor.Error())
 			}
-			_, errExecute = cursor.FetchOne(context.Background(), &i, &s)
-			if errExecute != nil {
-				t.Fatal(errExecute)
+			cursor.FetchOne(context.Background(), &i, &s)
+			if cursor.Err != nil {
+				t.Fatal(cursor.Err)
 			}
 			j++
 		}
@@ -189,9 +187,9 @@ func TestSmallFetchSize(t *testing.T) {
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
-		_, errExecute := cursor.FetchOne(context.Background(), &i, &s)
-		if errExecute != nil {
-			t.Fatal(errExecute)
+		cursor.FetchOne(context.Background(), &i, &s)
+		if cursor.Err != nil {
+			t.Fatal(cursor.Err)
 		}
 		j++
 	}
@@ -247,9 +245,9 @@ func TestWithContextAndExecute(t *testing.T) {
 		t.Fatal(cursor.Error())
 	}
 
-	errCancel := cursor.Cancel(context.Background())
-	if errCancel != nil {
-		t.Fatal(errCancel)
+	cursor.Cancel(context.Background())
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
 	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(2, '2')", true)
@@ -264,9 +262,9 @@ func TestWithContextAndExecute(t *testing.T) {
 
 	var i int32
 	var s string
-	_, errExecute := cursor.FetchOne(context.Background(), &i, &s)
-	if errExecute != nil {
-		t.Fatal(errExecute)
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
 	if cursor.HasMore(context.Background()) {
@@ -297,14 +295,9 @@ func TestAsync(t *testing.T) {
 		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
 	}
 
-	status, errStatus := cursor.Poll(context.Background())
-	if errStatus != nil {
-		t.Fatal(errStatus)
-	}
-	for *status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE {
-		status, errStatus = cursor.Poll(context.Background())
-		if errStatus != nil {
-			t.Fatal(errStatus)
+	for !cursor.Finished() {
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
 		}
 		time.Sleep(time.Duration(100 * time.Millisecond))
 	}
@@ -324,9 +317,9 @@ func TestAsync(t *testing.T) {
 
 	var i int32
 	var s string
-	_, errExecute := cursor.FetchOne(context.Background(), &i, &s)
-	if errExecute != nil {
-		t.Fatal(errExecute)
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
 	if cursor.HasMore(context.Background()) {
@@ -356,19 +349,14 @@ func TestCancel(t *testing.T) {
 	if elapsed > time.Duration(time.Second*5) {
 		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
 	}
-	errCancel := cursor.Cancel(context.Background())
-	if errCancel != nil {
-		t.Fatal(errCancel)
+	cursor.Cancel(context.Background())
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
-	status, errStatus := cursor.Poll(context.Background())
-	if errStatus != nil {
-		t.Fatal(errStatus)
-	}
-	for *status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE {
-		status, errStatus = cursor.Poll(context.Background())
-		if errStatus != nil {
-			t.Fatal(errStatus)
+	for !cursor.Finished() {
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
 		}
 		time.Sleep(time.Duration(100 * time.Millisecond))
 	}
@@ -379,9 +367,9 @@ func TestCancel(t *testing.T) {
 	}
 
 	var i int64 = 10
-	_, errExecute := cursor.FetchOne(context.Background(), &i)
-	if errExecute != nil {
-		t.Fatal(errExecute)
+	cursor.FetchOne(context.Background(), &i)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
 	if cursor.HasMore(context.Background()) {
@@ -406,7 +394,7 @@ func TestNoResult(t *testing.T) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
-	
+
 	if cursor.HasMore(context.Background()) {
 		t.Fatal("Shouldn't have any rows2")
 	}
@@ -424,7 +412,7 @@ func TestHasMore(t *testing.T) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
-	for i := 0 ; i < 10; i++ {
+	for i := 0; i < 10; i++ {
 		if !cursor.HasMore(context.Background()) {
 			t.Fatalf("Should have more rows, iteration %d", i)
 		}
@@ -492,11 +480,11 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 }
 
 func closeAll(t *testing.T, connection *Connection, cursor *Cursor) {
-	err := cursor.Close(context.Background())
-	if err != nil {
-		t.Fatal(err)
+	cursor.Close(context.Background())
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
-	err = connection.Close(context.Background())
+	err := connection.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

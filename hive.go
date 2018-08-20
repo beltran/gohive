@@ -299,20 +299,30 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 }
 
 // Poll returns the current status of the last operation
-func (c *Cursor) Poll(ctx context.Context) (status *hiveserver.TOperationState, err error) {
+func (c *Cursor) Poll(ctx context.Context) (status *hiveserver.TOperationState) {
+	c.Err = nil
 	progressGet := true
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
 	pollRequest.GetProgressUpdate = &progressGet
-	responsePoll, err := c.conn.client.GetOperationStatus(ctx, pollRequest)
-	if err != nil {
-		return nil, err
+	var responsePoll *hiveserver.TGetOperationStatusResp
+	responsePoll, c.Err = c.conn.client.GetOperationStatus(ctx, pollRequest)
+	if c.Err != nil {
+		return nil
 	}
 	if !success(responsePoll.GetStatus()) {
-		return nil, fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String())
+		c.Err = fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String())
+		return nil
 	}
-	return responsePoll.OperationState, nil
+	return responsePoll.OperationState
+}
 
+func (c *Cursor) Finished() bool {
+	status := c.Poll(context.Background())
+	if c.Err != nil {
+		return false
+	}
+	return !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
 }
 
 func success(status *hiveserver.TStatus) bool {
@@ -322,75 +332,85 @@ func success(status *hiveserver.TStatus) bool {
 
 // FetchOne returns one row
 // TODO, check if this context is honored, which probably is not, and do something similar to Exec
-func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool, err error) {
+func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool) {
 	c.Err = nil
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore(ctx) {
-			return false, nil
+			return false
 		}
 	}
 
 	if len(c.queue) != len(dests) {
-		return false, fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
+		c.Err = fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
+		return false
 	}
 	for i := 0; i < len(c.queue); i++ {
 		if c.queue[i].IsSetBinaryVal() {
 			// TODO revisit this
 			d, ok := dests[i].(*[]byte)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].BinaryVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetByteVal() {
 			d, ok := dests[i].(*int8)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].ByteVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI16Val() {
 			d, ok := dests[i].(*int16)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].I16Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI32Val() {
 			d, ok := dests[i].(*int32)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].I32Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI64Val() {
 			d, ok := dests[i].(*int64)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].I64Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].StringVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetDoubleVal() {
 			d, ok := dests[i].(*float64)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].DoubleVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
-				return false, fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+				return false
 			}
 			*d = c.queue[i].StringVal.Values[c.columnIndex]
 		} else {
-			return true, fmt.Errorf("Empty column %v", c.queue[i])
+			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
+			return true
 		}
 	}
 	c.columnIndex++
 
-	return c.HasMore(ctx), nil
+	return false
 }
 
 // HasMore returns weather more rows can be fetched from the server
@@ -463,23 +483,24 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 }
 
 // Cancel tries to cancel the current operation
-func (c *Cursor) Cancel(ctx context.Context) error {
+func (c *Cursor) Cancel(ctx context.Context) {
 	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
 	cancelRequest.OperationHandle = c.operationHandle
-	responseCancel, err := c.conn.client.CancelOperation(ctx, cancelRequest)
-	if err != nil {
-		return err
+	var responseCancel *hiveserver.TCancelOperationResp
+	responseCancel, c.Err = c.conn.client.CancelOperation(ctx, cancelRequest)
+	if c.Err != nil {
+		return
 	}
 	if !success(responseCancel.GetStatus()) {
-		return fmt.Errorf("Error closing the operation: %s", responseCancel.Status.String())
+		c.Err = fmt.Errorf("Error closing the operation: %s", responseCancel.Status.String())
 	}
-	return nil
+	return
 }
 
 // Close close the cursor
-func (c *Cursor) Close(ctx context.Context) error {
-	return c.resetState(ctx)
+func (c *Cursor) Close(ctx context.Context) {
+	c.Err = c.resetState(ctx)
 }
 
 func (c *Cursor) resetState(ctx context.Context) error {

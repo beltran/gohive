@@ -12,9 +12,9 @@ function wait_for_hive () {
           break
         fi
         counter=$((counter+1))
-        if [[ "$counter" -gt 12 ]]; then
+        if [[ "$counter" -gt 18 ]]; then
           # Just fail because the port didn't open
-          echo "Waited for two minutes and hive didn't appear to start"
+          echo "Waited for three minutes and hive didn't appear to start"
           exit 1
         fi
         echo "Waiting for hive port to open"
@@ -52,6 +52,10 @@ function setHive() {
     pushd dhive
     DHIVE_CONFIG_FILE=$1 make dclean all
     popd
+}
+
+function tearDown() {
+    DHIVE_CONFIG_FILE=config/hive_and_kerberos.cfg make dclean
 }
 
 function bringCredentials() {
@@ -105,6 +109,7 @@ function run_tests() {
     export SSL="0"
     go test -v -run . || exit 2
 
+    tearDown
 }
 
 install_deps
