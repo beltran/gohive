@@ -434,7 +434,7 @@ func TestNoResult(t *testing.T) {
 	}
 
 	if cursor.HasMore(context.Background()) {
-		t.Fatal("Shouldn't have any rows2")
+		t.Fatal("Shouldn't have any rows")
 	}
 
 	if cursor.Error() != nil {
@@ -457,6 +457,27 @@ func TestHasMore(t *testing.T) {
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
+	}
+
+	var j int32
+	var s string
+	for i := 0; i < 5; i++ {
+		if !cursor.HasMore(context.Background()) {
+			t.Fatalf("Should have more rows, iteration %d", i)
+		}
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+		cursor.FetchOne(context.Background(), &j, &s)
+		if cursor.Err != nil {
+			t.Fatal(cursor.Err)
+		}
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+	}
+	if cursor.HasMore(context.Background()) {
+		t.Fatalf("Should not have more rows")
 	}
 	closeAll(t, connection, cursor)
 }
