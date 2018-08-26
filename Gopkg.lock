@@ -11,11 +11,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:cc2734a6c300cf150d19fa7b0ee33e6ca72b206ba0cc6743f05c9f26eccbf87b"
+  digest = "1:223debf72def688665276d603ed807c6e879e2f47984df13261584ada9b898bb"
   name = "github.com/beltran/gosasl"
   packages = ["."]
   pruneopts = "UT"
-  revision = "1f9fb373d2687b89a9a2ff1b1ce7c7eb7221ccde"
+  revision = "976857b83456d67c235c57b90da855c4af4f3056"
 
 [[projects]]
   branch = "compile_mac"

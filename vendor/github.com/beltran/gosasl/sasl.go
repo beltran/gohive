@@ -1,6 +1,8 @@
 package gosasl
 
 import (
+	"crypto/hmac"
+	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"github.com/beltran/gssapi"
@@ -308,6 +310,33 @@ func (m GSSAPIMechanism) dispose() {
 
 func (m GSSAPIMechanism) getConfig() *MechanismConfig {
 	return m.config
+}
+
+// CramMD5Mechanism corresponds to PLAIN SASL mechanism
+type CramMD5Mechanism struct {
+	*PlainMechanism
+}
+
+// NewCramMD5Mechanism returns a new PlainMechanism
+func NewCramMD5Mechanism(username string, password string) *CramMD5Mechanism {
+	plain := NewPlainMechanism(username, password)
+	return &CramMD5Mechanism{
+		plain,
+	}
+}
+
+func (m *CramMD5Mechanism) step(challenge []byte) ([]byte, error) {
+	if challenge == nil {
+		return nil, nil
+	}
+	m.mechanismConfig.complete = true
+	hash := hmac.New(md5.New, []byte(m.password))
+	// hashed := make([]byte, hash.Size())
+	_, err := hash.Write(challenge)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(fmt.Sprintf("%s ", m.username)), hash.Sum(nil)...), nil
 }
 
 // Client is the entry point for usage of this library

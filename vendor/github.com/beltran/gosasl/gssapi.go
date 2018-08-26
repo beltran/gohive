@@ -93,7 +93,7 @@ func (c *GSSAPIContext) wrap(original []byte, conf_flag bool) (wrapped []byte, e
 	if err != nil {
 		return nil, err
 	}
-	_, wrappedBuffer, err := c.contextId.Wrap(conf_flag, 4, _original)
+	_, wrappedBuffer, err := c.contextId.Wrap(conf_flag, gssapi.GSS_C_QOP_DEFAULT, _original)
 	defer wrappedBuffer.Release()
 	if err != nil {
 		return nil, err
