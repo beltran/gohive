@@ -1,5 +1,5 @@
 # GoHive
-[![Build Status](https://travis-ci.org/beltran/gohive.svg?branch=master)](https://travis-ci.org/beltran/gohive)
+[![Build Status](https://travis-ci.org/beltran/gohive.svg?branch=master)](https://travis-ci.org/beltran/gohive) [![Coverage Status](https://coveralls.io/repos/github/beltran/gohive/badge.svg?branch=master)](https://coveralls.io/github/beltran/gohive?branch=master)
 
 
 GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
