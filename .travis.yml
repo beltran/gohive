@@ -1,0 +1,41 @@
+sudo: required
+
+language: go
+
+services:
+  - docker
+
+go:
+  - "1.10"
+
+branches:
+  only:
+  - master
+
+addons:
+  apt:
+    sources:
+      - deadsnakes # source required so it finds the package definition below
+    packages:
+      - python3.6
+  hosts:
+    - hs2.example.com
+    - kerberos.example.com
+
+before_install:
+  - sudo apt-get -y install python3.6-dev
+  - sudo apt-get -y install krb5-user
+  - cat scripts/create_krbconf.sh
+  - sudo bash scripts/create_krbconf.sh
+  - docker network create com
+  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+  - python3.6 get-pip.py --user
+
+env:
+  - DOCKER_COMPOSE_VERSION=1.22.0
+
+script:
+  - set -e
+  - docker --version
+  - PATH=$PATH:$HOME/.local/bin bash ./scripts/integration.sh
+  - go vet .

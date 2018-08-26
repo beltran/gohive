@@ -15,12 +15,14 @@ function wait_for_hive () {
         if [[ "$counter" -gt 18 ]]; then
           # Just fail because the port didn't open
           echo "Waited for three minutes and hive didn't appear to start"
+          docker logs hs2.example
           exit 1
         fi
         echo "Waiting for hive port to open"
         sleep 10
     done
 }
+
 
 function install_deps() {
     if [ ! -d "dhive" ] ; then
@@ -31,7 +33,9 @@ function install_deps() {
         cd ..
     fi
     pushd dhive
-    pip install --user -r requirements.txt
+    sed -i.bak 's/python3/python3.6/g' ./Makefile
+
+    python3.6 -m pip install --user -r requirements.txt
     sed -i.bak 's/hive_version.*/hive_version = 3.1.0/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.0/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_kerberos.cfg
@@ -55,11 +59,13 @@ function setHive() {
 }
 
 function tearDown() {
+    pushd dhive
     DHIVE_CONFIG_FILE=config/hive_and_kerberos.cfg make dclean
+    popd
 }
 
 function bringCredentials() {
-    kdestroy
+    kdestroy || true
     docker cp kerberos.example:/var/keytabs/hdfs.keytab .
     export KRB5CCNAME=/tmp/krb5_gohive
     kinit -c $KRB5CCNAME -kt ./hdfs.keytab hive/hs2.example.com@EXAMPLE.COM
@@ -78,18 +84,18 @@ function bringCredentials() {
 }
 
 function run_tests() {
-    
+
     export SKIP_UNSTABLE="1"
 
     setHive config/hive_and_kerberos.cfg
-    wait_for_hive || exit 1
+    wait_for_hive || { echo 'Failed waiting for hive' ; exit 1; }
 
     # Tests with binary transport and kerberos authentication
     bringCredentials
     export TRANSPORT="binary"
     export AUTH="KERBEROS"
     export SSL="0"
-    go test -v -run . || exit 2
+    go test -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     # Tests with http transport and kerberos authentication
     setHttpTransport
@@ -100,7 +106,7 @@ function run_tests() {
     export TRANSPORT="http"
     export AUTH="KERBEROS"
     export SSL="1"
-    go test -v -run . || exit 2
+    go test -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     # Tests with binary transport and none authentication
     setHive config/hive.cfg
@@ -109,7 +115,7 @@ function run_tests() {
     export TRANSPORT="binary"
     export AUTH="NONE"
     export SSL="0"
-    go test -v -run . || exit 2
+    go test -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     tearDown
 }
