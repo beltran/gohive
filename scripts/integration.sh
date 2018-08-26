@@ -79,6 +79,8 @@ function bringCredentials() {
 
 function run_tests() {
     
+    export SKIP_UNSTABLE="1"
+
     setHive config/hive_and_kerberos.cfg
     wait_for_hive || exit 1
 

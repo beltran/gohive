@@ -29,6 +29,7 @@ type Connection struct {
 	sessionHandle       *hiveserver.TSessionHandle
 	client              *hiveserver.TCLIServiceClient
 	configuration       *ConnectConfiguration
+	transport           thrift.TTransport
 }
 
 // ConnectConfiguration is the configuration for the connection
@@ -190,6 +191,7 @@ func Connect(ctx context.Context, host string, port int, auth string,
 		sessionHandle:       response.SessionHandle,
 		client:              client,
 		configuration:       configuration,
+		transport:           transport,
 	}, nil
 }
 
@@ -218,6 +220,13 @@ func (c *Connection) Close(ctx context.Context) error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
 	closeRequest.SessionHandle = c.sessionHandle
 	responseClose, err := c.client.CloseSession(ctx, closeRequest)
+
+	if c.transport != nil {
+		errTransport := c.transport.Close()
+		if errTransport != nil {
+			return errTransport
+		}
+	}
 	if err != nil {
 		return err
 	}

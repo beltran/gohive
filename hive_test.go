@@ -106,6 +106,9 @@ func TestFetchDatabase(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
+	if os.Getenv("SKIP_UNSTABLE") == "1" {
+		return
+	}
 	async := false
 	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
@@ -123,6 +126,33 @@ func TestCreateTable(t *testing.T) {
 	if cursor.Error() == nil {
 		t.Fatal("Error should have happened")
 	}
+	closeAll(t, connection, cursor)
+}
+
+func TestManyFailures(t *testing.T) {
+	if os.Getenv("SKIP_UNSTABLE") == "1" {
+		return
+	}
+	async := false
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	for i := 0; i < 20; i++ {
+		// Now it should fail because the table already exists
+		cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+		if cursor.Error() == nil {
+			t.Fatal("Error should have happened")
+		}
+	}
+
 	closeAll(t, connection, cursor)
 }
 
