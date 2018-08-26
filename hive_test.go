@@ -378,7 +378,8 @@ func TestAsync(t *testing.T) {
 func TestCancel(t *testing.T) {
 	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
-	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	cursor.Execute(context.Background(),
+		"SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L * 1000L) FROM pokes a JOIN pokes b", true)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -480,6 +481,90 @@ func TestHasMore(t *testing.T) {
 		t.Fatalf("Should not have more rows")
 	}
 	closeAll(t, connection, cursor)
+}
+
+func TestTypes(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
+	var b bool
+	var tinyInt int8
+	var smallInt int16
+	var normalInt int32
+	var bigInt int64
+	// This value is store as a float32. The go thrift API returns a floa64 though.
+	var floatType float64
+	var double float64
+	var s string
+	var timeStamp string
+	var binary []byte
+	var array string
+	var mapType string
+	var structType string
+	var union string
+	var decimal string
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	createAll := "CREATE TABLE all_types (" +
+		"`boolean` BOOLEAN," +
+		"`tinyint` TINYINT," +
+		"`smallint` SMALLINT," +
+		"`int` INT," +
+		"`bigint` BIGINT," +
+		"`float` FLOAT," +
+		"`double` DOUBLE," +
+		"`string` STRING," +
+		"`timestamp` TIMESTAMP," +
+		"`binary` BINARY," +
+		"`array` ARRAY<int>," +
+		"`map` MAP<int, int>," +
+		"`struct` STRUCT<a: int, b: int>," +
+		"`union` UNIONTYPE<int, string>," +
+		"`decimal` DECIMAL(10, 1))"
+	cursor.Execute(context.Background(), createAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	insertAll := `INSERT INTO TABLE all_types VALUES(
+		true,
+		127,
+		32767,
+		2147483647,
+		9223372036854775807,
+		0.5,
+		0.25,
+		'a string',
+		0,
+		'123',
+		array(1, 2),
+		map(1, 2, 3, 4),
+		named_struct('a', 1, 'b', 2),
+		create_union(0, 1, 'test_string'),
+		0.1)`
+	cursor.Execute(context.Background(), insertAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
 }
 
 func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {

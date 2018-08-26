@@ -405,6 +405,13 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 				return
 			}
 			*d = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if c.queue[i].IsSetBoolVal() {
+			d, ok := dests[i].(*bool)
+			if !ok {
+				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
+				return
+			}
+			*d = c.queue[i].BoolVal.Values[c.columnIndex]
 		} else {
 			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
 			return
