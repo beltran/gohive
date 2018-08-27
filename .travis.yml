@@ -11,6 +11,7 @@ go:
 branches:
   only:
   - master
+  - coveralls
 
 addons:
   apt:
@@ -23,6 +24,7 @@ addons:
     - kerberos.example.com
 
 before_install:
+  - go get github.com/mattn/goveralls
   - sudo apt-get -y install python3.6-dev
   - sudo apt-get -y install krb5-user
   - cat scripts/create_krbconf.sh
