@@ -513,6 +513,30 @@ func TestHasMore(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+
+func TestTypesError(t *testing.T) {
+	connection, cursor := prepareTable(t, 1, 1000)
+
+	var j int32
+	var s string
+
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.FetchOne(context.Background(), &j)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &s, &s)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because the arguments have wrong type")
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestTypes(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTable(t, cursor)
