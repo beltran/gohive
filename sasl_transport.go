@@ -165,7 +165,7 @@ func (p *TSaslTransport) Read(buf []byte) (l int, err error) {
 	var got int
 	if p.rawFrameSize > 0 {
 		rawBuf := make([]byte, p.rawFrameSize)
-		got, err = p.tp.Read(rawBuf)
+		got, err = io.ReadFull(p.tp, rawBuf)
 		if err != nil {
 			return
 		}

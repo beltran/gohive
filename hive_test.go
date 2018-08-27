@@ -106,9 +106,6 @@ func TestFetchDatabase(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
-	if os.Getenv("SKIP_UNSTABLE") == "1" {
-		return
-	}
 	async := false
 	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
@@ -130,9 +127,6 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestManyFailures(t *testing.T) {
-	if os.Getenv("SKIP_UNSTABLE") == "1" {
-		return
-	}
 	async := false
 	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
@@ -278,7 +272,6 @@ func TestWithContext(t *testing.T) {
 	if os.Getenv("SKIP_UNSTABLE") == "1" {
 		return
 	}
-
 	connection, cursor := prepareTable(t, 0, 1000)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
