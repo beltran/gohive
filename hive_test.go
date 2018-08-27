@@ -275,6 +275,10 @@ func TestSmallFetchSize(t *testing.T) {
 }
 
 func TestWithContext(t *testing.T) {
+	if os.Getenv("SKIP_UNSTABLE") == "1" {
+		return
+	}
+
 	connection, cursor := prepareTable(t, 0, 1000)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -512,7 +516,6 @@ func TestHasMore(t *testing.T) {
 	}
 	closeAll(t, connection, cursor)
 }
-
 
 func TestTypesError(t *testing.T) {
 	connection, cursor := prepareTable(t, 1, 1000)
