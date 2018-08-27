@@ -11,7 +11,6 @@ go:
 branches:
   only:
   - master
-  - coveralls
 
 addons:
   apt:
@@ -36,8 +35,8 @@ before_install:
 env:
   - DOCKER_COMPOSE_VERSION=1.22.0
 
-script:
-  - set -e
-  - docker --version
-  - PATH=$PATH:$HOME/.local/bin bash ./scripts/integration.sh
-  - go vet .
+  script:
+    - set -e
+    - go vet ./...
+    - go fmt ./...
+    - PATH=$PATH:$HOME/.local/bin bash ./scripts/integration.sh

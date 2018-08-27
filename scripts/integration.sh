@@ -95,6 +95,7 @@ function run_tests() {
     export TRANSPORT="binary"
     export AUTH="KERBEROS"
     export SSL="0"
+    go test -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
     go test -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     # Tests with http transport and kerberos authentication
@@ -106,6 +107,7 @@ function run_tests() {
     export TRANSPORT="http"
     export AUTH="KERBEROS"
     export SSL="1"
+    go test -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
     go test -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     # Tests with binary transport and none authentication
@@ -115,6 +117,7 @@ function run_tests() {
     export TRANSPORT="binary"
     export AUTH="NONE"
     export SSL="0"
+    go test -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
     go test -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     echo "mode: count" >coverage.out
