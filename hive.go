@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os/user"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -239,6 +240,7 @@ func (c *Connection) Close(ctx context.Context) error {
 const _RUNNING = 0
 const _FINISHED = 1
 const _NONE = 2
+const _CONTEXT_DONE = 3
 
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
@@ -253,17 +255,94 @@ type Cursor struct {
 	Err             error
 }
 
+// WaitForCompletion waits for an async operation to finish
+func (c *Cursor) WaitForCompletion(ctx context.Context) {
+	done := make(chan interface{})
+	defer close(done)
+
+	var mux sync.Mutex
+	var contextDone bool = false
+
+	go func() {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			mux.Lock()
+			contextDone = true
+			mux.Unlock()
+		}
+	}()
+
+	for true {
+		operationStatus := c.Poll(context.Background(), true)
+		if c.Err != nil {
+			return
+		}
+		status := operationStatus.OperationState
+		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
+		if finished {
+			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
+				c.Err = fmt.Errorf(*operationStatus.TaskStatus)
+			}
+			break
+		}
+
+		if c.Error() != nil {
+			return
+		}
+
+		mux.Lock()
+		if contextDone {
+			c.Err = fmt.Errorf("Context was done before the query was executed")
+			c.state = _CONTEXT_DONE
+			mux.Unlock()
+			return
+		}
+		mux.Unlock()
+		time.Sleep(time.Duration(10 * time.Millisecond))
+	}
+	done <- nil
+}
+
 // Execute sends a query to hive for execution with a context
 // If the context is Done it may not be possible to cancel the opeartion
 // Use async = true
 func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
+	if async {
+		c.executeAsync(ctx, query)
+	} else {
+		// We cannot trust in setting executeReq.RunAsync = true
+		// because if the context ends the operation can't be cancelled cleanly
+		c.executeAsync(ctx, query)
+		if c.Err != nil {
+			return
+		}
+		c.WaitForCompletion(ctx)
+		if c.Err != nil {
+			if c.state == _CONTEXT_DONE {
+				// TODO, which context to use here
+				originalError := c.Err
+				c.Cancel(context.Background())
+				if c.Err != nil {
+					return
+				}
+				c.resetState(ctx)
+				c.Err = originalError
+				c.state = _FINISHED
+			}
+			return
+		}
+	}
+}
+
+func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	c.resetState(ctx)
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
-	executeReq.RunAsync = async
+	executeReq.RunAsync = true
 
 	// The context from thrift doesn't seem to work
 	done := make(chan interface{})
@@ -288,6 +367,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 			*/
 		}()
 		// Mark the operation as finished
+		// TODO mark as context done
 		c.state = _FINISHED
 		c.Err = fmt.Errorf("Context was done before the query was executed")
 		return
@@ -328,10 +408,12 @@ func (c *Cursor) Poll(ctx context.Context, getProgres bool) (status *hiveserver.
 
 // Finished returns true if the last async operation has finished
 func (c *Cursor) Finished() bool {
-	status := c.Poll(context.Background(), true).OperationState
+	operationStatus := c.Poll(context.Background(), true)
+
 	if c.Err != nil {
-		return false
+		return true
 	}
+	status := operationStatus.OperationState
 	return !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
 }
 

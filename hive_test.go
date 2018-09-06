@@ -276,14 +276,12 @@ func TestWithContext(t *testing.T) {
 	}
 	connection, cursor := prepareTable(t, 0, 1000)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
-
-	cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
+	cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", false)
 	if cursor.Error() == nil {
 		t.Fatal("Error should be context has been done")
 	}
-
 	if cursor.HasMore(context.Background()) {
 		t.Fatal("All rows should have been read")
 	}
@@ -295,7 +293,7 @@ func TestWithContext(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestWithContextAndExecute(t *testing.T) {
+func TestExecute(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	auth := os.Getenv("AUTH")
 	if auth == "KERBEROS" && transport == "http" || true {
