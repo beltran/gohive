@@ -36,7 +36,7 @@ if cursor.Err != nil {
 
 var i int32
 var s string
-for ; cursor.HasMore(ctx); {
+for cursor.HasMore(ctx) {
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }
