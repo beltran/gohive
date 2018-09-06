@@ -134,7 +134,6 @@ func Connect(ctx context.Context, host string, port int, auth string,
 			httpTransport, ok := transport.(*thrift.THttpClient)
 			if ok {
 				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
-				httpTransport.SetHeader("X-XSRF-HEADER", "true ")
 			}
 			if err != nil {
 				return nil, err
@@ -643,6 +642,7 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 }
 
 type InMemoryCookieJar struct {
+	given   *bool
 	storage map[string][]http.Cookie
 }
 
@@ -650,6 +650,7 @@ func (jar InMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	for _, cookie := range cookies {
 		jar.storage["cliservice"] = []http.Cookie{*cookie}
 	}
+	*jar.given = false
 }
 
 func (jar InMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
@@ -661,10 +662,16 @@ func (jar InMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
 			}
 		}
 	}
-	return cookiesArray
+	if !*jar.given {
+		*jar.given = true
+		return cookiesArray
+	} else {
+		return nil
+	}
 }
 
 func newCookieJar() InMemoryCookieJar {
 	storage := make(map[string][]http.Cookie)
-	return InMemoryCookieJar{storage}
+	f := false
+	return InMemoryCookieJar{&f, storage}
 }
