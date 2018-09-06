@@ -320,6 +320,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 		c.WaitForCompletion(ctx)
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
+				// TODO, which context to use here
 				c.handleDoneContext(context.Background())
 			}
 			return
@@ -328,11 +329,12 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 }
 
 func (c *Cursor) handleDoneContext(ctx context.Context) {
-	// TODO, which context to use here
 	originalError := c.Err
-	c.Cancel(ctx)
-	if c.Err != nil {
-		return
+	if c.operationHandle != nil {
+		c.Cancel(ctx)
+		if c.Err != nil {
+			return
+		}
 	}
 	c.resetState(ctx)
 	c.Err = originalError
@@ -352,6 +354,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 
 	if c.Err != nil {
+		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
+			c.state = _CONTEXT_DONE
+		}
 		return
 	}
 	if !success(responseExecute.GetStatus()) {
