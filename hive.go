@@ -308,31 +308,36 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 // If the context is Done it may not be possible to cancel the opeartion
 // Use async = true
 func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
-	if async {
-		c.executeAsync(ctx, query)
-	} else {
+	c.executeAsync(ctx, query)
+	if !async {
 		// We cannot trust in setting executeReq.RunAsync = true
 		// because if the context ends the operation can't be cancelled cleanly
-		c.executeAsync(ctx, query)
 		if c.Err != nil {
+			if c.state == _CONTEXT_DONE {
+				c.handleDoneContext(context.Background())
+			}
 			return
 		}
 		c.WaitForCompletion(ctx)
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
-				// TODO, which context to use here
-				originalError := c.Err
-				c.Cancel(context.Background())
-				if c.Err != nil {
-					return
-				}
-				c.resetState(ctx)
-				c.Err = originalError
-				c.state = _FINISHED
+				c.handleDoneContext(context.Background())
 			}
 			return
 		}
 	}
+}
+
+func (c *Cursor) handleDoneContext(ctx context.Context) {
+	// TODO, which context to use here
+	originalError := c.Err
+	c.Cancel(ctx)
+	if c.Err != nil {
+		return
+	}
+	c.resetState(ctx)
+	c.Err = originalError
+	c.state = _FINISHED
 }
 
 func (c *Cursor) executeAsync(ctx context.Context, query string) {
@@ -343,35 +348,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
 	executeReq.RunAsync = true
-
-	// The context from thrift doesn't seem to work
-	done := make(chan interface{})
 	var responseExecute *hiveserver.TExecuteStatementResp
-	go func() {
-		defer close(done)
-		responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
-		done <- nil
-	}()
 
-	select {
-	case <-done:
-	case <-ctx.Done():
-		// TODO revisit this context
-		go func() {
-			// This can only be cancelled if it was async?
-			/*
-				err := c.Cancel(context.Background())
-				if err != nil {
-						panic (err)
-				}
-			*/
-		}()
-		// Mark the operation as finished
-		// TODO mark as context done
-		c.state = _FINISHED
-		c.Err = fmt.Errorf("Context was done before the query was executed")
-		return
-	}
+	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 
 	if c.Err != nil {
 		return

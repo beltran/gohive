@@ -271,23 +271,24 @@ func TestSmallFetchSize(t *testing.T) {
 }
 
 func TestWithContext(t *testing.T) {
-	if os.Getenv("SKIP_UNSTABLE") == "1" {
-		return
-	}
 	connection, cursor := prepareTable(t, 0, 1000)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-	cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", false)
-	if cursor.Error() == nil {
-		t.Fatal("Error should be context has been done")
-	}
-	if cursor.HasMore(context.Background()) {
-		t.Fatal("All rows should have been read")
-	}
+	values := []int{0, 0, 0, 100, 500, 1000}
 
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
+	for _, value := range values {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
+		defer cancel()
+		cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", false)
+		if cursor.Error() == nil {
+			t.Fatal("Error should be context has been done")
+		}
+		if cursor.HasMore(context.Background()) {
+			t.Fatal("All rows should have been read")
+		}
+
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
 	}
 
 	closeAll(t, connection, cursor)
