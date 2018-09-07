@@ -224,10 +224,29 @@ func TestIsRow(t *testing.T) {
 			t.Fatal("Error shouldn't be nil")
 		}
 		if cursor.Err.Error() != "No more rows are left" {
-			t.Fatal("Error should be No more rows are left")
+			t.Fatal("Error should be 'No more rows are left'")
 		}
 	}
 
+	closeAll(t, connection, cursor)
+}
+
+func TestFetchContext(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1000)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var i int32
+	var s string
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(0)*time.Millisecond)
+	defer cancel()
+	cursor.FetchOne(ctx, &i, &s)
+
+	if cursor.Error() == nil {
+		t.Fatal("Error should be context has been done")
+	}
 	closeAll(t, connection, cursor)
 }
 
@@ -287,7 +306,7 @@ func TestWithContext(t *testing.T) {
 		if cursor.Error() == nil {
 			t.Fatal("Error should be context has been done")
 		}
-		
+
 		if strings.Contains(cursor.Error().Error(), "context") {
 			if cursor.HasMore(context.Background()) {
 				t.Fatal("All rows should have been read")
