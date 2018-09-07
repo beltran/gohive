@@ -240,6 +240,7 @@ const _RUNNING = 0
 const _FINISHED = 1
 const _NONE = 2
 const _CONTEXT_DONE = 3
+const _ERROR = 4
 
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
@@ -322,6 +323,8 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 			if c.state == _CONTEXT_DONE {
 				// TODO, which context to use here
 				c.handleDoneContext(context.Background())
+			} else if c.state == _ERROR {
+				c.Err = fmt.Errorf("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 			}
 			return
 		}
@@ -356,6 +359,12 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	if c.Err != nil {
 		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
 			c.state = _CONTEXT_DONE
+			if responseExecute == nil {
+				c.state = _ERROR
+			} else {
+				// We may need this to cancel the operation
+				c.operationHandle = responseExecute.OperationHandle
+			}
 		}
 		return
 	}
