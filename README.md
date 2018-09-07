@@ -6,49 +6,60 @@ GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl)
 
 ## Quickstart
 
-```go 
-async := false
-ctx = context.Background()
-configuration := NewConnectConfiguration()
-configuration.Service = "hive"
-configuration.FetchSize = 1000
-// Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
-if errConn != nil {
-    log.Fatal(errConn)
-}
-cursor := connection.Cursor()
+```go
+package main
+import (
+    "fmt"
+    "log"
+    "context"
 
-cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
-if cursor.Err != nil {
-    log.Fatal(cursor.Err)
-}
+    "github.com/beltran/gohive"
+)
 
-cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
-if cursor.Err != nil {
-    log.Fatal(cursor.Err)
-}
+func main() {
+    async := false
+    ctx := context.Background()
+    configuration := gohive.NewConnectConfiguration()
+    configuration.Service = "hive"
+    configuration.FetchSize = 1000
+    // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
+    connection, errConn := gohive.Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
+    if errConn != nil {
+        log.Fatal(errConn)
+    }
+    cursor := connection.Cursor()
 
-cursor.Execute(ctx, "SELECT * FROM myTable", async)
-if cursor.Err != nil {
-    log.Fatal(cursor.Err)
-}
-
-var i int32
-var s string
-for cursor.HasMore(ctx) {
+    cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }
-    cursor.FetchOne(ctx, &i, &s)
+
+    cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }
-    fmt.Println(i, s)
-}
 
-cursor.Close(ctx)
-connection.Close(ctx)
+    cursor.Execute(ctx, "SELECT * FROM myTable", async)
+    if cursor.Err != nil {
+        log.Fatal(cursor.Err)
+    }
+
+    var i int32
+    var s string
+    for cursor.HasMore(ctx) {
+        if cursor.Err != nil {
+            log.Fatal(cursor.Err)
+        }
+        cursor.FetchOne(ctx, &i, &s)
+        if cursor.Err != nil {
+            log.Fatal(cursor.Err)
+        }
+        fmt.Println(i, s)
+    }
+
+    cursor.Close(ctx)
+    connection.Close(ctx)
+}
 ```
 
 `cursor.HasMore` may query hive for more rows if not all of them have been received. Once the row is
