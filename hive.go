@@ -290,7 +290,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		if c.Error() != nil {
 			return
 		}
-
+		time.Sleep(time.Duration(10 * time.Millisecond))
 		mux.Lock()
 		if contextDone {
 			c.Err = fmt.Errorf("Context was done before the query was executed")
@@ -299,7 +299,6 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 			return
 		}
 		mux.Unlock()
-		time.Sleep(time.Duration(10 * time.Millisecond))
 	}
 	done <- nil
 }
