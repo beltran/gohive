@@ -422,7 +422,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 		c.queue = nil
 		if !c.HasMore(ctx) {
 			c.Err = fmt.Errorf("No more rows are left")
-			return
+			return false
+		}
+		if c.Err != nil {
+			return false
 		}
 	}
 
@@ -527,9 +530,18 @@ func (c *Cursor) Error() error {
 
 func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	rowsAvailable := make(chan error)
-	defer close(rowsAvailable)
+	var stopLock sync.Mutex
+	var done bool = false
 	go func() {
+		defer close(rowsAvailable)
 		for true {
+			stopLock.Lock()
+			if done {
+				stopLock.Unlock()
+				return
+			}
+			stopLock.Unlock()
+
 			fetchRequest := hiveserver.NewTFetchResultsReq()
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
@@ -562,6 +574,9 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	select {
 	case err = <-rowsAvailable:
 	case <-ctx.Done():
+		stopLock.Lock()
+		done = true
+		stopLock.Unlock()
 	}
 
 	if err != nil {
