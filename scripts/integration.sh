@@ -107,8 +107,7 @@ function run_tests() {
     export TRANSPORT="http"
     export AUTH="KERBEROS"
     export SSL="1"
-    # We don't run with race here because there seems to be a bug in thrift when the context ends immediately
-    go test -tags integration -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+    go test -tags integration -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
     go test -tags integration -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 
     # Tests with binary transport and none authentication
