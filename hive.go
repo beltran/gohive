@@ -538,6 +538,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			stopLock.Lock()
 			if done {
 				stopLock.Unlock()
+				rowsAvailable <- nil
 				return
 			}
 			stopLock.Unlock()
@@ -577,6 +578,10 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		stopLock.Lock()
 		done = true
 		stopLock.Unlock()
+		select {
+			// Wait for goroutine to finish
+		case err = <-rowsAvailable:
+		}
 	}
 
 	if err != nil {
