@@ -275,7 +275,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 	}()
 
 	for true {
-		operationStatus := c.Poll(context.Background(), true)
+		operationStatus := c.Poll(true)
 		if c.Err != nil {
 			return
 		}
@@ -379,14 +379,15 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 }
 
 // Poll returns the current status of the last operation
-func (c *Cursor) Poll(ctx context.Context, getProgres bool) (status *hiveserver.TGetOperationStatusResp) {
+func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusResp) {
 	c.Err = nil
 	progressGet := getProgres
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
 	pollRequest.GetProgressUpdate = &progressGet
 	var responsePoll *hiveserver.TGetOperationStatusResp
-	responsePoll, c.Err = c.conn.client.GetOperationStatus(ctx, pollRequest)
+	// Context ignored
+	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
 	if c.Err != nil {
 		return nil
 	}
@@ -399,7 +400,7 @@ func (c *Cursor) Poll(ctx context.Context, getProgres bool) (status *hiveserver.
 
 // Finished returns true if the last async operation has finished
 func (c *Cursor) Finished() bool {
-	operationStatus := c.Poll(context.Background(), true)
+	operationStatus := c.Poll(true)
 
 	if c.Err != nil {
 		return true
