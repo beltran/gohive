@@ -554,23 +554,131 @@ func TestHasMore(t *testing.T) {
 }
 
 func TestTypesError(t *testing.T) {
-	connection, cursor := prepareTable(t, 1, 1000)
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
 
-	var j int32
+	var b bool
+	var tinyInt int8
+	var smallInt int16
+	var normalInt int32
+	var bigInt int64
+	// This value is store as a float32. The go thrift API returns a floa64 though.
+	var floatType float64
+	var double float64
 	var s string
+	var timeStamp string
+	var binary []byte
+	var array string
+	var mapType string
+	var structType string
+	var union string
+	var decimal string
+	var dummy chan<- int
 
-	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
-	cursor.FetchOne(context.Background(), &j)
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt)
 	if cursor.Err == nil {
 		t.Fatal("Error should have happened because there are not enough arguments")
 	}
 
-	cursor.FetchOne(context.Background(), &s, &s)
+	cursor.FetchOne(context.Background(), &dummy, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
 	if cursor.Err == nil {
-		t.Fatal("Error should have happened because the arguments have wrong type")
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &dummy, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &dummy, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &dummy, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &dummy,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&dummy, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &dummy, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &dummy, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &dummy, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &dummy, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &dummy, &mapType, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &dummy, &structType, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &dummy, &union, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &dummy, &decimal)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &dummy)
+	if cursor.Err == nil {
+		t.Fatal("Error should have happened because there are not enough arguments")
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
 	}
 
 	closeAll(t, connection, cursor)
