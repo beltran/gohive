@@ -292,7 +292,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		if c.Error() != nil {
 			return
 		}
-		time.Sleep(time.Duration(10 * time.Millisecond))
+		time.Sleep(time.Duration(time.Duration(c.conn.configuration.PollIntervalInMillis)) * time.Millisecond)
 		mux.Lock()
 		if contextDone {
 			c.Err = fmt.Errorf("Context was done before the query was executed")
