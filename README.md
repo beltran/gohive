@@ -9,7 +9,6 @@ GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl)
 ```go
 package main
 import (
-    "fmt"
     "log"
     "context"
 
@@ -54,7 +53,7 @@ func main() {
         if cursor.Err != nil {
             log.Fatal(cursor.Err)
         }
-        fmt.Println(i, s)
+        log.Println(i, s)
     }
 
     cursor.Close()

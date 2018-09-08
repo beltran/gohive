@@ -578,7 +578,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		done = true
 		stopLock.Unlock()
 		select {
-			// Wait for goroutine to finish
+		// Wait for goroutine to finish
 		case err = <-rowsAvailable:
 		}
 	}
