@@ -289,7 +289,7 @@ func TestSmallFetchSize(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestWithContext(t *testing.T) {
+func TestWithContextSync(t *testing.T) {
 	if os.Getenv("TRANSPORT") == "http" {
 		if os.Getenv("SKIP_UNSTABLE") == "1" {
 			return
@@ -315,6 +315,22 @@ func TestWithContext(t *testing.T) {
 				t.Fatal(cursor.Error())
 			}
 		}
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestWithContextAsync(t *testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+
+	value := 0
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
+	defer cancel()
+	time.Sleep(500 * time.Millisecond)
+	cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", true)
+	if cursor.Error() != nil {
+		t.Fatal("Error shouldn't happen despite the context being done")
 	}
 
 	closeAll(t, connection, cursor)
