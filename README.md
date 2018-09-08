@@ -57,8 +57,8 @@ func main() {
         fmt.Println(i, s)
     }
 
-    cursor.Close(ctx)
-    connection.Close(ctx)
+    cursor.Close()
+    connection.Close()
 }
 ```
 

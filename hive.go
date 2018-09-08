@@ -216,10 +216,11 @@ func (c *Connection) Cursor() *Cursor {
 }
 
 // Close closes a session
-func (c *Connection) Close(ctx context.Context) error {
+func (c *Connection) Close() error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
 	closeRequest.SessionHandle = c.sessionHandle
-	responseClose, err := c.client.CloseSession(ctx, closeRequest)
+	// This context is ignored
+	responseClose, err := c.client.CloseSession(context.Background(), closeRequest)
 
 	if c.transport != nil {
 		errTransport := c.transport.Close()
@@ -313,15 +314,14 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 		// because if the context ends the operation can't be cancelled cleanly
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
-				c.handleDoneContext(context.Background())
+				c.handleDoneContext()
 			}
 			return
 		}
 		c.WaitForCompletion(ctx)
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
-				// TODO, which context to use here
-				c.handleDoneContext(context.Background())
+				c.handleDoneContext()
 			} else if c.state == _ERROR {
 				c.Err = fmt.Errorf("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 			}
@@ -330,7 +330,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 	}
 }
 
-func (c *Cursor) handleDoneContext(ctx context.Context) {
+func (c *Cursor) handleDoneContext() {
 	originalError := c.Err
 	if c.operationHandle != nil {
 		c.Cancel()
@@ -338,13 +338,13 @@ func (c *Cursor) handleDoneContext(ctx context.Context) {
 			return
 		}
 	}
-	c.resetState(ctx)
+	c.resetState()
 	c.Err = originalError
 	c.state = _FINISHED
 }
 
 func (c *Cursor) executeAsync(ctx context.Context, query string) {
-	c.resetState(ctx)
+	c.resetState()
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
@@ -611,11 +611,11 @@ func (c *Cursor) Cancel() {
 }
 
 // Close close the cursor
-func (c *Cursor) Close(ctx context.Context) {
-	c.Err = c.resetState(ctx)
+func (c *Cursor) Close() {
+	c.Err = c.resetState()
 }
 
-func (c *Cursor) resetState(ctx context.Context) error {
+func (c *Cursor) resetState() error {
 	c.response = nil
 	c.Err = nil
 	c.queue = nil
@@ -626,7 +626,8 @@ func (c *Cursor) resetState(ctx context.Context) error {
 	if c.operationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()
 		closeRequest.OperationHandle = c.operationHandle
-		responseClose, err := c.conn.client.CloseOperation(ctx, closeRequest)
+		// This context is ignored
+		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
 		c.operationHandle = nil
 		if err != nil {
 			return err
