@@ -22,7 +22,7 @@ func main() {
     configuration.Service = "hive"
     configuration.FetchSize = 1000
     // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-    connection, errConn := gohive.Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
+    connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
     if errConn != nil {
         log.Fatal(errConn)
     }

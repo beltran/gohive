@@ -65,7 +65,7 @@ func NewConnectConfiguration() *ConnectConfiguration {
 }
 
 // Connect to hive server
-func Connect(ctx context.Context, host string, port int, auth string,
+func Connect(host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 
 	var socket thrift.TTransport
@@ -177,7 +177,8 @@ func Connect(ctx context.Context, host string, port int, auth string,
 	openSession.Configuration = configuration.HiveConfiguration
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
-	response, err := client.OpenSession(ctx, openSession)
+	// Context is ignored
+	response, err := client.OpenSession(context.Background(), openSession)
 	if err != nil {
 		return
 	}

@@ -23,7 +23,7 @@ func TestConnectDefault(t *testing.T) {
 
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
-	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestConnectHttp(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestConnectSasl(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	connection, err := Connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := Connect("hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestConnectSasl(t *testing.T) {
 func TestClosedPort(t *testing.T) {
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
-	_, err := Connect(context.Background(), "hs2.example.com", 12345, getAuth(), configuration)
+	_, err := Connect("hs2.example.com", 12345, getAuth(), configuration)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -692,7 +692,7 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 		port = 10000
 		configuration.HttpPath = "cliservice"
 	}
-	connection, errConn := Connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)
+	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}
