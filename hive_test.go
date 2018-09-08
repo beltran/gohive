@@ -27,7 +27,7 @@ func TestConnectDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	connection.Close(context.Background())
+	connection.Close()
 }
 
 func TestConnectHttp(t *testing.T) {
@@ -50,7 +50,7 @@ func TestConnectHttp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	connection.Close(context.Background())
+	connection.Close()
 }
 
 func TestConnectSasl(t *testing.T) {
@@ -73,7 +73,7 @@ func TestConnectSasl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	connection.Close(context.Background())
+	connection.Close()
 }
 
 func TestClosedPort(t *testing.T) {
@@ -337,7 +337,7 @@ func TestExecute(t *testing.T) {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Cancel(context.Background())
+	cursor.Cancel()
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
 	}
@@ -442,7 +442,7 @@ func TestCancel(t *testing.T) {
 	if elapsed > time.Duration(time.Second*5) {
 		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
 	}
-	cursor.Cancel(context.Background())
+	cursor.Cancel()
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
 	}
@@ -701,11 +701,11 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 }
 
 func closeAll(t *testing.T, connection *Connection, cursor *Cursor) {
-	cursor.Close(context.Background())
+	cursor.Close()
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
 	}
-	err := connection.Close(context.Background())
+	err := connection.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
