@@ -333,7 +333,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 func (c *Cursor) handleDoneContext(ctx context.Context) {
 	originalError := c.Err
 	if c.operationHandle != nil {
-		c.Cancel(ctx)
+		c.Cancel()
 		if c.Err != nil {
 			return
 		}
@@ -594,12 +594,13 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 }
 
 // Cancel tries to cancel the current operation
-func (c *Cursor) Cancel(ctx context.Context) {
+func (c *Cursor) Cancel() {
 	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
 	cancelRequest.OperationHandle = c.operationHandle
 	var responseCancel *hiveserver.TCancelOperationResp
-	responseCancel, c.Err = c.conn.client.CancelOperation(ctx, cancelRequest)
+	// This context is simply ignored
+	responseCancel, c.Err = c.conn.client.CancelOperation(context.Background(), cancelRequest)
 	if c.Err != nil {
 		return
 	}

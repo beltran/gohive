@@ -337,7 +337,7 @@ func TestExecute(t *testing.T) {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Cancel(context.Background())
+	cursor.Cancel()
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
 	}
@@ -442,7 +442,7 @@ func TestCancel(t *testing.T) {
 	if elapsed > time.Duration(time.Second*5) {
 		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
 	}
-	cursor.Cancel(context.Background())
+	cursor.Cancel()
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
 	}
