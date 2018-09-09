@@ -242,6 +242,7 @@ func TestFetchContext(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(0)*time.Millisecond)
 	defer cancel()
+	time.Sleep(500 * time.Millisecond)
 	cursor.FetchOne(ctx, &i, &s)
 
 	if cursor.Error() == nil {
@@ -321,16 +322,23 @@ func TestWithContextSync(t *testing.T) {
 }
 
 func TestWithContextAsync(t *testing.T) {
+	if os.Getenv("TRANSPORT") == "http" {
+		if os.Getenv("SKIP_UNSTABLE") == "1" {
+			return
+		}
+	}
 	connection, cursor := prepareTable(t, 0, 1000)
 
 	value := 0
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
-	defer cancel()
-	time.Sleep(500 * time.Millisecond)
-	cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", true)
-	if cursor.Error() != nil {
-		t.Fatal("Error shouldn't happen despite the context being done")
+	for i:= 0; i < 20; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
+		defer cancel()
+		time.Sleep(100 * time.Millisecond)
+		cursor.Execute(ctx, "SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM pokes a JOIN pokes b", true)
+		if cursor.Error() != nil {
+			t.Fatal("Error shouldn't happen despite the context being done: ", cursor.Err)
+		}
 	}
 
 	closeAll(t, connection, cursor)
