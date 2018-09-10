@@ -525,7 +525,7 @@ func (c *Cursor) Error() error {
 func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	rowsAvailable := make(chan error)
 	var stopLock sync.Mutex
-	var done bool = false
+	var done = false
 	go func() {
 		defer close(rowsAvailable)
 		for true {
@@ -574,8 +574,9 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		stopLock.Unlock()
 		select {
 		// Wait for goroutine to finish
-		case err = <-rowsAvailable:
+		case <-rowsAvailable:
 		}
+		err = fmt.Errorf("Context is done")
 	}
 
 	if err != nil {
