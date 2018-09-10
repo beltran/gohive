@@ -251,6 +251,27 @@ func TestFetchContext(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestHasMoreContext(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var i int32
+	var s string
+
+	cursor.FetchOne(context.Background(), &i, &s)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(0)*time.Millisecond)
+	defer cancel()
+	time.Sleep(500 * time.Millisecond)
+	cursor.HasMore(ctx)
+	if cursor.Error() == nil {
+		t.Fatal("Error should be context has been done")
+	}
+	closeAll(t, connection, cursor)
+}
+
 func TestSmallFetchSize(t *testing.T) {
 	async := false
 	connection, cursor := prepareTable(t, 4, 2)
