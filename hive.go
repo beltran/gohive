@@ -541,7 +541,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
-			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
+			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
 			if err != nil {
 				rowsAvailable <- err
 				return
