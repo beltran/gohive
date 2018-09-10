@@ -166,7 +166,9 @@ func TestSelect(t *testing.T) {
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
-
+		if !cursor.Finished() {
+			t.Fatal("Finished should be true")
+		}
 		for cursor.HasMore(context.Background()) {
 			if cursor.Error() != nil {
 				t.Fatal(cursor.Error())
@@ -319,7 +321,7 @@ func TestWithContextSync(t *testing.T) {
 	}
 	connection, cursor := prepareTable(t, 0, 1000)
 
-	values := []int{0, 0, 0, 200, 200, 200, 300, 400, 100, 500, 1000, 5000}
+	values := []int{0, 0, 0, 200, 200, 200, 300, 400, 100, 500, 1000}
 
 	for _, value := range values {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
@@ -803,10 +805,15 @@ func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection,
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
-
+	if !cursor.Finished() {
+		t.Fatal("Finished should be true")
+	}
 	cursor.Execute(context.Background(), "CREATE TABLE pokes (a INT, b STRING)", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
+	}
+	if !cursor.Finished() {
+		t.Fatal("Finished should be true")
 	}
 	if rowsToInsert > 0 {
 		values := ""
@@ -819,6 +826,9 @@ func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection,
 		cursor.Execute(context.Background(), "INSERT INTO pokes VALUES "+values, false)
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
+		}
+		if !cursor.Finished() {
+			t.Fatal("Finished should be true")
 		}
 	}
 	return connection, cursor
