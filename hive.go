@@ -260,7 +260,7 @@ type Cursor struct {
 
 // WaitForCompletion waits for an async operation to finish
 func (c *Cursor) WaitForCompletion(ctx context.Context) {
-	done := make(chan interface{})
+	done := make(chan interface{}, 1)
 	defer close(done)
 
 	var mux sync.Mutex

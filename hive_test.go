@@ -430,8 +430,8 @@ func TestAsync(t *testing.T) {
 	}
 	stop := time.Now()
 	elapsed := stop.Sub(start)
-	if elapsed > time.Duration(time.Second*5) {
-		t.Fatal("It shouldn't have taken more than 5 seconds to run the query in async mode")
+	if elapsed > time.Duration(time.Second*7) {
+		t.Fatal("It shouldn't have taken more than 7 seconds to run the query in async mode")
 	}
 
 	for !cursor.Finished() {
@@ -471,6 +471,64 @@ func TestAsync(t *testing.T) {
 
 	if i != 1 || s != "1" {
 		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestWaitForCompletion(t *testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.WaitForCompletion(context.Background())
+
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	var i int32
+	var s string
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if cursor.HasMore(context.Background()) {
+		t.Fatal("All rows should have been read")
+	}
+
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	if i != 1 || s != "1" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestWaitForCompletionContext(t *testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes d, pokes e, pokes f order by d.a, e.a, f.a", true)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	values := []int{0, 0, 0}
+	for _, value := range values {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(0)*time.Millisecond)
+		defer cancel()
+		time.Sleep(time.Duration(value) * time.Millisecond)
+		cursor.WaitForCompletion(ctx)
+
+		if cursor.Error() == nil {
+			t.Fatal("Context should have been done")
+		}
 	}
 
 	closeAll(t, connection, cursor)
