@@ -243,6 +243,7 @@ const _FINISHED = 1
 const _NONE = 2
 const _CONTEXT_DONE = 3
 const _ERROR = 4
+const _ASYNC_ENDED = 5
 
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
@@ -328,6 +329,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 			}
 			return
 		}
+		c.state = _ASYNC_ENDED
 	}
 }
 
