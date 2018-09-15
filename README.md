@@ -2,37 +2,22 @@
 [![Build Status](https://travis-ci.org/beltran/gohive.svg?branch=master)](https://travis-ci.org/beltran/gohive) [![Coverage Status](https://coveralls.io/repos/github/beltran/gohive/badge.svg?branch=master)](https://coveralls.io/github/beltran/gohive?branch=master)
 
 
-GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
+GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and http transport, with and without SSL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
+
+## Installation
+```
+go get github.com/beltran/gohive
+```
 
 ## Quickstart
 
 ```go
-package main
-import (
-    "log"
-    "context"
-
-    "github.com/beltran/gohive"
-)
-
-func main() {
-    async := false
-    ctx := context.Background()
-    configuration := gohive.NewConnectConfiguration()
-    configuration.Service = "hive"
-    configuration.FetchSize = 1000
-    // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
     connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
     if errConn != nil {
         log.Fatal(errConn)
     }
     cursor := connection.Cursor()
-
-    cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
-    if cursor.Err != nil {
-        log.Fatal(cursor.Err)
-    }
-
+    
     cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
@@ -46,9 +31,6 @@ func main() {
     var i int32
     var s string
     for cursor.HasMore(ctx) {
-        if cursor.Err != nil {
-            log.Fatal(cursor.Err)
-        }
         cursor.FetchOne(ctx, &i, &s)
         if cursor.Err != nil {
             log.Fatal(cursor.Err)
@@ -116,7 +98,7 @@ This implies setting in hive-site.xml:
 - `hive.server2.thrift.http.port = 10001`
 
 ## Running tests
-Tests need an instance of hive listening at `hs2.example.com`. This can be set up with:
+Tests can be run with:
 ```
 ./scripts/integration
 ```
