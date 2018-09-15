@@ -30,6 +30,22 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
+func TestResuseConnection(t * testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.Close()
+
+	newCursor := connection.Cursor()
+	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	closeAll(t, connection, newCursor)
+}
+
 func TestConnectHttp(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	ssl := os.Getenv("SSL")
@@ -382,6 +398,9 @@ func TestExecute(t *testing.T) {
 	cursor.Execute(ctx, "INSERT INTO pokes VALUES(1, '1')", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
+	}
+	if !cursor.Finished() {
+		t.Fatal("Operation should have finished")
 	}
 
 	cursor.Cancel()
