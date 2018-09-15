@@ -30,6 +30,22 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
+func TestResuseConnection(t * testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.Close()
+
+	newCursor := connection.Cursor()
+	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	closeAll(t, connection, newCursor)
+}
+
 func TestConnectHttp(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	ssl := os.Getenv("SSL")
@@ -383,6 +399,9 @@ func TestExecute(t *testing.T) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+	if !cursor.Finished() {
+		t.Fatal("Operation should have finished")
+	}
 
 	cursor.Cancel()
 	if cursor.Err != nil {
@@ -421,9 +440,29 @@ func TestExecute(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestConsecutiveAsyncStatements(t * testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+	async_statements := []string{"INSERT INTO pokes VALUES(1, '1')", "USE DEFAULT", "USE DEFAULT", "SELECT * FROM pokes", "SELECT * FROM pokes"}
+
+	for _, stm := range(async_statements) {
+		cursor.Execute(context.Background(), stm, true)
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+
+		cursor.WaitForCompletion(context.Background())
+
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+	}
+	closeAll(t, connection, cursor)
+}
+
 func TestAsync(t *testing.T) {
 	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
+
 	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
