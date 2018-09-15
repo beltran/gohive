@@ -30,7 +30,7 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
-func TestResuseConnection(t * testing.T) {
+func TestResuseConnection(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute(context.Background(), "SHOW DATABASES", false)
 	if cursor.Error() != nil {
@@ -440,11 +440,11 @@ func TestExecute(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestConsecutiveAsyncStatements(t * testing.T) {
+func TestConsecutiveAsyncStatements(t *testing.T) {
 	connection, cursor := prepareTable(t, 0, 1000)
 	async_statements := []string{"INSERT INTO pokes VALUES(1, '1')", "USE DEFAULT", "USE DEFAULT", "SELECT * FROM pokes", "SELECT * FROM pokes"}
 
-	for _, stm := range(async_statements) {
+	for _, stm := range async_statements {
 		cursor.Execute(context.Background(), stm, true)
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
