@@ -440,9 +440,29 @@ func TestExecute(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestConsecutiveAsyncStatements(t * testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+	async_statements := []string{"INSERT INTO pokes VALUES(1, '1')", "USE DEFAULT", "USE DEFAULT", "SELECT * FROM pokes", "SELECT * FROM pokes"}
+
+	for _, stm := range(async_statements) {
+		cursor.Execute(context.Background(), stm, true)
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+
+		cursor.WaitForCompletion(context.Background())
+
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+	}
+	closeAll(t, connection, cursor)
+}
+
 func TestAsync(t *testing.T) {
 	connection, cursor := prepareTable(t, 0, 1000)
 	start := time.Now()
+
 	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, '1')", true)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
