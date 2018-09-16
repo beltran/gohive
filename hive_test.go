@@ -170,11 +170,11 @@ func TestManyFailures(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	async := false
-	connection, cursor := prepareTable(t, 2, 1000)
+	connection, cursor := prepareTable(t, 6000, 1000)
 
 	var i int32
 	var s string
-	var j int
+	var j int32
 	var z int
 
 	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
@@ -195,7 +195,7 @@ func TestSelect(t *testing.T) {
 			}
 			j++
 		}
-		if i != 2 || s != "2" {
+		if i != 6000 || s != "6000" {
 			log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
 		}
 		if cursor.HasMore(context.Background()) {
@@ -204,8 +204,8 @@ func TestSelect(t *testing.T) {
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
-		if j != 2 {
-			t.Fatal("Two rows expected here")
+		if j != 6000 {
+			t.Fatalf("6000 rows expected here")
 		}
 	}
 	closeAll(t, connection, cursor)
