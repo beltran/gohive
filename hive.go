@@ -419,16 +419,16 @@ func success(status *hiveserver.TStatus) bool {
 
 // FetchOne returns one row
 // TODO, check if this context is honored, which probably is not, and do something similar to Exec
-func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool) {
+func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 	c.Err = nil
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore(ctx) {
 			c.Err = fmt.Errorf("No more rows are left")
-			return false
+			return
 		}
 		if c.Err != nil {
-			return false
+			return
 		}
 	}
 
