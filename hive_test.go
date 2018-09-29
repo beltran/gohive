@@ -306,6 +306,20 @@ func TestSelect(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestSimpleSelect(t *testing.T) {
+	connection, cursor := prepareTable(t, 1, 1000)
+	fmt.Println("Select Coming")
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var s string
+	var i int32
+	cursor.FetchOne(context.Background(), &i, &s)
+
+	closeAll(t, connection, cursor)
+}
+
 func TestIsRow(t *testing.T) {
 	connection, cursor := prepareTable(t, 1, 1000)
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
@@ -382,6 +396,31 @@ func TestHasMoreContext(t *testing.T) {
 	if cursor.Error() == nil {
 		t.Fatal("Error should be context has been done")
 	}
+	closeAll(t, connection, cursor)
+}
+
+func TestRowMap(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{"pokes.a": int32(1), "pokes.b": "1"}
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	m = cursor.RowMap(context.Background())
+	expected = map[string]interface{}{"pokes.a": int32(2), "pokes.b": "2"}
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	if cursor.HasMore(context.Background()) {
+		log.Fatal("Shouldn't have any more values")
+	}
+
 	closeAll(t, connection, cursor)
 }
 
