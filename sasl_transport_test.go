@@ -46,6 +46,7 @@ func TestSaslTransportThrift(t *testing.T) {
 }
 
 const TRANSPORT_BINARY_DATA_SIZE = 4096
+
 var (
 	transport_bdata  []byte // test data for writing; same as data
 	transport_header map[string]string
