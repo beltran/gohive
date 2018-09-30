@@ -256,6 +256,7 @@ type Cursor struct {
 	state           int
 	newData         bool
 	Err             error
+	description     map[string]string
 }
 
 // WaitForCompletion waits for an async operation to finish
@@ -504,6 +505,37 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) (isRow bool
 	return
 }
 
+// Description return a map with the names of the columns and their types
+// must be called after a FetchResult request
+// a context should be added here but seems to be ignored by thrift
+func (c *Cursor) Description() map[string]string {
+	if c.description != nil {
+		return c.description
+	}
+	if c.operationHandle == nil {
+		c.Err = fmt.Errorf("Description can only be called after after a Poll or after an async request")
+	}
+
+	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
+	metaRequest.OperationHandle = c.operationHandle
+	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
+	if err != nil {
+		c.Err = err
+		return nil
+	}
+	if metaResponse.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
+		c.Err = fmt.Errorf(metaResponse.Status.String())
+		return nil
+	}
+	m := make(map[string]string, len(metaResponse.Schema.Columns))
+	for _, column := range metaResponse.Schema.Columns {
+		for _, typeDesc := range column.TypeDesc.Types {
+			m[column.ColumnName] = typeDesc.PrimitiveEntry.Type.String()
+		}
+	}
+	return m
+}
+
 // HasMore returns weather more rows can be fetched from the server
 func (c *Cursor) HasMore(ctx context.Context) bool {
 	c.Err = nil
@@ -620,6 +652,7 @@ func (c *Cursor) resetState() error {
 	c.columnIndex = 0
 	c.totalRows = 0
 	c.state = _NONE
+	c.description = nil
 	c.newData = false
 	if c.operationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()

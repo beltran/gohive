@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -163,6 +164,100 @@ func TestManyFailures(t *testing.T) {
 		if cursor.Error() == nil {
 			t.Fatal("Error should have happened")
 		}
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestDescription(t *testing.T) {
+	async := false
+	connection, cursor := prepareTable(t, 2, 1000)
+
+	// We come from an insert
+	d := cursor.Description()
+	expected := map[string]string{"col1": "INT_TYPE", "col2": "STRING_TYPE"}
+	if !reflect.DeepEqual(d, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	d = cursor.Description()
+	expected = map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	if !reflect.DeepEqual(d, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	var i int32
+	var s string
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	d = cursor.Description()
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	expected = map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	if !reflect.DeepEqual(d, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
+	}
+
+	// Call again it will follow a different path
+	d = cursor.Description()
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestDescriptionAsync(t *testing.T) {
+	async := true
+	connection, cursor := prepareTable(t, 2, 1000)
+
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	d := cursor.Description()
+	expected := map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	if !reflect.DeepEqual(d, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.WaitForCompletion(context.Background())
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	var i int32
+	var s string
+
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+	if i != 1 || s != "1" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
 	}
 
 	closeAll(t, connection, cursor)
@@ -807,6 +902,28 @@ func TestTypesError(t *testing.T) {
 		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
+	}
+
+	d := cursor.Description()
+	expected := map[string]string{
+		"all_types.bigint":    "BIGINT_TYPE",
+		"all_types.map":       "MAP_TYPE",
+		"all_types.union":     "UNION_TYPE",
+		"all_types.boolean":   "BOOLEAN_TYPE",
+		"all_types.smallint":  "SMALLINT_TYPE",
+		"all_types.int":       "INT_TYPE",
+		"all_types.double":    "DOUBLE_TYPE",
+		"all_types.timestamp": "TIMESTAMP_TYPE",
+		"all_types.array":     "ARRAY_TYPE",
+		"all_types.float":     "FLOAT_TYPE",
+		"all_types.binary":    "BINARY_TYPE",
+		"all_types.decimal":   "DECIMAL_TYPE",
+		"all_types.tinyint":   "TINYINT_TYPE",
+		"all_types.string":    "STRING_TYPE",
+		"all_types.struct":    "STRUCT_TYPE",
+	}
+	if !reflect.DeepEqual(d, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
 
 	closeAll(t, connection, cursor)
