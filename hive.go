@@ -45,8 +45,8 @@ type ConnectConfiguration struct {
 	PollIntervalInMillis int
 	FetchSize            int64
 	TransportMode        string
-	HttpPath             string
-	TlsConfig            *tls.Config
+	HTTPPath             string
+	TLSConfig            *tls.Config
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -59,8 +59,8 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		PollIntervalInMillis: 200,
 		FetchSize:            DEFAULT_FETCH_SIZE,
 		TransportMode:        "binary",
-		HttpPath:             "cliservice",
-		TlsConfig:            nil,
+		HTTPPath:             "cliservice",
+		TLSConfig:            nil,
 	}
 }
 
@@ -69,8 +69,8 @@ func Connect(host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 
 	var socket thrift.TTransport
-	if configuration.TlsConfig != nil {
-		socket, err = thrift.NewTSSLSocket(fmt.Sprintf("%s:%d", host, port), configuration.TlsConfig)
+	if configuration.TLSConfig != nil {
+		socket, err = thrift.NewTSSLSocket(fmt.Sprintf("%s:%d", host, port), configuration.TLSConfig)
 	} else {
 		socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
 	}
@@ -98,12 +98,12 @@ func Connect(host string, port int, auth string,
 
 	if configuration.TransportMode == "http" {
 		if auth == "NONE" {
-			httpClient, protocol, err := getHttpClient(configuration)
+			httpClient, protocol, err := getHTTPClient(configuration)
 			if err != nil {
 				return nil, err
 			}
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HttpPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
 			if err != nil {
 				return nil, err
 			}
@@ -121,7 +121,7 @@ func Connect(host string, port int, auth string,
 				return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
 			}
 
-			httpClient, protocol, err := getHttpClient(configuration)
+			httpClient, protocol, err := getHTTPClient(configuration)
 			if err != nil {
 				return nil, err
 			}
@@ -130,7 +130,7 @@ func Connect(host string, port int, auth string,
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
 			}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HttpPath, host, port), httpOptions).GetTransport(socket)
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HTTPPath, host, port), httpOptions).GetTransport(socket)
 			httpTransport, ok := transport.(*thrift.THttpClient)
 			if ok {
 				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
@@ -196,9 +196,9 @@ func Connect(host string, port int, auth string,
 	}, nil
 }
 
-func getHttpClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
-	if configuration.TlsConfig != nil {
-		transport := &http.Transport{TLSClientConfig: configuration.TlsConfig}
+func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
+	if configuration.TLSConfig != nil {
+		transport := &http.Transport{TLSClientConfig: configuration.TLSConfig}
 		httpClient = &http.Client{Transport: transport}
 		protocol = "https"
 	} else {
