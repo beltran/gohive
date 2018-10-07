@@ -256,7 +256,7 @@ type Cursor struct {
 	state           int
 	newData         bool
 	Err             error
-	description     map[string]string
+	description     [][]string
 }
 
 // WaitForCompletion waits for an async operation to finish
@@ -508,7 +508,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 // Description return a map with the names of the columns and their types
 // must be called after a FetchResult request
 // a context should be added here but seems to be ignored by thrift
-func (c *Cursor) Description() map[string]string {
+func (c *Cursor) Description() [][]string {
 	if c.description != nil {
 		return c.description
 	}
@@ -527,10 +527,10 @@ func (c *Cursor) Description() map[string]string {
 		c.Err = fmt.Errorf(metaResponse.Status.String())
 		return nil
 	}
-	m := make(map[string]string, len(metaResponse.Schema.Columns))
-	for _, column := range metaResponse.Schema.Columns {
+	m := make([][]string, len(metaResponse.Schema.Columns))
+	for i, column := range metaResponse.Schema.Columns {
 		for _, typeDesc := range column.TypeDesc.Types {
-			m[column.ColumnName] = typeDesc.PrimitiveEntry.Type.String()
+			m[i] = []string{column.ColumnName, typeDesc.PrimitiveEntry.Type.String()}
 		}
 	}
 	return m

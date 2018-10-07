@@ -175,7 +175,7 @@ func TestDescription(t *testing.T) {
 
 	// We come from an insert
 	d := cursor.Description()
-	expected := map[string]string{"col1": "INT_TYPE", "col2": "STRING_TYPE"}
+	expected := [][]string{[]string{"col1", "INT_TYPE"}, []string{"col2", "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
@@ -189,7 +189,7 @@ func TestDescription(t *testing.T) {
 	}
 
 	d = cursor.Description()
-	expected = map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	expected = [][]string{[]string{"pokes.a", "INT_TYPE"}, []string{"pokes.b", "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
@@ -209,7 +209,7 @@ func TestDescription(t *testing.T) {
 		t.Fatal(cursor.Err)
 	}
 
-	expected = map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	expected = [][]string{[]string{"pokes.a", "INT_TYPE"}, []string{"pokes.b", "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
@@ -233,7 +233,7 @@ func TestDescriptionAsync(t *testing.T) {
 	}
 
 	d := cursor.Description()
-	expected := map[string]string{"pokes.a": "INT_TYPE", "pokes.b": "STRING_TYPE"}
+	expected := [][]string{[]string{"pokes.a", "INT_TYPE"}, []string{"pokes.b", "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
@@ -905,22 +905,22 @@ func TestTypesError(t *testing.T) {
 	}
 
 	d := cursor.Description()
-	expected := map[string]string{
-		"all_types.bigint":    "BIGINT_TYPE",
-		"all_types.map":       "MAP_TYPE",
-		"all_types.union":     "UNION_TYPE",
-		"all_types.boolean":   "BOOLEAN_TYPE",
-		"all_types.smallint":  "SMALLINT_TYPE",
-		"all_types.int":       "INT_TYPE",
-		"all_types.double":    "DOUBLE_TYPE",
-		"all_types.timestamp": "TIMESTAMP_TYPE",
-		"all_types.array":     "ARRAY_TYPE",
-		"all_types.float":     "FLOAT_TYPE",
-		"all_types.binary":    "BINARY_TYPE",
-		"all_types.decimal":   "DECIMAL_TYPE",
-		"all_types.tinyint":   "TINYINT_TYPE",
-		"all_types.string":    "STRING_TYPE",
-		"all_types.struct":    "STRUCT_TYPE",
+	expected := [][]string{
+		[]string{"all_types.boolean", "BOOLEAN_TYPE"},
+		[]string{"all_types.tinyint", "TINYINT_TYPE"},
+		[]string{"all_types.smallint", "SMALLINT_TYPE"},
+		[]string{"all_types.int", "INT_TYPE"},
+		[]string{"all_types.bigint", "BIGINT_TYPE"},
+		[]string{"all_types.float", "FLOAT_TYPE"},
+		[]string{"all_types.double", "DOUBLE_TYPE"},
+		[]string{"all_types.string", "STRING_TYPE"},
+		[]string{"all_types.timestamp", "TIMESTAMP_TYPE"},
+		[]string{"all_types.binary", "BINARY_TYPE"},
+		[]string{"all_types.array", "ARRAY_TYPE"},
+		[]string{"all_types.map", "MAP_TYPE"},
+		[]string{"all_types.struct", "STRUCT_TYPE"},
+		[]string{"all_types.union", "UNION_TYPE"},
+		[]string{"all_types.decimal", "DECIMAL_TYPE"},
 	}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
