@@ -707,19 +707,19 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 	return 0, fmt.Errorf("All columns seem empty")
 }
 
-type InMemoryCookieJar struct {
+type inMemoryCookieJar struct {
 	given   *bool
 	storage map[string][]http.Cookie
 }
 
-func (jar InMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+func (jar inMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	for _, cookie := range cookies {
 		jar.storage["cliservice"] = []http.Cookie{*cookie}
 	}
 	*jar.given = false
 }
 
-func (jar InMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
+func (jar inMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	cookiesArray := []*http.Cookie{}
 	for pattern, cookies := range jar.storage {
 		if strings.Contains(u.String(), pattern) {
@@ -736,8 +736,8 @@ func (jar InMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	}
 }
 
-func newCookieJar() InMemoryCookieJar {
+func newCookieJar() inMemoryCookieJar {
 	storage := make(map[string][]http.Cookie)
 	f := false
-	return InMemoryCookieJar{&f, storage}
+	return inMemoryCookieJar{&f, storage}
 }
