@@ -58,7 +58,7 @@ func TestConnectHttp(t *testing.T) {
 	configuration.Service = "hive"
 	if ssl == "1" {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
-		configuration.TlsConfig = tlsConfig
+		configuration.TLSConfig = tlsConfig
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +81,7 @@ func TestConnectSasl(t *testing.T) {
 	configuration.Service = "hive"
 	if ssl == "1" {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
-		configuration.TlsConfig = tlsConfig
+		configuration.TLSConfig = tlsConfig
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1058,7 +1058,7 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 
 	if ssl {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
-		configuration.TlsConfig = tlsConfig
+		configuration.TLSConfig = tlsConfig
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1067,7 +1067,7 @@ func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
 	var port int = 10000
 	if mode == "http" {
 		port = 10000
-		configuration.HttpPath = "cliservice"
+		configuration.HTTPPath = "cliservice"
 	}
 	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
