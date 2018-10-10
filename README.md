@@ -40,7 +40,6 @@ go get github.com/beltran/gohive
 
     cursor.Close()
     connection.Close()
-}
 ```
 
 `cursor.HasMore` may query hive for more rows if not all of them have been received. Once the row is
