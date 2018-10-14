@@ -418,9 +418,7 @@ func success(status *hiveserver.TStatus) bool {
 	return statusCode == hiveserver.TStatusCode_SUCCESS_STATUS || statusCode == hiveserver.TStatusCode_SUCCESS_WITH_INFO_STATUS
 }
 
-// FetchOne returns one row
-// TODO, check if this context is honored, which probably is not, and do something similar to Exec
-func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
+func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	c.Err = nil
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
@@ -431,6 +429,65 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 		if c.Err != nil {
 			return
 		}
+	}
+}
+
+//RowMap returns one row as a map. Advances the cursor one
+func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
+	c.Err = nil
+	c.fetchIfEmpty(ctx)
+	if c.Err != nil {
+		return nil
+	}
+
+	d := c.Description()
+
+	m := make(map[string]interface{}, len(c.queue))
+	for i := 0; i < len(c.queue); i++ {
+		columnName := d[i][0]
+		columnType := d[i][1]
+		if columnType == "BOOLEAN_TYPE" {
+			m[columnName] = c.queue[i].BoolVal.Values[c.columnIndex]
+		} else if columnType == "TINYINT_TYPE" {
+			m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+		} else if columnType == "SMALLINT_TYPE" {
+			m[columnName] = c.queue[i].I16Val.Values[c.columnIndex]
+		} else if columnType == "INT_TYPE" {
+			m[columnName] = c.queue[i].I32Val.Values[c.columnIndex]
+		} else if columnType == "BIGINT_TYPE" {
+			m[columnName] = c.queue[i].I64Val.Values[c.columnIndex]
+		} else if columnType == "FLOAT_TYPE" {
+			m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+		} else if columnType == "DOUBLE_TYPE" {
+			m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+		} else if columnType == "STRING_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "TIMESTAMP_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "BINARY_TYPE" {
+			m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+		} else if columnType == "ARRAY_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "MAP_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "STRUCT_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "UNION_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		} else if columnType == "DECIMAL_TYPE" {
+			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+		}
+	}
+	c.columnIndex++
+	return m
+}
+
+// FetchOne returns one row and advances the cursor one
+func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
+	c.Err = nil
+	c.fetchIfEmpty(ctx)
+	if c.Err != nil {
+		return
 	}
 
 	if len(c.queue) != len(dests) {
