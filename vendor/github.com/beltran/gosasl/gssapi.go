@@ -1,6 +1,9 @@
+// +build kerberos
+
 package gosasl
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/beltran/gssapi"
@@ -8,6 +11,169 @@ import (
 	"os"
 	"sync"
 )
+
+// GSSAPIMechanism corresponds to GSSAPI SASL mechanism
+type GSSAPIMechanism struct {
+	config           *MechanismConfig
+	host             string
+	user             string
+	service          string
+	negotiationStage int
+	context          *GSSAPIContext
+	qop              byte
+	supportedQop     uint8
+	serverMaxLength  int
+	UserSelectQop    uint8
+	MaxLength        int
+}
+
+// NewGSSAPIMechanism returns a new GSSAPIMechanism
+func NewGSSAPIMechanism(service string) (mechanism *GSSAPIMechanism, err error) {
+	context := newGSSAPIContext()
+	mechanism = &GSSAPIMechanism{
+		config:           newDefaultConfig("GSSAPI"),
+		service:          service,
+		negotiationStage: 0,
+		context:          context,
+		supportedQop:     QOP_TO_FLAG[AUTH] | QOP_TO_FLAG[AUTH_CONF] | QOP_TO_FLAG[AUTH_INT],
+		MaxLength:        DEFAULT_MAX_LENGTH,
+		UserSelectQop:    QOP_TO_FLAG[AUTH] | QOP_TO_FLAG[AUTH_INT] | QOP_TO_FLAG[AUTH_CONF],
+	}
+	return
+}
+
+func (m *GSSAPIMechanism) start() ([]byte, error) {
+	return m.step(nil)
+}
+
+func (m *GSSAPIMechanism) step(challenge []byte) ([]byte, error) {
+	if m.negotiationStage == 0 {
+		err := initClientContext(m.context, m.service+"/"+m.host, nil)
+		m.negotiationStage = 1
+		return m.context.token, err
+
+	} else if m.negotiationStage == 1 {
+		err := initClientContext(m.context, m.service+"/"+m.host, challenge)
+		if err != nil {
+			log.Fatal(err)
+			return nil, err
+		}
+
+		var srcName *gssapi.Name
+		if m.context.contextId != nil {
+			srcName, _, _, _, _, _, _, _ = m.context.contextId.InquireContext()
+			if srcName != nil {
+				m.user = srcName.String()
+			}
+		}
+		if m.user != "" {
+			// Check if the context is available. If the user has set the flags
+			// it will fail, although at this point we could know that the negotiation won't succeed
+			if !m.context.integAvail() && !m.context.confAvail() {
+				log.Println("No security layer can be established, authentication is still possible")
+			}
+			m.negotiationStage = 2
+		}
+		return m.context.token, nil
+	} else if m.negotiationStage == 2 {
+		data, err := m.context.unwrap(challenge)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) != 4 {
+			return nil, fmt.Errorf("Decoded data should have length for at this stage")
+		}
+		qopBits := data[0]
+		data[0] = 0
+		m.serverMaxLength = int(binary.BigEndian.Uint32(data))
+		if m.serverMaxLength == 0 {
+			return nil, fmt.Errorf("The maximum packet length can't be zero. The server doesn't support GSSAPI")
+		}
+
+		m.qop, err = m.selectQop(qopBits)
+		// The client doesn't support or want any of the security layers offered by the server
+		if err != nil {
+			m.MaxLength = 0
+		}
+
+		header := make([]byte, 4)
+		maxLength := m.serverMaxLength
+		if m.MaxLength < m.serverMaxLength {
+			maxLength = m.MaxLength
+		}
+
+		headerInt := (uint(m.qop) << 24) | uint(maxLength)
+
+		binary.BigEndian.PutUint32(header, uint32(headerInt))
+
+		// FLAG_BYTE + 3 bytes of length + user or authority
+		var name string
+		if name = m.user; m.config.AuthorizationID != "" {
+			name = m.config.AuthorizationID
+		}
+		out := append(header, []byte(name)...)
+		wrappedOut, err := m.context.wrap(out, false)
+
+		m.config.complete = true
+		return wrappedOut, err
+	}
+	return nil, fmt.Errorf("Error, this code should be unreachable")
+}
+
+func (m *GSSAPIMechanism) selectQop(qopByte byte) (byte, error) {
+	availableQops := m.UserSelectQop & m.supportedQop & qopByte
+	for _, qop := range []byte{QOP_TO_FLAG[AUTH_CONF], QOP_TO_FLAG[AUTH_INT], QOP_TO_FLAG[AUTH]} {
+		if qop&availableQops != 0 {
+			return qop, nil
+		}
+	}
+	return byte(0), fmt.Errorf("No qop satisfying all the conditions where found")
+}
+
+// replaceSPNHostWildcard substitutes the special string '_HOST' in the given
+// SPN for the given (current) host.
+func replaceSPNHostWildcard(spn, host string) string {
+	res := krbSPNHost.FindStringSubmatchIndex(spn)
+	if res == nil || res[2] == -1 {
+		return spn
+	}
+	return spn[:res[2]] + host + spn[res[3]:]
+}
+
+func (m GSSAPIMechanism) encode(outgoing []byte) ([]byte, error) {
+	if m.qop == QOP_TO_FLAG[AUTH] {
+		return outgoing, nil
+	} else {
+		var conf_flag bool = false
+		if m.qop == QOP_TO_FLAG[AUTH_CONF] {
+			conf_flag = true
+		}
+		return m.context.wrap(deepCopy(outgoing), conf_flag)
+	}
+}
+
+func (m GSSAPIMechanism) decode(incoming []byte) ([]byte, error) {
+	if m.qop == QOP_TO_FLAG[AUTH] {
+		return incoming, nil
+	}
+	return m.context.unwrap(deepCopy(incoming))
+}
+
+func deepCopy(original []byte) []byte {
+	copied := make([]byte, len(original))
+	for i, el := range original {
+		copied[i] = el
+	}
+	return copied
+}
+
+func (m GSSAPIMechanism) dispose() {
+	m.context.dispose()
+}
+
+func (m GSSAPIMechanism) getConfig() *MechanismConfig {
+	return m.config
+}
 
 type GSSAPIContext struct {
 	DebugLog       bool

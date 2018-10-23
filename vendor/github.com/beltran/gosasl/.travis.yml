@@ -1,0 +1,15 @@
+language: go
+
+go:
+  - "1.9"
+  - "1.10"
+
+branches:
+  only:
+  - master
+
+script:
+  - go vet ./...
+  - go fmt ./...
+  - go test -v -tags kerberos ./...
+  - go test -v ./...
