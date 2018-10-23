@@ -17,7 +17,7 @@ To add kerberos support gohive requires header files to build against the GSSAPI
 
 Then later
 ```
-go get github.com/beltran/gohive build kerberos
+go get -tags kerberos github.com/beltran/gohive build kerberos
 ```
 
 ## Quickstart
