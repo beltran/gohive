@@ -3,19 +3,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:eee9386329f4fcdf8d6c0def0c9771b634bdd5ba460d888aa98c17d59b37a76c"
+  digest = "1:e95de5c830369d6592224de57a31cd87a2ba1cec2abaf050d06a63ee8f7babd8"
   name = "git.apache.org/thrift.git"
   packages = ["lib/go/thrift"]
   pruneopts = "UT"
-  revision = "6e67faa92827ece022380b211c2caaadd6145bf5"
+  revision = "cd829a0b9a5c66203b63350fa029589669ec43f6"
 
 [[projects]]
   branch = "master"
-  digest = "1:223debf72def688665276d603ed807c6e879e2f47984df13261584ada9b898bb"
+  digest = "1:ce86c93eeefcd512a82180ad5ecdceaa378400bb6134a9b72b29cdeb37035a0c"
   name = "github.com/beltran/gosasl"
   packages = ["."]
   pruneopts = "UT"
-  revision = "976857b83456d67c235c57b90da855c4af4f3056"
+  revision = "01c4c2ce6a513cbe3cf4bb643f2577539ba3e65b"
 
 [[projects]]
   branch = "compile_mac"

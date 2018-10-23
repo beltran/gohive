@@ -5,14 +5,19 @@
 GoHive is a driver for Hive in go that supports mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and http transport, with and without SSL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
 ## Installation
-Gohive depends on [apcera](https://github.com/apcera/gssapi) which requires header files to build against the GSSAPI C library. They can be installed with:
+Gohive can be installed with:
+```
+go get github.com/beltran/gohive
+```
+
+To add kerberos support gohive requires header files to build against the GSSAPI C library. They can be installed with:
 - Ubuntu: `sudo apt-get install libkrb5-dev`
 - MacOS: `brew install homebrew/dupes/heimdal --without-x11`
 - Debian: `yum install -y krb5-devel`
 
-Later gohive can be installed with:
+Then later
 ```
-go get github.com/beltran/gohive
+go get github.com/beltran/gohive build kerberos
 ```
 
 ## Quickstart
