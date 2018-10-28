@@ -15,7 +15,7 @@ To add kerberos support gohive requires header files to build against the GSSAPI
 - MacOS: `brew install homebrew/dupes/heimdal --without-x11`
 - Debian: `yum install -y krb5-devel`
 
-Then later
+Then:
 ```
 go get -tags kerberos github.com/beltran/gohive
 ```
