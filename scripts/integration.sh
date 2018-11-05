@@ -36,8 +36,8 @@ function install_deps() {
     sed -i.bak 's/python3/python3.6/g' ./Makefile
 
     python3.6 -m pip install --user -r requirements.txt
-    sed -i.bak 's/hive_version.*/hive_version = 3.1.0/g' ./config/hive.cfg
-    sed -i.bak 's/hive_version.*/hive_version = 3.1.0/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.1/g' ./config/hive.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.1/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_kerberos.cfg
     popd
 }
