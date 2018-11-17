@@ -1,11 +1,10 @@
 package gohive
 
 import (
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"testing"
-
 	"context"
+	"git.apache.org/thrift.git/lib/go/thrift"
 	"io"
+	"testing"
 )
 
 func TestSaslTransport(t *testing.T) {
@@ -16,7 +15,13 @@ func TestSaslTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error creating transport")
 	}
-	trans.IsOpen()
+	if trans.IsOpen() {
+		t.Fatal("Transport shouldn't be opened yet")
+	}
+	trans.Open()
+	if !trans.IsOpen() {
+		t.Fatal("Transport shouldbe opened")
+	}
 }
 
 func setup() {
@@ -43,6 +48,9 @@ func TestSaslTransportThrift(t *testing.T) {
 	trans.Open()
 	socket.Reset()
 	TransportTest(t, trans, trans)
+	if trans.RemainingBytes() != 0 {
+		t.Fatal("Expected 0 remaining bytes but found: ", trans.RemainingBytes())
+	}
 }
 
 const TRANSPORT_BINARY_DATA_SIZE = 4096

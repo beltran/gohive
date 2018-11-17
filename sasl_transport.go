@@ -232,8 +232,7 @@ func (p *TSaslTransport) Flush(ctx context.Context) (err error) {
 	}
 
 	if size > 0 {
-		if n, err := p.tp.Write(wrappedBuf); err != nil {
-			print("Error while flushing write buffer of size ", size, " to transport, only wrote ", n, " bytes: ", err.Error(), "\n")
+		if _, err := p.tp.Write(wrappedBuf); err != nil {
 			return thrift.NewTTransportExceptionFromError(err)
 		}
 	}
