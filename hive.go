@@ -449,7 +449,7 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 		if columnType == "BOOLEAN_TYPE" {
 			m[columnName] = c.queue[i].BoolVal.Values[c.columnIndex]
 		} else if columnType == "TINYINT_TYPE" {
-			m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+			m[columnName] = c.queue[i].ByteVal.Values[c.columnIndex]
 		} else if columnType == "SMALLINT_TYPE" {
 			m[columnName] = c.queue[i].I16Val.Values[c.columnIndex]
 		} else if columnType == "INT_TYPE" {
