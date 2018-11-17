@@ -424,6 +424,40 @@ func TestRowMap(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestRowMapAllTypes(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{
+		"all_types.smallint": int16(32767), 
+		"all_types.int": int32(2147483647), 
+		"all_types.float": float64(0.5), 
+		"all_types.double": float64(0.25), 
+		"all_types.string": "a string", 
+		"all_types.boolean": true, 
+		"all_types.struct": "{\"a\":1,\"b\":2}", 
+		"all_types.bigint": int64(9223372036854775807), 
+		"all_types.array": "[1,2]", 
+		"all_types.map": "{1:2,3:4}", 
+		"all_types.decimal": "0.1", 
+		"all_types.binary": []uint8{49, 50, 51}, 
+		"all_types.timestamp": "1970-01-01 00:00:00", 
+		"all_types.union": "{0:1}", 
+		"all_types.tinyint": int8(127), 
+	}
+
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestSmallFetchSize(t *testing.T) {
 	async := false
 	connection, cursor := prepareTable(t, 4, 2)
