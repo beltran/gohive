@@ -95,7 +95,7 @@ This implies setting in hive-site.xml:
 Binary transport mode is supported for this three options(PLAIN, KERBEROS and NOSASL). Http transport is supported for PLAIN and KERBEROS:
 ``` go
 configuration := NewConnectConfiguration()
-configuration.HttpPath = "cliservice" // this is the default path although in hive
+configuration.HttpPath = "cliservice" // this is the default path in hive configuration.
 configuration.TransportMode = "http"
 configuration.Service = "hive"
 
@@ -103,7 +103,7 @@ connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", config
 ```
 This implies setting in hive-site.xml:
 
-- `hive.server2.authentication = KERBEROS`, or NONE
+- `hive.server2.authentication = KERBEROS`, or `NONE`
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
 
