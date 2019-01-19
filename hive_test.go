@@ -308,7 +308,6 @@ func TestSelect(t *testing.T) {
 
 func TestSimpleSelect(t *testing.T) {
 	connection, cursor := prepareTable(t, 1, 1000)
-	fmt.Println("Select Coming")
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
