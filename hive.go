@@ -5,15 +5,16 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/beltran/gohive/hiveserver"
-	"github.com/beltran/gosasl"
 	"net/http"
 	"net/url"
 	"os/user"
 	"strings"
 	"sync"
 	"time"
+
+	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/beltran/gohive/hiveserver"
+	"github.com/beltran/gosasl"
 )
 
 const DEFAULT_FETCH_SIZE int64 = 1000
@@ -286,7 +287,17 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
 		if finished {
 			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
-				c.Err = fmt.Errorf(*operationStatus.TaskStatus)
+				msg := operationStatus.TaskStatus
+				if msg == nil {
+					msg = operationStatus.ErrorMessage
+				}
+				if s := operationStatus.Status; msg == nil && s != nil {
+					msg = s.ErrorMessage
+				}
+				if msg == nil {
+					*msg = fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
+				}
+				c.Err = fmt.Errorf(*msg)
 			}
 			break
 		}
