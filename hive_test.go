@@ -319,6 +319,24 @@ func TestSimpleSelect(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestSimpleSelectWithNil(t *testing.T) {
+	connection, cursor := prepareTable(t, 0, 1000)
+	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES (1, NULL) ", false)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var s string
+	var i int32
+	cursor.FetchOne(context.Background(), &i, &s)
+
+	if i != 1 || s != "" {
+		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestIsRow(t *testing.T) {
 	connection, cursor := prepareTable(t, 1, 1000)
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
@@ -433,21 +451,21 @@ func TestRowMapAllTypes(t *testing.T) {
 	}
 	m := cursor.RowMap(context.Background())
 	expected := map[string]interface{}{
-		"all_types.smallint": int16(32767), 
-		"all_types.int": int32(2147483647), 
-		"all_types.float": float64(0.5), 
-		"all_types.double": float64(0.25), 
-		"all_types.string": "a string", 
-		"all_types.boolean": true, 
-		"all_types.struct": "{\"a\":1,\"b\":2}", 
-		"all_types.bigint": int64(9223372036854775807), 
-		"all_types.array": "[1,2]", 
-		"all_types.map": "{1:2,3:4}", 
-		"all_types.decimal": "0.1", 
-		"all_types.binary": []uint8{49, 50, 51}, 
-		"all_types.timestamp": "1970-01-01 00:00:00", 
-		"all_types.union": "{0:1}", 
-		"all_types.tinyint": int8(127), 
+		"all_types.smallint": int16(32767),
+		"all_types.int": int32(2147483647),
+		"all_types.float": float64(0.5),
+		"all_types.double": float64(0.25),
+		"all_types.string": "a string",
+		"all_types.boolean": true,
+		"all_types.struct": "{\"a\":1,\"b\":2}",
+		"all_types.bigint": int64(9223372036854775807),
+		"all_types.array": "[1,2]",
+		"all_types.map": "{1:2,3:4}",
+		"all_types.decimal": "0.1",
+		"all_types.binary": []uint8{49, 50, 51},
+		"all_types.timestamp": "1970-01-01 00:00:00",
+		"all_types.union": "{0:1}",
+		"all_types.tinyint": int8(127),
 	}
 
 	if !reflect.DeepEqual(m, expected) {
