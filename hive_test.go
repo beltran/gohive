@@ -1053,6 +1053,42 @@ func TestTypes(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestNullTypes(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
+	insertNullValuesAllTypes(t, cursor)
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types LIMIT 1", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{
+		"all_types.smallint": int16(32767),
+		"all_types.int": int32(2147483647),
+		"all_types.float": float64(0.5),
+		"all_types.double": float64(0.25),
+		"all_types.string": "",
+		"all_types.boolean": true,
+		"all_types.struct": nil,
+		"all_types.bigint": int64(9223372036854775807),
+		"all_types.array": "[1,2]",
+		"all_types.map": "{1:2,3:4}",
+		"all_types.decimal": "0.1",
+		"all_types.binary": []uint8{49, 50, 51},
+		"all_types.timestamp": nil,
+		"all_types.union": nil,
+		"all_types.tinyint": int8(127),
+	}
+
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
 	if cursor.Error() != nil {
@@ -1100,7 +1136,29 @@ func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+}
 
+func insertNullValuesAllTypes(t *testing.T, cursor *Cursor) {
+	insertAll := `INSERT INTO TABLE all_types VALUES(
+		true,
+		127,
+		32767,
+		2147483647,
+		9223372036854775807,
+		0.5,
+		0.25,
+		NULL,
+		0,
+		'123',
+		array(1, 2),
+		map(1, 2, 3, 4),
+		NULL,
+		NULL,
+		0.1)`
+	cursor.Execute(context.Background(), insertAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
 }
 
 func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {
