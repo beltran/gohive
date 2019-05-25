@@ -1071,7 +1071,7 @@ func TestNullTypes(t *testing.T) {
 		"all_types.double": float64(0.25),
 		"all_types.string": "",
 		"all_types.boolean": true,
-		"all_types.struct": nil,
+		"all_types.struct": "{\"a\":1,\"b\":2}",
 		"all_types.bigint": int64(9223372036854775807),
 		"all_types.array": "[1,2]",
 		"all_types.map": "{1:2,3:4}",
@@ -1152,7 +1152,7 @@ func insertNullValuesAllTypes(t *testing.T, cursor *Cursor) {
 		'123',
 		array(1, 2),
 		map(1, 2, 3, 4),
-		NULL,
+		named_struct('a', 1, 'b', 2),
 		NULL,
 		0.1)`
 	cursor.Execute(context.Background(), insertAll, false)
