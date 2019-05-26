@@ -452,7 +452,6 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	}
 
 	d := c.Description()
-
 	m := make(map[string]interface{}, len(c.queue))
 	for i := 0; i < len(c.queue); i++ {
 		columnName := d[i][0]
@@ -531,10 +530,20 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 		} else if c.queue[i].IsSetI32Val() {
 			d, ok := dests[i].(*int32)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
-				return
-			}
-			*d = c.queue[i].I32Val.Values[c.columnIndex]
+			    d, ok := dests[i].(**int32)
+                    if (isNull(c.queue[i].I32Val.Nulls, c.columnIndex)) {
+                        *d = nil
+                    } else {
+                        **d = 1
+                        **d = c.queue[i].I32Val.Values[c.columnIndex]
+                    }
+                if !ok {
+                    c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+                    return
+                }
+			} else {
+                *d = c.queue[i].I32Val.Values[c.columnIndex]
+            }
 		} else if c.queue[i].IsSetI64Val() {
 			d, ok := dests[i].(*int64)
 			if !ok {
@@ -571,6 +580,11 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 	c.columnIndex++
 
 	return
+}
+
+func isNull(nulls []byte, position int) bool {
+    b := nulls[position / 8]
+    return (b & (1 << (uint)(position % 8))) != 0
 }
 
 // Description return a map with the names of the columns and their types
