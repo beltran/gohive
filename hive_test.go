@@ -1053,7 +1053,55 @@ func TestTypes(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestTypesWithNulls(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTableWithNull(t, cursor)
+	var b bool
+	var tinyInt *int8 = new(int8)
+	var smallInt *int16 = new(int8)
+	var normalInt *int32 = new(int8)
+	var bigInt *int64 = new(int8)
+	// This value is store as a float32. The go thrift API returns a floa64 though.
+	var floatType *float64 = new(int8)
+	var double *float64 = new(int8)
+	var s string
+	var timeStamp string
+	var binary []byte
+	var array string
+	var mapType string
+	var structType string
+	var union string
+	var decimal string
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if (tinyInt != nil || smallInt != nil || bigInt != nil || binary != nil || array != nil || binary != nil) {
+		t.Fatal("Some type is not nil")
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
+	createAllTypesTable(t, cursor)
+	insertAllTypesTable(t, cursor)
+}
+
+func prepareAllTypesTableWithNull(t *testing.T, cursor *Cursor) {
+	createAllTypesTable(t, cursor)
+	insertAllTypesTableWithNulls(t, cursor)
+}
+
+func createAllTypesTable(t *testing.T, cursor *Cursor) {
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
@@ -1079,7 +1127,9 @@ func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+}
 
+func insertAllTypesTable(t *testing.T, cursor *Cursor) {
 	insertAll := `INSERT INTO TABLE all_types VALUES(
 		true,
 		127,
@@ -1100,7 +1150,14 @@ func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+}
 
+func insertAllTypesTableWithNulls(t *testing.T, cursor *Cursor) {
+	insertAll := `INSERT INTO TABLE all_types(`int`) VALUES(2147483647)`
+	cursor.Execute(context.Background(), insertAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
 }
 
 func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {

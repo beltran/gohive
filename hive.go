@@ -506,7 +506,6 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 	}
 	for i := 0; i < len(c.queue); i++ {
 		if c.queue[i].IsSetBinaryVal() {
-			// TODO revisit this
 			d, ok := dests[i].(*[]byte)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
@@ -523,34 +522,57 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 		} else if c.queue[i].IsSetI16Val() {
 			d, ok := dests[i].(*int16)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
-				return
-			}
-			*d = c.queue[i].I16Val.Values[c.columnIndex]
+				d, ok := dests[i].(**int16)
+				if !ok {
+          c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+          return
+        }
+
+	      if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+	       	*d = nil
+	      } else {
+	        **d = 1
+	        **d = c.queue[i].I16Val.Values[c.columnIndex]
+	      }
+			} else {
+      	*d = c.queue[i].I16Val.Values[c.columnIndex]
+      }
 		} else if c.queue[i].IsSetI32Val() {
 			d, ok := dests[i].(*int32)
 			if !ok {
-			    d, ok := dests[i].(**int32)
-                    if (isNull(c.queue[i].I32Val.Nulls, c.columnIndex)) {
-                        *d = nil
-                    } else {
-                        **d = 1
-                        **d = c.queue[i].I32Val.Values[c.columnIndex]
-                    }
-                if !ok {
-                    c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
-                    return
-                }
+				d, ok := dests[i].(**int32)
+				if !ok {
+          c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+          return
+        }
+
+	      if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+	       	*d = nil
+	      } else {
+	        **d = 1
+	        **d = c.queue[i].I32Val.Values[c.columnIndex]
+	      }
 			} else {
-                *d = c.queue[i].I32Val.Values[c.columnIndex]
-            }
+      	*d = c.queue[i].I32Val.Values[c.columnIndex]
+      }
 		} else if c.queue[i].IsSetI64Val() {
 			d, ok := dests[i].(*int64)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
-				return
-			}
-			*d = c.queue[i].I64Val.Values[c.columnIndex]
+				d, ok := dests[i].(**int64)
+				if !ok {
+          c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+          return
+        }
+
+	      if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+	       	*d = nil
+	      } else {
+	        **d = 1
+	        **d = c.queue[i].I64Val.Values[c.columnIndex]
+	      }
+			} else {
+      	*d = c.queue[i].I64Val.Values[c.columnIndex]
+      }
 		} else if c.queue[i].IsSetStringVal() {
 			d, ok := dests[i].(*string)
 			if !ok {
@@ -561,17 +583,39 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 		} else if c.queue[i].IsSetDoubleVal() {
 			d, ok := dests[i].(*float64)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
-				return
-			}
-			*d = c.queue[i].DoubleVal.Values[c.columnIndex]
+				d, ok := dests[i].(**float64)
+				if !ok {
+          c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+          return
+        }
+
+	      if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+	       	*d = nil
+	      } else {
+	        **d = 1
+	        **d = c.queue[i].DoubleVal.Values[c.columnIndex]
+	      }
+			} else {
+      	*d = c.queue[i].DoubleVal.Values[c.columnIndex]
+      }
 		} else if c.queue[i].IsSetBoolVal() {
 			d, ok := dests[i].(*bool)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
-				return
-			}
-			*d = c.queue[i].BoolVal.Values[c.columnIndex]
+				d, ok := dests[i].(**bool)
+				if !ok {
+          c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
+          return
+        }
+
+	      if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+	       	*d = nil
+	      } else {
+	        **d = 1
+	        **d = c.queue[i].BoolVal.Values[c.columnIndex]
+	      }
+			} else {
+      	*d = c.queue[i].BoolVal.Values[c.columnIndex]
+      }
 		} else {
 			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
 			return
