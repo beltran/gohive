@@ -306,6 +306,50 @@ func TestSelect(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestSelectNull(t *testing.T) {
+	async := false
+	connection, cursor := prepareTableSingleValue(t, 6000, 1000)
+
+	var s string
+	var j int32
+
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	if !cursor.Finished() {
+		t.Fatal("Finished should be true")
+	}
+	for cursor.HasMore(context.Background()) {
+		var i *int32 = new(int32)
+		*i = 1
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+		cursor.FetchOne(context.Background(), &i, &s)
+		if cursor.Err != nil {
+			t.Fatal(cursor.Err)
+		}
+		if i != nil {
+			log.Fatalf("Unexpected value for i: %d", *i)
+		}
+		j++
+	}
+	if s != "6000" {
+		log.Fatalf("Unexpected values for s(%s) ", s)
+	}
+	if cursor.HasMore(context.Background()) {
+		log.Fatal("Shouldn't have any more values")
+	}
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	if j != 6000 {
+		t.Fatalf("6000 rows expected here")
+	}
+	closeAll(t, connection, cursor)
+}
+
 func TestSimpleSelect(t *testing.T) {
 	connection, cursor := prepareTable(t, 1, 1000)
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
@@ -451,21 +495,21 @@ func TestRowMapAllTypes(t *testing.T) {
 	}
 	m := cursor.RowMap(context.Background())
 	expected := map[string]interface{}{
-		"all_types.smallint": int16(32767),
-		"all_types.int": int32(2147483647),
-		"all_types.float": float64(0.5),
-		"all_types.double": float64(0.25),
-		"all_types.string": "a string",
-		"all_types.boolean": true,
-		"all_types.struct": "{\"a\":1,\"b\":2}",
-		"all_types.bigint": int64(9223372036854775807),
-		"all_types.array": "[1,2]",
-		"all_types.map": "{1:2,3:4}",
-		"all_types.decimal": "0.1",
-		"all_types.binary": []uint8{49, 50, 51},
+		"all_types.smallint":  int16(32767),
+		"all_types.int":       int32(2147483647),
+		"all_types.float":     float64(0.5),
+		"all_types.double":    float64(0.25),
+		"all_types.string":    "a string",
+		"all_types.boolean":   true,
+		"all_types.struct":    "{\"a\":1,\"b\":2}",
+		"all_types.bigint":    int64(9223372036854775807),
+		"all_types.array":     "[1,2]",
+		"all_types.map":       "{1:2,3:4}",
+		"all_types.decimal":   "0.1",
+		"all_types.binary":    []uint8{49, 50, 51},
 		"all_types.timestamp": "1970-01-01 00:00:00",
-		"all_types.union": "{0:1}",
-		"all_types.tinyint": int8(127),
+		"all_types.union":     "{0:1}",
+		"all_types.tinyint":   int8(127),
 	}
 
 	if !reflect.DeepEqual(m, expected) {
@@ -1053,7 +1097,54 @@ func TestTypes(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestTypesWithNulls(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTableWithNull(t, cursor)
+	var b bool
+	var tinyInt *int8 = new(int8)
+	var smallInt *int16 = new(int16)
+	var normalInt *int32 = new(int32)
+	var bigInt *int64 = new(int64)
+	// This value is store as a float32. The go thrift API returns a floa64 though.
+	var floatType *float64 = new(float64)
+	var double *float64 = new(float64)
+	var s *string = new(string)
+	var timeStamp string
+	var binary []byte
+	var array string
+	var mapType string
+	var structType string
+	var decimal string
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &decimal)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if tinyInt != nil || smallInt != nil || bigInt != nil || binary != nil || array != "" || s != nil {
+		t.Fatalf("Unexpected value, tinyInt: %p, smallInt: %p, bigInt: %p, binary: %x, array: %s, s: %s", tinyInt, smallInt, bigInt, binary, array, *s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
+	createAllTypesTable(t, cursor)
+	insertAllTypesTable(t, cursor)
+}
+
+func prepareAllTypesTableWithNull(t *testing.T, cursor *Cursor) {
+	createAllTypesTableNoUnion(t, cursor)
+	insertAllTypesTableWithNulls(t, cursor)
+}
+
+func createAllTypesTable(t *testing.T, cursor *Cursor) {
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
@@ -1079,7 +1170,36 @@ func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+}
 
+func createAllTypesTableNoUnion(t *testing.T, cursor *Cursor) {
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	createAll := "CREATE TABLE all_types (" +
+		"`boolean` BOOLEAN," +
+		"`tinyint` TINYINT," +
+		"`smallint` SMALLINT," +
+		"`int` INT," +
+		"`bigint` BIGINT," +
+		"`float` FLOAT," +
+		"`double` DOUBLE," +
+		"`string` STRING," +
+		"`timestamp` TIMESTAMP," +
+		"`binary` BINARY," +
+		"`array` ARRAY<int>," +
+		"`map` MAP<int, int>," +
+		"`struct` STRUCT<a: int, b: int>," +
+		"`decimal` DECIMAL(10, 1))"
+	cursor.Execute(context.Background(), createAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+}
+
+func insertAllTypesTable(t *testing.T, cursor *Cursor) {
 	insertAll := `INSERT INTO TABLE all_types VALUES(
 		true,
 		127,
@@ -1100,11 +1220,31 @@ func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
+}
 
+func insertAllTypesTableWithNulls(t *testing.T, cursor *Cursor) {
+	insertAll := "INSERT INTO TABLE all_types(`int`) VALUES(2147483647)"
+	cursor.Execute(context.Background(), insertAll, false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
 }
 
 func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {
 	connection, cursor := makeConnection(t, fetchSize)
+	createTable(t, cursor)
+	insertInTable(t, cursor, rowsToInsert)
+	return connection, cursor
+}
+
+func prepareTableSingleValue(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection, *Cursor) {
+	connection, cursor := makeConnection(t, fetchSize)
+	createTable(t, cursor)
+	insertInTableSingleValue(t, cursor, rowsToInsert)
+	return connection, cursor
+}
+
+func createTable(t *testing.T, cursor *Cursor) {
 	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes", false)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
@@ -1119,6 +1259,9 @@ func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection,
 	if !cursor.Finished() {
 		t.Fatal("Finished should be true")
 	}
+}
+
+func insertInTable(t *testing.T, cursor *Cursor, rowsToInsert int) {
 	if rowsToInsert > 0 {
 		values := ""
 		for i := 1; i <= rowsToInsert; i++ {
@@ -1135,7 +1278,25 @@ func prepareTable(t *testing.T, rowsToInsert int, fetchSize int64) (*Connection,
 			t.Fatal("Finished should be true")
 		}
 	}
-	return connection, cursor
+}
+
+func insertInTableSingleValue(t *testing.T, cursor *Cursor, rowsToInsert int) {
+	if rowsToInsert > 0 {
+		values := ""
+		for i := 1; i <= rowsToInsert; i++ {
+			values += fmt.Sprintf("('%d')", i)
+			if i != rowsToInsert {
+				values += ","
+			}
+		}
+		cursor.Execute(context.Background(), "INSERT INTO pokes(b) VALUES "+values, false)
+		if cursor.Error() != nil {
+			t.Fatal(cursor.Error())
+		}
+		if !cursor.Finished() {
+			t.Fatal("Finished should be true")
+		}
+	}
 }
 
 func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
