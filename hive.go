@@ -710,8 +710,12 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 }
 
 func isNull(nulls []byte, position int) bool {
-	b := nulls[position/8]
-	return (b & (1 << (uint)(position%8))) != 0
+	index := position / 8
+	if len(nulls) > index {
+		b := nulls[index]
+		return (b & (1 << (uint)(position%8))) != 0
+	}
+	return false
 }
 
 // Description return a map with the names of the columns and their types
