@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -308,9 +309,10 @@ func TestSelect(t *testing.T) {
 func TestSelectNull(t *testing.T) {
 	async := false
 	connection, cursor := prepareTableSingleValue(t, 6000, 1000)
+	cursor.Exec(context.Background(), "INSERT into pokes(a) values(1);")
+	closeAll(t, connection, cursor)
 
-	var s string
-	var j int32
+	connection, cursor = makeConnection(t, 199)
 
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
 	if cursor.Error() != nil {
@@ -319,8 +321,10 @@ func TestSelectNull(t *testing.T) {
 	if !cursor.Finished() {
 		t.Fatal("Finished should be true")
 	}
+	j := 0
 	for cursor.HasMore(context.Background()) {
 		var i *int32 = new(int32)
+		var s *string = new(string)
 		*i = 1
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
@@ -332,10 +336,16 @@ func TestSelectNull(t *testing.T) {
 		if i != nil {
 			log.Fatalf("Unexpected value for i: %d", *i)
 		}
+		if j == 6000 {
+			if *i != 1 && s != nil {
+				log.Fatalf("Unexpected values for i(%d)  or s(%s) ", *i, *s)
+			}
+		} else {
+			if i != nil && *s != strconv.Itoa(j) {
+				log.Fatalf("Unexpected values for i(%d)  or s(%s) ", *i, *s)
+			}
+		}
 		j++
-	}
-	if s != "6000" {
-		log.Fatalf("Unexpected values for s(%s) ", s)
 	}
 	if cursor.HasMore(context.Background()) {
 		log.Fatal("Shouldn't have any more values")
