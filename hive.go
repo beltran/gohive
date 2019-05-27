@@ -319,8 +319,6 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 }
 
 // Execute sends a query to hive for execution with a context
-// If the context is Done it may not be possible to cancel the opeartion
-// Use async = true
 func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 	c.executeAsync(ctx, query)
 	if !async {
@@ -691,7 +689,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	return nil
 }
 
-// Cancel tries to cancel the current operation
+// Cancels the current operation
 func (c *Cursor) Cancel() {
 	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
