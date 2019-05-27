@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-	async := false
 	ctx := context.Background()
 	configuration := gohive.NewConnectConfiguration()
 	configuration.Service = "hive"
@@ -20,17 +19,17 @@ func main() {
 	}
 	cursor := connection.Cursor()
 
-	cursor.Execute(ctx, "CREATE TABLE myTable (a INT, b STRING)", async)
+	cursor.Exec(ctx, "CREATE TABLE myTable (a INT, b STRING)")
 	if cursor.Err != nil {
 		log.Fatal(cursor.Err)
 	}
 
-	cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
+	cursor.Exec(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
 	if cursor.Err != nil {
 		log.Fatal(cursor.Err)
 	}
 
-	cursor.Execute(ctx, "SELECT * FROM myTable", async)
+	cursor.Exec(ctx, "SELECT * FROM myTable")
 	if cursor.Err != nil {
 		log.Fatal(cursor.Err)
 	}

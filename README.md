@@ -29,12 +29,12 @@ go get -tags kerberos github.com/beltran/gohive
     }
     cursor := connection.Cursor()
     
-    cursor.Execute(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')", async)
+    cursor.Exec(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }
 
-    cursor.Execute(ctx, "SELECT * FROM myTable", async)
+    cursor.Exec(ctx, "SELECT * FROM myTable")
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }

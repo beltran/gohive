@@ -264,7 +264,6 @@ func TestDescriptionAsync(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	async := false
 	connection, cursor := prepareTable(t, 6000, 1000)
 
 	var i int32
@@ -273,7 +272,7 @@ func TestSelect(t *testing.T) {
 	var z int
 
 	for z, j = 0, 0; z < 10; z, j, i, s = z+1, 0, 0, "-1" {
-		cursor.Execute(context.Background(), "SELECT * FROM pokes", async)
+		cursor.Exec(context.Background(), "SELECT * FROM pokes")
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}

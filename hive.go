@@ -318,6 +318,11 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 	done <- nil
 }
 
+// Exec issues a synchronous query.
+func (c *Cursor) Exec(ctx context.Context, query string) {
+	c.Execute(ctx, query, false)
+}
+
 // Execute sends a query to hive for execution with a context
 func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 	c.executeAsync(ctx, query)
