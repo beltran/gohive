@@ -455,35 +455,95 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 		columnName := d[i][0]
 		columnType := d[i][1]
 		if columnType == "BOOLEAN_TYPE" {
-			m[columnName] = c.queue[i].BoolVal.Values[c.columnIndex]
+			if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].BoolVal.Values[c.columnIndex]
+			}
 		} else if columnType == "TINYINT_TYPE" {
-			m[columnName] = c.queue[i].ByteVal.Values[c.columnIndex]
+			if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].ByteVal.Values[c.columnIndex]
+			}
 		} else if columnType == "SMALLINT_TYPE" {
-			m[columnName] = c.queue[i].I16Val.Values[c.columnIndex]
+			if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].I16Val.Values[c.columnIndex]
+			}
 		} else if columnType == "INT_TYPE" {
-			m[columnName] = c.queue[i].I32Val.Values[c.columnIndex]
+			if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].I32Val.Values[c.columnIndex]
+			}
 		} else if columnType == "BIGINT_TYPE" {
-			m[columnName] = c.queue[i].I64Val.Values[c.columnIndex]
+			if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].I64Val.Values[c.columnIndex]
+			}
 		} else if columnType == "FLOAT_TYPE" {
-			m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+			}
 		} else if columnType == "DOUBLE_TYPE" {
-			m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+			}
 		} else if columnType == "STRING_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "TIMESTAMP_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "BINARY_TYPE" {
-			m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+			}
 		} else if columnType == "ARRAY_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "MAP_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "STRUCT_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "UNION_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		} else if columnType == "DECIMAL_TYPE" {
-			m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
 		}
 	}
 	c.columnIndex++
