@@ -76,7 +76,7 @@ configuration := NewConnectConfiguration()
 // If it's not set it will be picked up from the logged user
 configuration.Username = "myUsername"
 // This may not be necessary
-configuration.Username = "myPassword"
+configuration.Password = "myPassword"
 connection, errConn := Connect(ctx, "hs2.example.com", 10000, "NONE", configuration)
 ```
 This implies setting in hive-site.xml:
