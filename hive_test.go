@@ -264,6 +264,43 @@ func TestDescriptionAsync(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestHiveProperties(t *testing.T) {
+	configuration := map[string]string{
+    "hadoop.madeup.one": "one",
+	}
+
+	connection, cursor := makeConnectionWithConfiguration(t, 1000, configuration)
+
+	cursor.Exec(context.Background(), "SET hadoop.madeup.one")
+
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{"set": "hadoop.madeup.one=one"}
+
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	cursor.Exec(context.Background(), "SET hadoop.madeup.two = two")
+	cursor.Exec(context.Background(), "SET hadoop.madeup.two")
+
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	m = cursor.RowMap(context.Background())
+	expected = map[string]interface{}{"set": "hadoop.madeup.two=two"}
+
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestSelect(t *testing.T) {
 	connection, cursor := prepareTable(t, 6000, 1000)
 
@@ -1379,12 +1416,17 @@ func insertInTableSingleValue(t *testing.T, cursor *Cursor, rowsToInsert int) {
 }
 
 func makeConnection(t *testing.T, fetchSize int64) (*Connection, *Cursor) {
+	return makeConnectionWithConfiguration(t, fetchSize, nil)
+}
+
+func makeConnectionWithConfiguration(t *testing.T, fetchSize int64, hiveConfiguration map[string]string) (*Connection, *Cursor) {
 	mode := getTransport()
 	ssl := getSsl()
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	configuration.FetchSize = fetchSize
 	configuration.TransportMode = mode
+	configuration.HiveConfiguration = hiveConfiguration
 
 	if ssl {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
