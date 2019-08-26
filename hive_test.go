@@ -306,6 +306,67 @@ func TestSelect(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestUseDatabase(t *testing.T) {
+	async := false
+
+	connection, cursor := makeConnection(t, 1000)
+
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS db.pokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS db", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "CREATE DATABASE db", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "CREATE TABLE db.pokes (foo INT, bar INT)", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "USE db", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, 1111)", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Exec(context.Background(), "SELECT * FROM pokes")
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{"pokes.foo": int32(1), "pokes.bar": int32(1111)}
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	cursor.Exec(context.Background(), "SELECT * FROM db.pokes")
+	m = cursor.RowMap(context.Background())
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS db.pokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS db", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestSelectNull(t *testing.T) {
 	async := false
 	connection, cursor := prepareTableSingleValue(t, 6000, 1000)
