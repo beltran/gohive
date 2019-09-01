@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/apache/thrift.git/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
 )

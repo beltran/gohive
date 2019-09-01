@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
-	"github.com/beltran/gosasl"
 	"io"
+
+	"github.com/apache/thrift.git/lib/go/thrift"
+	"github.com/beltran/gosasl"
 )
 
 const (
