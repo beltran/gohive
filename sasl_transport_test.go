@@ -2,9 +2,10 @@ package gohive
 
 import (
 	"context"
-	"git.apache.org/thrift.git/lib/go/thrift"
 	"io"
 	"testing"
+
+	"github.com/apache/thrift/lib/go/thrift"
 )
 
 func TestSaslTransport(t *testing.T) {
