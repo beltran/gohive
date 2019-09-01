@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/apache/thrift.git/lib/go/thrift"
+	"github.com/apache/thrift/lib/go/thrift"
 )
 
 func TestSaslTransport(t *testing.T) {

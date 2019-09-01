@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/apache/thrift.git/lib/go/thrift"
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gosasl"
 )
 
