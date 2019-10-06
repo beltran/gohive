@@ -104,7 +104,7 @@ func Connect(host string, port int, auth string,
 				return nil, err
 			}
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, configuration.Username, configuration.Password, host, port), httpOptions).GetTransport(socket)
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
 			if err != nil {
 				return nil, err
 			}
