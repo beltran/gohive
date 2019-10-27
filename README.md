@@ -28,7 +28,7 @@ go get -tags kerberos github.com/beltran/gohive
         log.Fatal(errConn)
     }
     cursor := connection.Cursor()
-    
+
     cursor.Exec(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
@@ -106,6 +106,20 @@ This implies setting in hive-site.xml:
 - `hive.server2.authentication = KERBEROS`, or `NONE`
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
+
+## NULL values
+For example if a NULL value is a row the following operations would put 0 into `i`:
+```
+var i int32
+cursor.FetchOne(context.Background(), &i)
+```
+To differentiate between these two values (NULL and 0) the following will set `i` to nil or `*i` to 0:
+```
+var i *int32 = new(int32)
+cursor.FetchOne(context.Background(), &i)
+```
+Alternative the using the rowmap API, `m := cursor.RowMap(context.Background())`,
+ `m` would be `map[string]interface{}{"table_name.column_name": nil}`
 
 ## Running tests
 Tests can be run with:
