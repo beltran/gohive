@@ -245,3 +245,8 @@ func (p *TSaslTransport) Flush(ctx context.Context) (err error) {
 func (p *TSaslTransport) RemainingBytes() uint64 {
 	return uint64(p.frameSize)
 }
+
+// SetMaxLength set the maxLength
+func (p *TSaslTransport) SetMaxLength(maxLength uint32) {
+	p.maxLength = maxLength
+}
