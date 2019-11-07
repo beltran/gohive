@@ -108,18 +108,18 @@ This implies setting in hive-site.xml:
 - `hive.server2.thrift.http.port = 10001`
 
 ## NULL values
-For example if a NULL value is a row the following operations would put 0 into `i`:
+For example if a `NULL` value is in a row, the following operations would put `0` into `i`:
 ```
 var i int32
 cursor.FetchOne(context.Background(), &i)
 ```
-To differentiate between these two values (NULL and 0) the following will set `i` to nil or `*i` to 0:
+To differentiate between these two values (`NULL` and `0`) the following will set `i` to `nil` or `*i` to `0`:
 ```
 var i *int32 = new(int32)
 cursor.FetchOne(context.Background(), &i)
 ```
-Alternative the using the rowmap API, `m := cursor.RowMap(context.Background())`,
- `m` would be `map[string]interface{}{"table_name.column_name": nil}`
+Alternatively, using the rowmap API, `m := cursor.RowMap(context.Background())`,
+ `m` would be `map[string]interface{}{"table_name.column_name": nil}` for a `NULL` value.
 
 ## Running tests
 Tests can be run with:
