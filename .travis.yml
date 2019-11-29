@@ -34,6 +34,7 @@ before_install:
   - docker network create com
   - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
   - python3.6 get-pip.py --user
+  - travis_retry go get github.com/beltran/gssapi
 
 env:
   - DOCKER_COMPOSE_VERSION=1.22.0
