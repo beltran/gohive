@@ -163,8 +163,10 @@ func Connect(host string, port int, auth string,
 		} else {
 			panic("Unrecognized auth")
 		}
-		if err = transport.Open(); err != nil {
-			return
+		if !transport.IsOpen() {
+			if err = transport.Open(); err != nil {
+				return
+			}
 		}
 	} else {
 		panic(fmt.Sprintf("Unrecognized transport mode %s", configuration.TransportMode))
