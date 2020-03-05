@@ -16,6 +16,7 @@ function wait_for_hive () {
           # Just fail because the port didn't open
           echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
+          docker logs keberos.example
           exit 1
         fi
         echo "Waiting for hive port to open"
@@ -93,8 +94,8 @@ function  binaryKerberos() {
   export TRANSPORT="binary"
   export AUTH="KERBEROS"
   export SSL="0"
-  go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags "integration kerberos" -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; docker logs kerberos.example.com; exit 2; }
+  go test -tags "integration kerberos" -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; docker logs kerberos.example.com ; exit 2; }
   go run -tags "kerberos" example/main.go
 }
 
@@ -109,7 +110,7 @@ function httpKerberos() {
   export AUTH="KERBEROS"
   export SSL="1"
   # go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags "integration kerberos" -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags "integration kerberos" -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; docker logs kerberos.example ; exit 2; }
 }
 
 function binaryNone() {
@@ -121,7 +122,7 @@ function binaryNone() {
   export AUTH="NONE"
   export SSL="0"
   # go test -tags integration -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags integration -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags integration -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; docker logs kerberos.example.com ; exit 2; }
 
   echo "mode: count" >coverage.out
   grep -h -v "mode: count" *.part >>coverage.out
