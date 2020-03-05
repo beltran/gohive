@@ -12,6 +12,7 @@ cat >/etc/krb5.conf <<EOL
  EXAMPLE.COM = {
      kdc = kerberos.example.com
      admin_server = kerberos.example.com
+     default_domain = EXAMPLE.COM
  }
 
 [domain_realm]

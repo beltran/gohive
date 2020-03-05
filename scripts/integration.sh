@@ -41,6 +41,7 @@ function install_deps() {
     #sed -i.bak 's/fs.default.name.*/fs.default.name = 3.1.2/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.0    /g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_kerberos.cfg
     popd
 }
