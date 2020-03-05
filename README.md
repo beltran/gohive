@@ -9,6 +9,7 @@ Gohive can be installed with:
 go get github.com/beltran/gohive
 ```
 
+
 To add kerberos support gohive requires header files to build against the GSSAPI C library. They can be installed with:
 - Ubuntu: `sudo apt-get install libkrb5-dev`
 - MacOS: `brew install homebrew/dupes/heimdal --without-x11`
