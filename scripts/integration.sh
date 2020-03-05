@@ -17,7 +17,6 @@ function wait_for_hive () {
           echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
           docker logs kerberos.example
-          docker logs nn.example
           exit 1
         fi
         echo "Waiting for hive port to open"
@@ -28,7 +27,7 @@ function wait_for_hive () {
 
 function install_deps() {
     if [ ! -d "dhive" ] ; then
-        git clone https://github.com/beltran/dhive
+        git clone -b test https://github.com/beltran/dhive
     else
         cd dhive
         git fetch && git reset --hard origin/master
