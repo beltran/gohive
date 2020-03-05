@@ -16,7 +16,6 @@ function wait_for_hive () {
           # Just fail because the port didn't open
           echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
-          docker logs kerberos.example
           exit 1
         fi
         echo "Waiting for hive port to open"
