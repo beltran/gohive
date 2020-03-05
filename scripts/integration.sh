@@ -16,7 +16,7 @@ function wait_for_hive () {
           # Just fail because the port didn't open
           echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
-          docker logs kerberos.example
+          docker logs ker beros.example
           exit 1
         fi
         echo "Waiting for hive port to open"
@@ -132,8 +132,8 @@ function run_tests() {
 
     export SKIP_UNSTABLE="1"
 
-    binaryKerberos
-    httpKerberos
+    #binaryKerberos
+    #httpKerberos
     binaryNone
 
     goveralls -coverprofile=coverage.out -service=travis-ci
