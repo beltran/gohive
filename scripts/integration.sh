@@ -16,7 +16,8 @@ function wait_for_hive () {
           # Just fail because the port didn't open
           echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
-          docker logs ker beros.example
+          docker logs kerberos.example
+          docker logs nn.example
           exit 1
         fi
         echo "Waiting for hive port to open"
@@ -38,6 +39,7 @@ function install_deps() {
     sed -i.bak 's/python3/python3.6/g' ./Makefile
 
     python3.6 -m pip install --user -r requirements.txt
+    #sed -i.bak 's/fs.default.name.*/fs.default.name = 3.1.2/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_kerberos.cfg
