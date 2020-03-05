@@ -33,7 +33,7 @@ function install_deps() {
         cd ..
     fi
     pushd dhive
-    git reset --hard 91e046ded668cf97dc845cb280aa2d12a9709293
+    #git reset --hard 91e046ded668cf97dc845cb280aa2d12a9709293
     git checkout test
     sed -i.bak 's/python3/python3.6/g' ./Makefile
 
