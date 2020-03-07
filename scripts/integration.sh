@@ -33,7 +33,7 @@ function install_deps() {
         cd ..
     fi
     pushd dhive
-    git reset --hard 91e046ded668cf97dc845cb280aa2d12a9709293
+    git reset --hard 750e11b9c07d79d97aea1e182ef12965fc4e922d
     sed -i.bak 's/python3/python3.6/g' ./Makefile
 
     python3.6 -m pip install --user -r requirements.txt
