@@ -1,7 +1,9 @@
 module github.com/beltran/gohive
 
+go 1.14
+
 require (
 	github.com/apache/thrift v0.12.0
-	github.com/beltran/gosasl v0.0.0-20181023043315-01c4c2ce6a51
-	github.com/beltran/gssapi v0.0.0-20180807003338-598f9f3b2878 // indirect
+	github.com/beltran/gosasl v0.0.0-20200324154900-112336fc0fc0
+	github.com/beltran/gssapi v0.0.0-20200324152954-d86554db4bab // indirect
 )
