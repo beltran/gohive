@@ -266,7 +266,7 @@ func TestDescriptionAsync(t *testing.T) {
 
 func TestHiveProperties(t *testing.T) {
 	configuration := map[string]string{
-    "hadoop.madeup.one": "one",
+		"hadoop.madeup.one": "one",
 	}
 
 	connection, cursor := makeConnectionWithConfiguration(t, 1000, configuration)
@@ -1309,6 +1309,26 @@ func TestTypesWithNulls(t *testing.T) {
 	}
 
 	closeAll(t, connection, cursor)
+}
+
+func TestParseZookeeperHiveServer2Info(t *testing.T) {
+	children := []string{
+		"serverUri=x1.test.io:10000;version=2.3.2;sequence=0000000792",
+		"",
+		"serverUri=x2.test.io:10001;version=2.3.2;sequence=0000000794",
+		"serverUri=x3.test.io:10006;version=2.3.2;sequence=0000000791",
+		"serverUri=invalid.test.io;version=2.3.2;sequence=0000000791",
+		"invalid=invalid",
+	}
+	expected := []map[string]string{
+		map[string]string{"host": "x1.test.io", "port": "10000", "version": "2.3.2", "sequence": "0000000792"},
+		map[string]string{"host": "x2.test.io", "port": "10001", "version": "2.3.2", "sequence": "0000000794"},
+		map[string]string{"host": "x3.test.io", "port": "10006", "version": "2.3.2", "sequence": "0000000791"},
+	}
+	result := parseHiveServer2Info(children)
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("Expected : %+v, got: %+v", expected, result)
+	}
 }
 
 func prepareAllTypesTable(t *testing.T, cursor *Cursor) {
