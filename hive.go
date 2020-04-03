@@ -107,7 +107,8 @@ func Connect(host string, port int, auth string,
 				}
 				conn, err := innerConnect(node["host"], port, auth, configuration)
 				if err != nil {
-					return nil, err
+					// Let's try to connect to the next hiveserver2
+					continue
 				}
 				return conn, nil
 			}
