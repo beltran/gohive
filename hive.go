@@ -118,7 +118,6 @@ func Connect(host string, port int, auth string,
 			return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
 				configuration.ZookeeperNamespace)
 		}
-		return nil, nil
 	} else {
 		return innerConnect(host, port, auth, configuration)
 	}
