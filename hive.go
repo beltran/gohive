@@ -5,9 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os/user"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +17,11 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
+	"github.com/go-zookeeper/zk"
 )
 
 const DEFAULT_FETCH_SIZE int64 = 1000
+const ZOOKEEPER_DEFAULT_NAMESPACE = "hiveserver2"
 
 // Connection holds the information for getting a cursor to hive
 type Connection struct {
@@ -48,6 +52,8 @@ type ConnectConfiguration struct {
 	TransportMode        string
 	HTTPPath             string
 	TLSConfig            *tls.Config
+	UseZookeeper         bool
+	ZookeeperNamespace   string
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -62,11 +68,96 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		TransportMode:        "binary",
 		HTTPPath:             "cliservice",
 		TLSConfig:            nil,
+		UseZookeeper:         false,
+		ZookeeperNamespace:   ZOOKEEPER_DEFAULT_NAMESPACE,
 	}
 }
 
 // Connect to hive server
 func Connect(host string, port int, auth string,
+	configuration *ConnectConfiguration) (conn *Connection, err error) {
+
+	if configuration.UseZookeeper {
+		// consider zkHost as zookeeper quorum
+		zkHosts := strings.Split(host, ",")
+		for i, zkHost := range zkHosts {
+			if !strings.Contains(zkHost, ":") {
+				zkHosts[i] = fmt.Sprintf("%s:%d", zkHost, port)
+			}
+		}
+
+		zkConn, _, err := zk.Connect(zkHosts, time.Second)
+		if err != nil {
+			return nil, err
+		}
+
+		hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
+		if err != nil {
+			panic(err)
+		}
+		if len(hsInfos) > 0 {
+			nodes := parseHiveServer2Info(hsInfos)
+			rand.Shuffle(len(nodes), func(i, j int) {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			})
+			for _, node := range nodes {
+				port, err := strconv.Atoi(node["port"])
+				if err != nil {
+					continue
+				}
+				conn, err := innerConnect(node["host"], port, auth, configuration)
+				if err != nil {
+					return nil, err
+				}
+				return conn, nil
+			}
+			return nil, fmt.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
+				configuration.ZookeeperNamespace)
+		} else {
+			return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
+				configuration.ZookeeperNamespace)
+		}
+		return nil, nil
+	} else {
+		return innerConnect(host, port, auth, configuration)
+	}
+}
+
+func parseHiveServer2Info(hsInfos []string) []map[string]string {
+	results := make([]map[string]string, len(hsInfos))
+	actualCount := 0
+
+	for _, hsInfo := range hsInfos {
+		validFormat := false
+		node := make(map[string]string)
+
+		for _, param := range strings.Split(hsInfo, ";") {
+			kvPair := strings.Split(param, "=")
+			if len(kvPair) < 2 {
+				break
+			}
+			if kvPair[0] == "serverUri" {
+				hostAndPort := strings.Split(kvPair[1], ":")
+				if len(hostAndPort) == 2 {
+					node["host"] = hostAndPort[0]
+					node["port"] = hostAndPort[1]
+					validFormat = len(node["host"]) != 0 && len(node["port"]) != 0
+				} else {
+					break
+				}
+			} else {
+				node[kvPair[0]] = kvPair[1]
+			}
+		}
+		if validFormat {
+			results[actualCount] = node
+			actualCount++
+		}
+	}
+	return results[0:actualCount]
+}
+
+func innerConnect(host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 
 	var socket thrift.TTransport
