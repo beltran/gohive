@@ -52,7 +52,6 @@ type ConnectConfiguration struct {
 	TransportMode        string
 	HTTPPath             string
 	TLSConfig            *tls.Config
-	UseZookeeper         bool
 	ZookeeperNamespace   string
 }
 
@@ -68,59 +67,56 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		TransportMode:        "binary",
 		HTTPPath:             "cliservice",
 		TLSConfig:            nil,
-		UseZookeeper:         false,
 		ZookeeperNamespace:   ZOOKEEPER_DEFAULT_NAMESPACE,
 	}
+}
+
+
+// Connect to zookeper to get hive hosts and then connect to hive.
+// hosts is in format host1:port1,host2:port2,host3:port3 (zookeeper hosts).
+func ConnectZookeeper(hosts string, auth string,
+	configuration *ConnectConfiguration) (conn *Connection, err error) {
+	// consider host as zookeeper quorum
+	zkHosts := strings.Split(hosts, ",")
+	zkConn, _, err := zk.Connect(zkHosts, time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
+	if err != nil {
+		panic(err)
+	}
+	if len(hsInfos) > 0 {
+		nodes := parseHiveServer2Info(hsInfos)
+		rand.Shuffle(len(nodes), func(i, j int) {
+			nodes[i], nodes[j] = nodes[j], nodes[i]
+		})
+		for _, node := range nodes {
+			port, err := strconv.Atoi(node["port"])
+			if err != nil {
+				continue
+			}
+			conn, err := innerConnect(node["host"], port, auth, configuration)
+			if err != nil {
+				// Let's try to connect to the next one
+				continue
+			}
+			return conn, nil
+		}
+		return nil, fmt.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
+			configuration.ZookeeperNamespace)
+	} else {
+		return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
+			configuration.ZookeeperNamespace)
+	}
+
 }
 
 // Connect to hive server
 func Connect(host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
-
-	if configuration.UseZookeeper {
-		// consider host as zookeeper quorum
-		zkHosts := strings.Split(host, ",")
-		for i, zkHost := range zkHosts {
-			if !strings.Contains(zkHost, ":") {
-				zkHosts[i] = fmt.Sprintf("%s:%d", zkHost, port)
-			}
-		}
-
-		zkConn, _, err := zk.Connect(zkHosts, time.Second)
-		if err != nil {
-			return nil, err
-		}
-
-		hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
-		if err != nil {
-			panic(err)
-		}
-		if len(hsInfos) > 0 {
-			nodes := parseHiveServer2Info(hsInfos)
-			rand.Shuffle(len(nodes), func(i, j int) {
-				nodes[i], nodes[j] = nodes[j], nodes[i]
-			})
-			for _, node := range nodes {
-				port, err := strconv.Atoi(node["port"])
-				if err != nil {
-					continue
-				}
-				conn, err := innerConnect(node["host"], port, auth, configuration)
-				if err != nil {
-					// Let's try to connect to the next one
-					continue
-				}
-				return conn, nil
-			}
-			return nil, fmt.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
-				configuration.ZookeeperNamespace)
-		} else {
-			return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
-				configuration.ZookeeperNamespace)
-		}
-	} else {
-		return innerConnect(host, port, auth, configuration)
-	}
+	return innerConnect(host, port, auth, configuration)
 }
 
 func parseHiveServer2Info(hsInfos []string) []map[string]string {
