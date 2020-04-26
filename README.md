@@ -63,7 +63,7 @@ data can be queried.
 configuration := NewConnectConfiguration()
 configuration.Service = "hive"
 // Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
+connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
 ```
 This implies setting in hive-site.xml:
 - `hive.server2.authentication = KERBEROS`
@@ -77,7 +77,7 @@ configuration := NewConnectConfiguration()
 configuration.Username = "myUsername"
 // This may not be necessary
 configuration.Password = "myPassword"
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "NONE", configuration)
+connection, errConn := Connect("hs2.example.com", 10000, "NONE", configuration)
 ```
 This implies setting in hive-site.xml:
 
@@ -85,7 +85,7 @@ This implies setting in hive-site.xml:
 
 ### Connnect using No Sasl:
 ``` go
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "NOSASL", nil)
+connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", nil)
 ```
 This implies setting in hive-site.xml:
 
@@ -99,7 +99,7 @@ configuration.HttpPath = "cliservice" // this is the default path in hive config
 configuration.TransportMode = "http"
 configuration.Service = "hive"
 
-connection, errConn := Connect(ctx, "hs2.example.com", 10000, "KERBEROS", configuration)
+connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
 ```
 This implies setting in hive-site.xml:
 
