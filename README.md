@@ -107,6 +107,14 @@ This implies setting in hive-site.xml:
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
 
+## Zookeeper
+A connection can be made using zookeeper:
+
+```go
+connection, errConn := ConnectZookeeper("zk1.example.com:2181,zk2.example.com:2181", "NONE", configuration)
+```
+The last two parameters determine how the connection to hive will be made once the hive hosts are retrieved from zookeeper.
+
 ## NULL values
 For example if a `NULL` value is in a row, the following operations would put `0` into `i`:
 ```
