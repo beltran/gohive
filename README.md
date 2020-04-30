@@ -85,7 +85,7 @@ This implies setting in hive-site.xml:
 
 ### Connnect using No Sasl:
 ``` go
-connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", nil)
+connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", NewConnectConfiguration())
 ```
 This implies setting in hive-site.xml:
 
