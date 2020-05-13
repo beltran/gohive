@@ -32,7 +32,7 @@ type Connection struct {
 	auth                string
 	kerberosServiceName string
 	password            string
-	sessionHandle       *hiveserver.TSessionHandle
+	SessionHandle       *hiveserver.TSessionHandle
 	client              *hiveserver.TCLIServiceClient
 	configuration       *ConnectConfiguration
 	transport           thrift.TTransport
@@ -278,7 +278,7 @@ func innerConnect(host string, port int, auth string,
 		database:            "default",
 		auth:                auth,
 		kerberosServiceName: "",
-		sessionHandle:       response.SessionHandle,
+		SessionHandle:       response.SessionHandle,
 		client:              client,
 		configuration:       configuration,
 		transport:           transport,
@@ -308,7 +308,7 @@ func (c *Connection) Cursor() *Cursor {
 // Close closes a session
 func (c *Connection) Close() error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
-	closeRequest.SessionHandle = c.sessionHandle
+	closeRequest.SessionHandle = c.SessionHandle
 	// This context is ignored
 	responseClose, err := c.client.CloseSession(context.Background(), closeRequest)
 
@@ -454,7 +454,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
-	executeReq.SessionHandle = c.conn.sessionHandle
+	executeReq.SessionHandle = c.conn.SessionHandle
 	executeReq.Statement = query
 	executeReq.RunAsync = true
 	var responseExecute *hiveserver.TExecuteStatementResp
