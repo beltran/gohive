@@ -87,7 +87,7 @@ This implies setting in hive-site.xml:
 ``` go
 connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", NewConnectConfiguration())
 ```
-This implies setting in hive-site.xml:
+This implies setting in hive-site.xml: 
 
 - `hive.server2.authentication = NOSASL`
 
