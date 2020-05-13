@@ -1,3 +1,4 @@
+github.com/EugeneChung/gosasl v0.0.0-20200504081612-65126081b793 h1:gAAKPCfiiA9cS0dCu8nC+UPBazo5Cw29sp8T1bY78ys=
 github.com/EugeneChung/gosasl v0.0.0-20200504081612-65126081b793/go.mod h1:JmI1rmq539DAxVlWDgKhlv1+Chnt3ntSVi7joD4k3g4=
 github.com/apache/thrift v0.12.0 h1:pODnxUFNcjP9UTLZGTdeh+j16A8lJbRvD3rOtrk/7bs=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
