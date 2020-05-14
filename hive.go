@@ -337,7 +337,7 @@ const _ASYNC_ENDED = 5
 // Cursor is used for fetching the rows after a query
 type Cursor struct {
 	conn            *Connection
-	operationHandle *hiveserver.TOperationHandle
+	OperationHandle *hiveserver.TOperationHandle
 	queue           []*hiveserver.TColumn
 	response        *hiveserver.TFetchResultsResp
 	columnIndex     int
@@ -438,7 +438,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 
 func (c *Cursor) handleDoneContext() {
 	originalError := c.Err
-	if c.operationHandle != nil {
+	if c.OperationHandle != nil {
 		c.Cancel()
 		if c.Err != nil {
 			return
@@ -468,7 +468,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 				c.state = _ERROR
 			} else {
 				// We may need this to cancel the operation
-				c.operationHandle = responseExecute.OperationHandle
+				c.OperationHandle = responseExecute.OperationHandle
 			}
 		}
 		return
@@ -478,7 +478,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 		return
 	}
 
-	c.operationHandle = responseExecute.OperationHandle
+	c.OperationHandle = responseExecute.OperationHandle
 	if !responseExecute.OperationHandle.HasResultSet {
 		c.state = _FINISHED
 	}
@@ -489,7 +489,7 @@ func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusRe
 	c.Err = nil
 	progressGet := getProgres
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
-	pollRequest.OperationHandle = c.operationHandle
+	pollRequest.OperationHandle = c.OperationHandle
 	pollRequest.GetProgressUpdate = &progressGet
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
@@ -813,12 +813,12 @@ func (c *Cursor) Description() [][]string {
 	if c.description != nil {
 		return c.description
 	}
-	if c.operationHandle == nil {
+	if c.OperationHandle == nil {
 		c.Err = fmt.Errorf("Description can only be called after after a Poll or after an async request")
 	}
 
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
-	metaRequest.OperationHandle = c.operationHandle
+	metaRequest.OperationHandle = c.OperationHandle
 	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
 	if err != nil {
 		c.Err = err
@@ -873,7 +873,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			stopLock.Unlock()
 
 			fetchRequest := hiveserver.NewTFetchResultsReq()
-			fetchRequest.OperationHandle = c.operationHandle
+			fetchRequest.OperationHandle = c.OperationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
@@ -928,7 +928,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 func (c *Cursor) Cancel() {
 	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
-	cancelRequest.OperationHandle = c.operationHandle
+	cancelRequest.OperationHandle = c.OperationHandle
 	var responseCancel *hiveserver.TCancelOperationResp
 	// This context is simply ignored
 	responseCancel, c.Err = c.conn.client.CancelOperation(context.Background(), cancelRequest)
@@ -955,12 +955,12 @@ func (c *Cursor) resetState() error {
 	c.state = _NONE
 	c.description = nil
 	c.newData = false
-	if c.operationHandle != nil {
+	if c.OperationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()
-		closeRequest.OperationHandle = c.operationHandle
+		closeRequest.OperationHandle = c.OperationHandle
 		// This context is ignored
 		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
-		c.operationHandle = nil
+		c.OperationHandle = nil
 		if err != nil {
 			return err
 		}
