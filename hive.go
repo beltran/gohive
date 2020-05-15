@@ -305,6 +305,12 @@ func (c *Connection) Cursor() *Cursor {
 	}
 }
 
+func (c *Connection) MetaData() *DatabaseMetaData {
+	return &DatabaseMetaData{
+		conn: c,
+	}
+}
+
 // Close closes a session
 func (c *Connection) Close() error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
@@ -449,6 +455,18 @@ func (c *Cursor) handleDoneContext() {
 	c.state = _FINISHED
 }
 
+func (c *Cursor) handleContextDeadline(operationHandle *hiveserver.TOperationHandle) {
+	if strings.Contains(c.Err.Error(), "context deadline exceeded") {
+		c.state = _CONTEXT_DONE
+		if operationHandle == nil {
+			c.state = _ERROR
+		} else {
+			// We may need this to cancel the operation
+			c.OperationHandle = operationHandle
+		}
+	}
+}
+
 func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	c.resetState()
 
@@ -462,15 +480,11 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 
 	if c.Err != nil {
-		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
-			c.state = _CONTEXT_DONE
-			if responseExecute == nil {
-				c.state = _ERROR
-			} else {
-				// We may need this to cancel the operation
-				c.OperationHandle = responseExecute.OperationHandle
-			}
+		var operationHandle *hiveserver.TOperationHandle = nil
+		if responseExecute != nil {
+			operationHandle = responseExecute.OperationHandle
 		}
+		c.handleContextDeadline(operationHandle)
 		return
 	}
 	if !success(responseExecute.GetStatus()) {
@@ -1008,12 +1022,48 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 	return 0, fmt.Errorf("All columns seem empty")
 }
 
+type DatabaseMetaData struct {
+	conn *Connection
+}
+
+func (md *DatabaseMetaData) GetTables(ctx context.Context, catalog string, schemaPattern string, tableNamePattern string, types []string) (cursor *Cursor) {
+	req := hiveserver.NewTGetTablesReq()
+	req.SessionHandle = md.conn.SessionHandle
+	req.CatalogName = (*hiveserver.TPatternOrIdentifier)(&catalog)
+	req.SchemaName = (*hiveserver.TPatternOrIdentifier)(&schemaPattern)
+	req.TableName = (*hiveserver.TPatternOrIdentifier)(&tableNamePattern)
+	req.TableTypes = types
+
+	var resp *hiveserver.TGetTablesResp
+
+	cursor = md.conn.Cursor()
+	resp, cursor.Err = md.conn.client.GetTables(ctx, req)
+	if cursor.Err != nil {
+		var operationHandle *hiveserver.TOperationHandle = nil
+		if resp != nil {
+			operationHandle = resp.OperationHandle
+		}
+		cursor.handleContextDeadline(operationHandle)
+		return cursor
+	}
+	if !success(resp.GetStatus()) {
+		cursor.Err = fmt.Errorf("error while getting tables: %s", resp.Status.String())
+		return cursor
+	}
+
+	if !resp.OperationHandle.HasResultSet {
+		cursor.state = _FINISHED
+	}
+	cursor.OperationHandle = resp.OperationHandle
+	return cursor
+}
+
 type inMemoryCookieJar struct {
 	given   *bool
 	storage map[string][]http.Cookie
 }
 
-func (jar inMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+func (jar inMemoryCookieJar) SetCookies(_ *url.URL, cookies []*http.Cookie) {
 	for _, cookie := range cookies {
 		jar.storage["cliservice"] = []http.Cookie{*cookie}
 	}
