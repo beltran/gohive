@@ -1026,6 +1026,34 @@ type DatabaseMetaData struct {
 	conn *Connection
 }
 
+func (md *DatabaseMetaData) GetCatalogs(ctx context.Context) (cursor *Cursor) {
+	req := hiveserver.NewTGetCatalogsReq()
+	req.SessionHandle = md.conn.SessionHandle
+
+	var resp *hiveserver.TGetCatalogsResp
+
+	cursor = md.conn.Cursor()
+	resp, cursor.Err = md.conn.client.GetCatalogs(ctx, req)
+	if cursor.Err != nil {
+		var operationHandle *hiveserver.TOperationHandle = nil
+		if resp != nil {
+			operationHandle = resp.OperationHandle
+		}
+		cursor.handleContextDeadline(operationHandle)
+		return cursor
+	}
+	if !success(resp.GetStatus()) {
+		cursor.Err = fmt.Errorf("error while getting catalogs: %s", resp.Status.String())
+		return cursor
+	}
+
+	if !resp.OperationHandle.HasResultSet {
+		cursor.state = _FINISHED
+	}
+	cursor.OperationHandle = resp.OperationHandle
+	return cursor
+}
+
 func (md *DatabaseMetaData) GetTables(ctx context.Context, catalog string, schemaPattern string, tableNamePattern string, types []string) (cursor *Cursor) {
 	req := hiveserver.NewTGetTablesReq()
 	req.SessionHandle = md.conn.SessionHandle
@@ -1048,6 +1076,38 @@ func (md *DatabaseMetaData) GetTables(ctx context.Context, catalog string, schem
 	}
 	if !success(resp.GetStatus()) {
 		cursor.Err = fmt.Errorf("error while getting tables: %s", resp.Status.String())
+		return cursor
+	}
+
+	if !resp.OperationHandle.HasResultSet {
+		cursor.state = _FINISHED
+	}
+	cursor.OperationHandle = resp.OperationHandle
+	return cursor
+}
+
+func (md *DatabaseMetaData) GetColumns(ctx context.Context, catalog string, schemaPattern string, tableNamePattern string, columnNamePattern string) (cursor *Cursor) {
+	req := hiveserver.NewTGetColumnsReq()
+	req.SessionHandle = md.conn.SessionHandle
+	req.CatalogName = (*hiveserver.TIdentifier)(&catalog)
+	req.SchemaName = (*hiveserver.TPatternOrIdentifier)(&schemaPattern)
+	req.TableName = (*hiveserver.TPatternOrIdentifier)(&tableNamePattern)
+	req.ColumnName = (*hiveserver.TPatternOrIdentifier)(&columnNamePattern)
+
+	var resp *hiveserver.TGetColumnsResp
+
+	cursor = md.conn.Cursor()
+	resp, cursor.Err = md.conn.client.GetColumns(ctx, req)
+	if cursor.Err != nil {
+		var operationHandle *hiveserver.TOperationHandle = nil
+		if resp != nil {
+			operationHandle = resp.OperationHandle
+		}
+		cursor.handleContextDeadline(operationHandle)
+		return cursor
+	}
+	if !success(resp.GetStatus()) {
+		cursor.Err = fmt.Errorf("error while getting columns: %s", resp.Status.String())
 		return cursor
 	}
 
