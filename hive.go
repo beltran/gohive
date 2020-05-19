@@ -1026,14 +1026,14 @@ type DatabaseMetaData struct {
 	conn *Connection
 }
 
-func (md *DatabaseMetaData) GetCatalogs(ctx context.Context) (cursor *Cursor) {
-	req := hiveserver.NewTGetCatalogsReq()
+func (md *DatabaseMetaData) GetSchemas(ctx context.Context) (cursor *Cursor) {
+	req := hiveserver.NewTGetSchemasReq()
 	req.SessionHandle = md.conn.SessionHandle
 
-	var resp *hiveserver.TGetCatalogsResp
+	var resp *hiveserver.TGetSchemasResp
 
 	cursor = md.conn.Cursor()
-	resp, cursor.Err = md.conn.client.GetCatalogs(ctx, req)
+	resp, cursor.Err = md.conn.client.GetSchemas(ctx, req)
 	if cursor.Err != nil {
 		var operationHandle *hiveserver.TOperationHandle = nil
 		if resp != nil {
@@ -1043,7 +1043,7 @@ func (md *DatabaseMetaData) GetCatalogs(ctx context.Context) (cursor *Cursor) {
 		return cursor
 	}
 	if !success(resp.GetStatus()) {
-		cursor.Err = fmt.Errorf("error while getting catalogs: %s", resp.Status.String())
+		cursor.Err = fmt.Errorf("error while getting schemas: %s", resp.Status.String())
 		return cursor
 	}
 
