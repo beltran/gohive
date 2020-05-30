@@ -404,6 +404,68 @@ func TestUseDatabase(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestSetDatabaseConfig(t *testing.T) {
+	async := false
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS dpokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "CREATE DATABASE IF NOT EXISTS datbas", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	configuration := NewConnectConfiguration()
+	configuration.Database = "datbas"
+	configuration.Service = "hive"
+	configuration.FetchSize = 1000
+	configuration.TransportMode = getTransport()
+	configuration.HiveConfiguration = nil
+
+	connection, cursor = makeConnectionWithConnectConfiguration(t, configuration)
+
+	cursor.Execute(context.Background(), "CREATE TABLE datbas.dpokes (foo INT, bar INT)", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "INSERT INTO dpokes VALUES(1, 1111)", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Exec(context.Background(), "SELECT * FROM dpokes")
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{"dpokes.foo": int32(1), "dpokes.bar": int32(1111)}
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	cursor.Exec(context.Background(), "SELECT * FROM datbas.dpokes")
+	m = cursor.RowMap(context.Background())
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS datbas", async)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestSelectNull(t *testing.T) {
 	async := false
 	connection, cursor := prepareTableSingleValue(t, 6000, 1000)
@@ -1509,6 +1571,30 @@ func makeConnectionWithConfiguration(t *testing.T, fetchSize int64, hiveConfigur
 	configuration.TransportMode = mode
 	configuration.HiveConfiguration = hiveConfiguration
 
+	if ssl {
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TLSConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var port int = 10000
+	if mode == "http" {
+		port = 10000
+		configuration.HTTPPath = "cliservice"
+	}
+	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
+	if errConn != nil {
+		t.Fatal(errConn)
+	}
+	cursor := connection.Cursor()
+	return connection, cursor
+}
+
+func makeConnectionWithConnectConfiguration(t *testing.T, configuration *ConnectConfiguration) (*Connection, *Cursor) {
+	mode := getTransport()
+	ssl := getSsl()
 	if ssl {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
 		configuration.TLSConfig = tlsConfig

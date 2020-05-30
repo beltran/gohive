@@ -53,6 +53,7 @@ type ConnectConfiguration struct {
 	HTTPPath             string
 	TLSConfig            *tls.Config
 	ZookeeperNamespace   string
+	Database             string
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -70,7 +71,6 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		ZookeeperNamespace:   ZOOKEEPER_DEFAULT_NAMESPACE,
 	}
 }
-
 
 // Connect to zookeper to get hive hosts and then connect to hive.
 // hosts is in format host1:port1,host2:port2,host3:port3 (zookeeper hosts).
@@ -273,17 +273,31 @@ func innerConnect(host string, port int, auth string,
 		return
 	}
 
-	return &Connection{
+	database := configuration.Database
+	if database == "" {
+		database = "default"
+	}
+	connection := &Connection{
 		host:                host,
 		port:                port,
-		database:            "default",
+		database:            database,
 		auth:                auth,
 		kerberosServiceName: "",
 		sessionHandle:       response.SessionHandle,
 		client:              client,
 		configuration:       configuration,
 		transport:           transport,
-	}, nil
+	}
+
+	if configuration.Database != "" {
+		cursor := connection.Cursor()
+		cursor.Exec(context.Background(), "USE "+configuration.Database)
+		if cursor.Err != nil {
+			return nil, cursor.Err
+		}
+	}
+
+	return connection, nil
 }
 
 func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
