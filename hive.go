@@ -849,6 +849,7 @@ func (c *Cursor) Description() [][]string {
 			m[i] = []string{column.ColumnName, typeDesc.PrimitiveEntry.Type.String()}
 		}
 	}
+	c.description = m
 	return m
 }
 
