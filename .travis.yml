@@ -37,7 +37,7 @@ before_install:
   - travis_retry go get github.com/beltran/gssapi
 
 env:
-  - DOCKER_COMPOSE_VERSION=1.22.0
+  - DOCKER_COMPOSE_VERSION=1.22.0 GO111MODULE=on
 
 script:
   - set -e
