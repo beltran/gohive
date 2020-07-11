@@ -528,6 +528,9 @@ func TestSimpleSelect(t *testing.T) {
 	var s string
 	var i int32
 	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
 
 	closeAll(t, connection, cursor)
 }
@@ -1294,6 +1297,45 @@ func TestTypes(t *testing.T) {
 		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
 	if cursor.Err != nil {
 		t.Fatal(cursor.Err)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestTypesInterface(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	i := make([]interface{}, 15)
+	expected := make([]interface{}, 15)
+	expected[0] = true
+	expected[1] = int8(127)
+	expected[2] = int16(32767)
+	expected[3] = int32(2147483647)
+	expected[4] = int64(9223372036854775807)
+	expected[5] = float64(0.5)
+	expected[6] = float64(0.25)
+	expected[7] = "a string"
+	expected[8] = "1970-01-01 00:00:00"
+	expected[9] = []uint8{49, 50, 51}
+	expected[10] = "[1,2]"
+	expected[11] = "{1:2,3:4}"
+	expected[12] = "{\"a\":1,\"b\":2}"
+	expected[13] = "{0:1}"
+	expected[14] = "0.1"
+
+	cursor.FetchOne(context.Background(), i...)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if !reflect.DeepEqual(i, expected) {
+		t.Fatalf("Expected array: %+v, got: %+v", expected, i)
 	}
 
 	closeAll(t, connection, cursor)
