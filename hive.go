@@ -672,6 +672,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 	}
 	for i := 0; i < len(c.queue); i++ {
 		if c.queue[i].IsSetBinaryVal() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].BinaryVal.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*[]byte)
 			if !ok {
 				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
@@ -683,6 +687,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].BinaryVal.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetByteVal() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].ByteVal.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*int8)
 			if !ok {
 				d, ok := dests[i].(**int8)
@@ -701,6 +709,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			}
 
 		} else if c.queue[i].IsSetI16Val() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].I16Val.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*int16)
 			if !ok {
 				d, ok := dests[i].(**int16)
@@ -718,6 +730,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].I16Val.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetI32Val() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].I32Val.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*int32)
 			if !ok {
 				d, ok := dests[i].(**int32)
@@ -735,6 +751,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].I32Val.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetI64Val() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].I64Val.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*int64)
 			if !ok {
 				d, ok := dests[i].(**int64)
@@ -752,6 +772,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].I64Val.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetStringVal() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].StringVal.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*string)
 			if !ok {
 				d, ok := dests[i].(**string)
@@ -769,6 +793,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].StringVal.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetDoubleVal() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].DoubleVal.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*float64)
 			if !ok {
 				d, ok := dests[i].(**float64)
@@ -786,6 +814,10 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].DoubleVal.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetBoolVal() {
+			if dests[i] == nil {
+				dests[i] = c.queue[i].BoolVal.Values[c.columnIndex]
+				continue
+			}
 			d, ok := dests[i].(*bool)
 			if !ok {
 				d, ok := dests[i].(**bool)
