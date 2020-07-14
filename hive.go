@@ -252,6 +252,7 @@ func innerConnect(host string, port int, auth string,
 			transport, err = NewTSaslTransport(socket, host, "DIGEST-MD5", saslConfiguration)
 			if err != nil {
 				return
+			}
 		} else {
 			panic("Unrecognized auth")
 		}

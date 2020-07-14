@@ -50,7 +50,7 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 			return nil, err
 		}
 	} else if mechanismName == "DIGEST-MD5" {
-		mechanism = gosasl.NewDigestMD5Mechanism(configuration["username"], configuration["password"])
+		mechanism = gosasl.NewDigestMD5Mechanism(configuration["username"], configuration["password"], configuration["service"])
 	} else {
 		panic("Mechanism not supported")
 	}
