@@ -8,6 +8,8 @@ github.com/beltran/gosasl v0.0.0-20200326175049-9dfbcb61a4b3 h1:q832ARlau2fGuPSJ
 github.com/beltran/gosasl v0.0.0-20200326175049-9dfbcb61a4b3/go.mod h1:Qx8cW6jkI8riyzmklj80kAIkv+iezFUTBiGU0qHhHes=
 github.com/beltran/gosasl v0.0.0-20200513032552-d3700baa7593 h1:+CofSOeu+dXtANvH0VGR0K2dswnEUR6BOcGb3uXxOvk=
 github.com/beltran/gosasl v0.0.0-20200513032552-d3700baa7593/go.mod h1:Qx8cW6jkI8riyzmklj80kAIkv+iezFUTBiGU0qHhHes=
+github.com/beltran/gosasl v0.0.0-20200713231802-2742ac7deace h1:5o/MYI4CyKBcJytl3KqY8hhyXMRY+eNXObQ1aUz6e/M=
+github.com/beltran/gosasl v0.0.0-20200713231802-2742ac7deace/go.mod h1:Qx8cW6jkI8riyzmklj80kAIkv+iezFUTBiGU0qHhHes=
 github.com/beltran/gssapi v0.0.0-20200324152954-d86554db4bab h1:ayfcn60tXOSYy5zUN1AMSTQo4nJCf7hrdzAVchpPst4=
 github.com/beltran/gssapi v0.0.0-20200324152954-d86554db4bab/go.mod h1:GLe4UoSyvJ3cVG+DVtKen5eAiaD8mAJFuV5PT3Eeg9Q=
 github.com/go-zookeeper/zk v1.0.1 h1:LmXNmSnkNsNKai+aDu6sHRr8ZJzIrHJo8z8Z4sm8cT8=
