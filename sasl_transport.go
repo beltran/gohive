@@ -50,7 +50,7 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 			return nil, err
 		}
 	} else if mechanismName == "DIGEST-MD5" {
-		mechanism = gosasl.NewDigestMD5Mechanism(configuration["username"], configuration["password"], configuration["service"])
+		mechanism = gosasl.NewDigestMD5Mechanism(configuration["service"], configuration["username"], configuration["password"])
 	} else {
 		panic("Mechanism not supported")
 	}
@@ -80,16 +80,16 @@ func (p *TSaslTransport) Open() (err error) {
 		}
 	}
 	if err = p.sendSaslMsg(p.OpeningContext, START, []byte(p.mechanism)); err != nil {
-		return nil
+		return err
 	}
 
 	proccessed, err := p.saslClient.Start()
 	if err != nil {
-		return
+		return err
 	}
 
 	if err = p.sendSaslMsg(p.OpeningContext, OK, proccessed); err != nil {
-		return nil
+		return err
 	}
 
 	for true {

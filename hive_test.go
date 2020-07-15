@@ -32,6 +32,24 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
+func TestConnectDigestMd5(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	auth := os.Getenv("AUTH")
+	ssl := os.Getenv("SSL")
+	if auth != "NONE" || transport != "binary" || ssl == "1" {
+		return
+	}
+
+	configuration := NewConnectConfiguration()
+	configuration.Service = "null"
+	configuration.Password = "pass"
+	configuration.Username = "hive"
+	_, err := Connect("hs2.example.com", 10000, "DIGEST-MD5", configuration)
+	if err == nil {
+		t.Fatal("Error was expected because the server won't accept this mechanism")
+	}
+}
+
 func TestResuseConnection(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	cursor.Execute(context.Background(), "SHOW DATABASES", false)
