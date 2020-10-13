@@ -163,6 +163,10 @@ func innerConnect(host string, port int, auth string,
 		socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
 	}
 
+	if err != nil {
+		return
+	}
+
 	if err = socket.Open(); err != nil {
 		return
 	}

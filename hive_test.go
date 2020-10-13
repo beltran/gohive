@@ -32,6 +32,22 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
+func TestDomainDoesntExist(t *testing.T) {
+	transport := os.Getenv("TRANSPORT")
+	auth := os.Getenv("AUTH")
+	ssl := os.Getenv("SSL")
+	if auth != "KERBEROS" || transport != "binary" || ssl == "1" {
+		return
+	}
+
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	_, err := Connect("nonexistentdomain", 10000, getAuth(), configuration)
+	if err == nil {
+		t.Fatal("Expected error because domain doesn't exist")
+	}
+}
+
 func TestConnectDigestMd5(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	auth := os.Getenv("AUTH")
