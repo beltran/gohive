@@ -691,6 +691,38 @@ func TestRowMap(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+
+func TestRowMapColumnRename(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	cursor.Exec(context.Background(), "create table if not exists t(a int, b int)")
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.Exec(context.Background(), "insert into t values(1,2)")
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	cursor.Exec(context.Background(), "select * from t as x left join t as y on x.a=y.b")
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	m := cursor.RowMap(context.Background())
+	expected := map[string]interface{}{"x.a": int32(1), "x.b": int32(2), "y.a": nil, "y.b": nil}
+	if !reflect.DeepEqual(m, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
+	}
+
+	if cursor.HasMore(context.Background()) {
+		log.Fatal("Shouldn't have any more values")
+	}
+	cursor.Exec(context.Background(), "drop table t")
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestRowMapAllTypes(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTable(t, cursor)
