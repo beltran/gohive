@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"log"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
@@ -663,6 +664,9 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
 			}
 		}
+	}
+	if len(m) != len(d) {
+		log.Panicf("Some columns have the same name as per the description: %v, this makes it impossible to get the values using the RowMap API, please use the FetchOne API", d)
 	}
 	c.columnIndex++
 	return m
