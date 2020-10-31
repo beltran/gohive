@@ -666,7 +666,7 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 		}
 	}
 	if len(m) != len(d) {
-		log.Panicf("Some columns have the same name as per the description: %v, this makes it impossible to get the values using the RowMap API, please use the FetchOne API", d)
+		log.Printf("Some columns have the same name as per the description: %v, this makes it impossible to get the values using the RowMap API, please use the FetchOne API", d)
 	}
 	c.columnIndex++
 	return m
