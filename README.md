@@ -134,4 +134,4 @@ Tests can be run with:
 ```
 ./scripts/integration
 ```
-This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with hive and kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`.
+This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with hive and kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/beltran/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.
