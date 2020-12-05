@@ -274,7 +274,7 @@ func innerConnect(host string, port int, auth string,
 	client := hiveserver.NewTCLIServiceClientFactory(transport, protocolFactory)
 
 	openSession := hiveserver.NewTOpenSessionReq()
-	openSession.ClientProtocol = hiveserver.TProtocolVersion_HIVE_CLI_SERVICE_PROTOCOL_V6
+	openSession.ClientProtocol = hiveserver.TProtocolVersion_HIVE_CLI_SERVICE_PROTOCOL_V3
 	openSession.Configuration = configuration.HiveConfiguration
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
@@ -401,17 +401,17 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
 		if finished {
 			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
-				msg := operationStatus.TaskStatus
+				msg := operationStatus.Status
 				if msg == nil {
-					msg = operationStatus.ErrorMessage
+					msg = operationStatus.Status
 				}
 				if s := operationStatus.Status; msg == nil && s != nil {
-					msg = s.ErrorMessage
+					msg = s
 				}
 				if msg == nil {
-					*msg = fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
+					*msg.ErrorMessage = fmt.Sprintf("gohive: operation in state without task status or error message")
 				}
-				c.Err = fmt.Errorf(*msg)
+				c.Err = fmt.Errorf(*msg.ErrorMessage)
 			}
 			break
 		}
@@ -513,10 +513,8 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 // Poll returns the current status of the last operation
 func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusResp) {
 	c.Err = nil
-	progressGet := getProgres
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
-	pollRequest.GetProgressUpdate = &progressGet
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
 	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
@@ -574,94 +572,88 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 		columnName := d[i][0]
 		columnType := d[i][1]
 		if columnType == "BOOLEAN_TYPE" {
-			if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+			if c.queue[i].BoolColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].BoolVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].BoolColumn[c.columnIndex]
 			}
 		} else if columnType == "TINYINT_TYPE" {
-			if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
+			if c.queue[i].ByteColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].ByteVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].ByteColumn[c.columnIndex].Value
 			}
 		} else if columnType == "SMALLINT_TYPE" {
-			if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+			if c.queue[i].I16Column[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].I16Val.Values[c.columnIndex]
+				m[columnName] = c.queue[i].I16Column[c.columnIndex].Value
 			}
 		} else if columnType == "INT_TYPE" {
-			if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+			if c.queue[i].I32Column[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].I32Val.Values[c.columnIndex]
+				m[columnName] = c.queue[i].I32Column[c.columnIndex].Value
 			}
 		} else if columnType == "BIGINT_TYPE" {
-			if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+			if c.queue[i].I64Column[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].I64Val.Values[c.columnIndex]
+				m[columnName] = c.queue[i].I64Column[c.columnIndex].Value
 			}
 		} else if columnType == "FLOAT_TYPE" {
-			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+			if c.queue[i].DoubleColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].DoubleColumn[c.columnIndex].Value
 			}
 		} else if columnType == "DOUBLE_TYPE" {
-			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+			if c.queue[i].DoubleColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].DoubleColumn[c.columnIndex].Value
 			}
 		} else if columnType == "STRING_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "TIMESTAMP_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
-			}
-		} else if columnType == "BINARY_TYPE" {
-			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
-				m[columnName] = nil
-			} else {
-				m[columnName] = c.queue[i].BinaryVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "ARRAY_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "MAP_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "STRUCT_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "UNION_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		} else if columnType == "DECIMAL_TYPE" {
-			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+			if c.queue[i].StringColumn[c.columnIndex] == nil {
 				m[columnName] = nil
 			} else {
-				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+				m[columnName] = c.queue[i].StringColumn[c.columnIndex].Value
 			}
 		}
 	}
@@ -685,168 +677,153 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 		return
 	}
 	for i := 0; i < len(c.queue); i++ {
-		if c.queue[i].IsSetBinaryVal() {
+		if c.queue[i].IsSetByteColumn() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].BinaryVal.Values[c.columnIndex]
-				continue
-			}
-			d, ok := dests[i].(*[]byte)
-			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
-				return
-			}
-			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
-				*d = nil
-			} else {
-				*d = c.queue[i].BinaryVal.Values[c.columnIndex]
-			}
-		} else if c.queue[i].IsSetByteVal() {
-			if dests[i] == nil {
-				dests[i] = c.queue[i].ByteVal.Values[c.columnIndex]
+				dests[i] = c.queue[i].ByteColumn[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*int8)
 			if !ok {
 				d, ok := dests[i].(**int8)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteColumn[c.columnIndex].Value, c.queue[i].ByteColumn[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
+				if c.queue[i].ByteColumn[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].ByteVal.Values[c.columnIndex]
+					**d = *c.queue[i].ByteColumn[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].ByteVal.Values[c.columnIndex]
+				*d = *c.queue[i].ByteColumn[c.columnIndex].Value
 			}
 
-		} else if c.queue[i].IsSetI16Val() {
+		} else if c.queue[i].IsSetI16Column() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].I16Val.Values[c.columnIndex]
+				dests[i] = c.queue[i].I16Column[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*int16)
 			if !ok {
 				d, ok := dests[i].(**int16)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Column[c.columnIndex].Value, c.queue[i].I16Column[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+				if c.queue[i].I16Column[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].I16Val.Values[c.columnIndex]
+					**d = *c.queue[i].I16Column[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].I16Val.Values[c.columnIndex]
+				*d = *c.queue[i].I16Column[c.columnIndex].Value
 			}
-		} else if c.queue[i].IsSetI32Val() {
+		} else if c.queue[i].IsSetI32Column() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].I32Val.Values[c.columnIndex]
+				dests[i] = c.queue[i].I32Column[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*int32)
 			if !ok {
 				d, ok := dests[i].(**int32)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Column[c.columnIndex].Value, c.queue[i].I32Column[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+				if c.queue[i].I32Column[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].I32Val.Values[c.columnIndex]
+					**d = *c.queue[i].I32Column[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].I32Val.Values[c.columnIndex]
+				*d = *c.queue[i].I32Column[c.columnIndex].Value
 			}
-		} else if c.queue[i].IsSetI64Val() {
+		} else if c.queue[i].IsSetI64Column() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].I64Val.Values[c.columnIndex]
+				dests[i] = c.queue[i].I64Column[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*int64)
 			if !ok {
 				d, ok := dests[i].(**int64)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Column[c.columnIndex].Value, c.queue[i].I64Column[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+				if c.queue[i].I64Column[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].I64Val.Values[c.columnIndex]
+					**d = *c.queue[i].I64Column[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].I64Val.Values[c.columnIndex]
+				*d = *c.queue[i].I64Column[c.columnIndex].Value
 			}
-		} else if c.queue[i].IsSetStringVal() {
+		} else if c.queue[i].IsSetStringColumn() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].StringVal.Values[c.columnIndex]
+				dests[i] = c.queue[i].StringColumn[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*string)
 			if !ok {
 				d, ok := dests[i].(**string)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringColumn[c.columnIndex].Value, c.queue[i].StringColumn[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				if c.queue[i].StringColumn[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].StringVal.Values[c.columnIndex]
+					**d = *c.queue[i].StringColumn[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].StringVal.Values[c.columnIndex]
+				*d = *c.queue[i].StringColumn[c.columnIndex].Value
 			}
-		} else if c.queue[i].IsSetDoubleVal() {
+		} else if c.queue[i].IsSetDoubleColumn() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].DoubleVal.Values[c.columnIndex]
+				dests[i] = c.queue[i].DoubleColumn[c.columnIndex].Value
 				continue
 			}
 			d, ok := dests[i].(*float64)
 			if !ok {
 				d, ok := dests[i].(**float64)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleColumn[c.columnIndex].Value, c.queue[i].DoubleColumn[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+				if c.queue[i].DoubleColumn[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].DoubleVal.Values[c.columnIndex]
+					**d = *c.queue[i].DoubleColumn[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].DoubleVal.Values[c.columnIndex]
+				*d = *c.queue[i].DoubleColumn[c.columnIndex].Value
 			}
-		} else if c.queue[i].IsSetBoolVal() {
+		} else if c.queue[i].IsSetBoolColumn() {
 			if dests[i] == nil {
-				dests[i] = c.queue[i].BoolVal.Values[c.columnIndex]
+				dests[i] = c.queue[i].BoolColumn[c.columnIndex]
 				continue
 			}
 			d, ok := dests[i].(*bool)
 			if !ok {
 				d, ok := dests[i].(**bool)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
+					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolColumn[c.columnIndex].Value, c.queue[i].BoolColumn[c.columnIndex].Value)
 					return
 				}
 
-				if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+				if c.queue[i].BoolColumn[c.columnIndex] == nil {
 					*d = nil
 				} else {
-					**d = c.queue[i].BoolVal.Values[c.columnIndex]
+					**d = *c.queue[i].BoolColumn[c.columnIndex].Value
 				}
 			} else {
-				*d = c.queue[i].BoolVal.Values[c.columnIndex]
+				*d = *c.queue[i].BoolColumn[c.columnIndex].Value
 			}
 		} else {
 			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
@@ -1047,22 +1024,20 @@ func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error
 
 func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 	for _, el := range columns {
-		if el.IsSetBinaryVal() {
-			return len(el.BinaryVal.Values), nil
-		} else if el.IsSetByteVal() {
-			return len(el.ByteVal.Values), nil
-		} else if el.IsSetI16Val() {
-			return len(el.I16Val.Values), nil
-		} else if el.IsSetI32Val() {
-			return len(el.I32Val.Values), nil
-		} else if el.IsSetI64Val() {
-			return len(el.I64Val.Values), nil
-		} else if el.IsSetBoolVal() {
-			return len(el.BoolVal.Values), nil
-		} else if el.IsSetDoubleVal() {
-			return len(el.DoubleVal.Values), nil
-		} else if el.IsSetStringVal() {
-			return len(el.StringVal.Values), nil
+		if el.IsSetByteColumn() {
+			return len(el.ByteColumn), nil
+		} else if el.IsSetI16Column() {
+			return len(el.I16Column), nil
+		} else if el.IsSetI32Column() {
+			return len(el.I32Column), nil
+		} else if el.IsSetI64Column() {
+			return len(el.I64Column), nil
+		} else if el.IsSetBoolColumn() {
+			return len(el.BoolColumn), nil
+		} else if el.IsSetDoubleColumn() {
+			return len(el.DoubleColumn), nil
+		} else if el.IsSetStringColumn() {
+			return len(el.StringColumn), nil
 		} else {
 			return -1, fmt.Errorf("Unrecognized column type %T", el)
 		}
