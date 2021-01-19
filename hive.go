@@ -402,7 +402,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		if finished {
 			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
 				msg := operationStatus.TaskStatus
-				if msg == nil {
+				if msg == nil || *msg == "[]" {
 					msg = operationStatus.ErrorMessage
 				}
 				if s := operationStatus.Status; msg == nil && s != nil {
