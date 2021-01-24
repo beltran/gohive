@@ -3,10 +3,12 @@
 cat >/etc/krb5.conf <<EOL
 [libdefaults]
  default_realm = EXAMPLE.COM
- default_tkt_enctypes = des3-hmac-sha1 des-cbc-crc
- default_tgs_enctypes = des3-hmac-sha1 des-cbc-crc
+ default_tkt_enctypes = des3-hmac-sha1 des-cbc-crc rc4-hmac  des-cbc-md5
+ default_tgs_enctypes = des3-hmac-sha1 des-cbc-crc rc4-hmac  des-cbc-md5
+ permitted_enctypes = des3-hmac-sha1 des-cbc-crc rc4-hmac  des-cbc-md5
  dns_lookup_kdc = true
  dns_lookup_realm = true
+ allow_weak_crypto = true
 
 [realms]
  EXAMPLE.COM = {
