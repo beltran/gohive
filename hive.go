@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"log"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
@@ -511,9 +511,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 }
 
 // Poll returns the current status of the last operation
-func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusResp) {
+func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
 	c.Err = nil
-	progressGet := getProgres
+	progressGet := getProgress
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
 	pollRequest.GetProgressUpdate = &progressGet
@@ -899,7 +899,7 @@ func (c *Cursor) Description() [][]string {
 	return m
 }
 
-// HasMore returns weather more rows can be fetched from the server
+// HasMore returns whether more rows can be fetched from the server
 func (c *Cursor) HasMore(ctx context.Context) bool {
 	c.Err = nil
 	if c.response == nil && c.state != _FINISHED {
@@ -907,7 +907,7 @@ func (c *Cursor) HasMore(ctx context.Context) bool {
 		return c.state != _FINISHED || c.totalRows != c.columnIndex
 	}
 	// *c.response.HasMoreRows is always false
-	// so it can be checked and another roundtrip has to be done if etra data has been added
+	// so it can be checked and another roundtrip has to be done if extra data has been added
 	if c.totalRows == c.columnIndex && c.state != _FINISHED {
 		c.Err = c.pollUntilData(ctx, 1)
 	}
@@ -1003,7 +1003,7 @@ func (c *Cursor) Cancel() {
 	return
 }
 
-// Close close the cursor
+// Close closes the cursor
 func (c *Cursor) Close() {
 	c.Err = c.resetState()
 }
