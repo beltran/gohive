@@ -645,6 +645,25 @@ func TestFetchContext(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestFetchLogs(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1000)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	logs := cursor.FetchLogs()
+	if logs == nil {
+		t.Fatal("Logs should not be nil")
+	}
+
+	if len(logs) == 0 {
+		t.Fatal("Logs should non-empty")
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestHasMoreContext(t *testing.T) {
 	connection, cursor := prepareTable(t, 2, 1)
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
@@ -690,7 +709,6 @@ func TestRowMap(t *testing.T) {
 
 	closeAll(t, connection, cursor)
 }
-
 
 func TestRowMapColumnRename(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"log"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
@@ -511,9 +511,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 }
 
 // Poll returns the current status of the last operation
-func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusResp) {
+func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
 	c.Err = nil
-	progressGet := getProgres
+	progressGet := getProgress
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
 	pollRequest.GetProgressUpdate = &progressGet
@@ -528,6 +528,34 @@ func (c *Cursor) Poll(getProgres bool) (status *hiveserver.TGetOperationStatusRe
 		return nil
 	}
 	return responsePoll
+}
+
+// FetchLogs returns all the Hive execution logs for the latest query up to the current point
+func (c *Cursor) FetchLogs() []string {
+	logRequest := hiveserver.NewTFetchResultsReq()
+	logRequest.OperationHandle = c.operationHandle
+	logRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
+	logRequest.MaxRows = c.conn.configuration.FetchSize
+	// FetchType 1 is "logs"
+	logRequest.FetchType = 1
+
+	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
+	if err != nil {
+		return nil
+	}
+
+	// resp contains 1 row, with a column for each line in the log
+	cols := resp.Results.GetColumns()
+	var logs []string
+
+	for i := 0; i < len(cols); i++ {
+		col := cols[i].StringVal.Values
+		for j := 0; j < len(col); j++ {
+			logs = append(logs, col[j])
+		}
+	}
+
+	return logs
 }
 
 // Finished returns true if the last async operation has finished
@@ -899,7 +927,7 @@ func (c *Cursor) Description() [][]string {
 	return m
 }
 
-// HasMore returns weather more rows can be fetched from the server
+// HasMore returns whether more rows can be fetched from the server
 func (c *Cursor) HasMore(ctx context.Context) bool {
 	c.Err = nil
 	if c.response == nil && c.state != _FINISHED {
@@ -907,7 +935,7 @@ func (c *Cursor) HasMore(ctx context.Context) bool {
 		return c.state != _FINISHED || c.totalRows != c.columnIndex
 	}
 	// *c.response.HasMoreRows is always false
-	// so it can be checked and another roundtrip has to be done if etra data has been added
+	// so it can be checked and another roundtrip has to be done if extra data has been added
 	if c.totalRows == c.columnIndex && c.state != _FINISHED {
 		c.Err = c.pollUntilData(ctx, 1)
 	}
@@ -1003,7 +1031,7 @@ func (c *Cursor) Cancel() {
 	return
 }
 
-// Close close the cursor
+// Close closes the cursor
 func (c *Cursor) Close() {
 	c.Err = c.resetState()
 }
