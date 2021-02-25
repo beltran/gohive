@@ -530,6 +530,34 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	return responsePoll
 }
 
+// FetchLogs returns all the Hive execution logs for the latest query up to the current point
+func (c *Cursor) FetchLogs() []string {
+	logRequest := hiveserver.NewTFetchResultsReq()
+	logRequest.OperationHandle = c.operationHandle
+	logRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
+	logRequest.MaxRows = c.conn.configuration.FetchSize
+	// FetchType 1 is "logs"
+	logRequest.FetchType = 1
+
+	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
+	if err != nil {
+		return nil
+	}
+
+	// resp contains 1 row, with a column for each line in the log
+	cols := resp.Results.GetColumns()
+	var logs []string
+
+	for i := 0; i < len(cols); i++ {
+		col := cols[i].StringVal.Values
+		for j := 0; j < len(col); j++ {
+			logs = append(logs, col[j])
+		}
+	}
+
+	return logs
+}
+
 // Finished returns true if the last async operation has finished
 func (c *Cursor) Finished() bool {
 	operationStatus := c.Poll(true)
