@@ -552,6 +552,7 @@ func (c *Cursor) FetchLogs() []string {
 
 	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
 	if err != nil {
+		c.Err = err
 		return nil
 	}
 
@@ -559,11 +560,8 @@ func (c *Cursor) FetchLogs() []string {
 	cols := resp.Results.GetColumns()
 	var logs []string
 
-	for i := 0; i < len(cols); i++ {
-		col := cols[i].StringVal.Values
-		for j := 0; j < len(col); j++ {
-			logs = append(logs, col[j])
-		}
+	for _, col := range cols {
+		logs = append(logs, col.StringVal.Values...)
 	}
 
 	return logs
