@@ -664,6 +664,26 @@ func TestFetchLogs(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestHiveError(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1000)
+	cursor.Execute(context.Background(), "SELECT * FROM table_doesnt_exist", false)
+	if cursor.Error() == nil {
+		t.Fatal("Querying a non-existing table should cause an error")
+	}
+
+	hiveErr, ok := cursor.Error().(HiveError)
+	if !ok {
+		t.Fatal("A HiveError should have been returned")
+	}
+
+	// table not found is code 10001 (1xxxx is SemanticException)
+	if hiveErr.ErrorCode != 10001 {
+		t.Fatalf("expected error code 10001, got %d", hiveErr.ErrorCode)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestHasMoreContext(t *testing.T) {
 	connection, cursor := prepareTable(t, 2, 1)
 	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
