@@ -73,6 +73,14 @@ func NewConnectConfiguration() *ConnectConfiguration {
 	}
 }
 
+// HiveError represents an error surfaced from Hive. We attach the specific Error code along with the usual message.
+type HiveError struct {
+	error
+
+	// See https://github.com/apache/hive/blob/master/common/src/java/org/apache/hadoop/hive/ql/ErrorMsg.java for info about error codes
+	ErrorCode int
+}
+
 // Connect to zookeper to get hive hosts and then connect to hive.
 // hosts is in format host1:port1,host2:port2,host3:port3 (zookeeper hosts).
 func ConnectZookeeper(hosts string, auth string,
@@ -500,7 +508,10 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 		return
 	}
 	if !success(responseExecute.GetStatus()) {
-		c.Err = fmt.Errorf("Error while executing query: %s", responseExecute.Status.String())
+		c.Err = HiveError{
+			error: fmt.Errorf("Error while executing query: %s", responseExecute.Status.String()),
+			ErrorCode: int(*responseExecute.Status.ErrorCode),
+		}
 		return
 	}
 
