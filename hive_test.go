@@ -661,7 +661,7 @@ func TestFetchLogs(t *testing.T) {
 		t.Fatal("Logs should non-empty")
 	}
 
-	if c.Error() != nil {
+	if cursor.Error() != nil {
 		t.Fatal("Error should be nil")
 	}
 
