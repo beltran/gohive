@@ -509,7 +509,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 	if !success(responseExecute.GetStatus()) {
 		c.Err = HiveError{
-			error: fmt.Errorf("Error while executing query: %s", responseExecute.Status.String()),
+			error:     fmt.Errorf("Error while executing query: %s", responseExecute.Status.String()),
 			ErrorCode: int(*responseExecute.Status.ErrorCode),
 		}
 		return
@@ -552,6 +552,7 @@ func (c *Cursor) FetchLogs() []string {
 
 	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
 	if err != nil {
+		c.Err = err
 		return nil
 	}
 
@@ -559,11 +560,8 @@ func (c *Cursor) FetchLogs() []string {
 	cols := resp.Results.GetColumns()
 	var logs []string
 
-	for i := 0; i < len(cols); i++ {
-		col := cols[i].StringVal.Values
-		for j := 0; j < len(col); j++ {
-			logs = append(logs, col[j])
-		}
+	for _, col := range cols {
+		logs = append(logs, col.StringVal.Values...)
 	}
 
 	return logs
@@ -661,6 +659,12 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
 			}
 		} else if columnType == "TIMESTAMP_TYPE" {
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				m[columnName] = nil
+			} else {
+				m[columnName] = c.queue[i].StringVal.Values[c.columnIndex]
+			}
+		} else if columnType == "DATE_TYPE" {
 			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
 				m[columnName] = nil
 			} else {
