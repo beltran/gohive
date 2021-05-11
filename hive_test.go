@@ -617,8 +617,8 @@ func TestIsRow(t *testing.T) {
 		if cursor.Error() == nil {
 			t.Fatal("Error shouldn't be nil")
 		}
-		if cursor.Err.Error() != "No more rows are left" {
-			t.Fatal("Error should be 'No more rows are left'")
+		if cursor.Err.Error() != "no more rows are left" {
+			t.Fatal("Error should be 'no more rows are left'")
 		}
 	}
 

@@ -114,10 +114,10 @@ func ConnectZookeeper(hosts string, auth string,
 			}
 			return conn, nil
 		}
-		return nil, fmt.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
+		return nil, errors.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
 			configuration.ZookeeperNamespace)
 	} else {
-		return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
+		return nil, errors.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
 			configuration.ZookeeperNamespace)
 	}
 
@@ -893,7 +893,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].BoolVal.Values[c.columnIndex]
 			}
 		} else {
-			c.Err = errors.Errorf("Empty column %v", c.queue[i])
+			c.Err = errors.Errorf("empty column %v", c.queue[i])
 			return
 		}
 	}
@@ -1042,7 +1042,7 @@ func (c *Cursor) Cancel() {
 		return
 	}
 	if !success(responseCancel.GetStatus()) {
-		c.Err = errors.New("Error closing the operation: " + responseCancel.Status.String())
+		c.Err = errors.New("error closing the operation: " + responseCancel.Status.String())
 	}
 	return
 }
@@ -1108,7 +1108,7 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 		} else if el.IsSetStringVal() {
 			return len(el.StringVal.Values), nil
 		} else {
-			return -1, fmt.Errorf("Unrecognized column type %T", el)
+			return -1, errors.Errorf("unrecognized column type %T", el)
 		}
 	}
 	return 0, errors.New("all columns seem empty")
