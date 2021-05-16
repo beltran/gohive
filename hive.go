@@ -1042,7 +1042,7 @@ func (c *Cursor) Cancel() {
 		return
 	}
 	if !success(responseCancel.GetStatus()) {
-		c.Err = errors.New("error closing the operation: " + responseCancel.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responseCancel.Status.String())
 	}
 	return
 }
@@ -1108,10 +1108,10 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 		} else if el.IsSetStringVal() {
 			return len(el.StringVal.Values), nil
 		} else {
-			return -1, errors.Errorf("unrecognized column type %T", el)
+			return -1, errors.Errorf("Unrecognized column type %T", el)
 		}
 	}
-	return 0, errors.New("all columns seem empty")
+	return 0, errors.New("All columns seem empty")
 }
 
 type inMemoryCookieJar struct {
