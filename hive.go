@@ -189,7 +189,7 @@ func innerConnect(host string, port int, auth string,
 	if configuration.Username == "" {
 		_user, err := user.Current()
 		if err != nil {
-			return nil, errors.New("determine the username")
+			return nil, errors.New("Can't determine the username")
 		}
 		configuration.Username = strings.Replace(_user.Name, " ", "", -1)
 	}
@@ -220,7 +220,7 @@ func innerConnect(host string, port int, auth string,
 				return nil, err
 			}
 			if len(token) == 0 {
-				return nil, errors.New("gssapi init context returned an empty token, probably the service is empty in the configuration")
+				return nil, errors.New("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
 			}
 
 			httpClient, protocol, err := getHTTPClient(configuration)
@@ -357,7 +357,7 @@ func (c *Connection) Close() error {
 		return err
 	}
 	if !success(responseClose.GetStatus()) {
-		return errors.New("closing the session: " + responseClose.Status.String())
+		return errors.New("Error closing the session: " + responseClose.Status.String())
 	}
 	return nil
 }
@@ -431,7 +431,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		time.Sleep(time.Duration(time.Duration(c.conn.configuration.PollIntervalInMillis)) * time.Millisecond)
 		mux.Lock()
 		if contextDone {
-			c.Err = errors.New("context was done before the query was executed")
+			c.Err = errors.New("Context was done before the query was executed")
 			c.state = _CONTEXT_DONE
 			mux.Unlock()
 			return
@@ -463,7 +463,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 			if c.state == _CONTEXT_DONE {
 				c.handleDoneContext()
 			} else if c.state == _ERROR {
-				c.Err = errors.New("probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
+				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 			}
 			return
 		}
@@ -510,7 +510,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 	if !success(responseExecute.GetStatus()) {
 		c.Err = HiveError{
-			error:     errors.New("executing query: " + responseExecute.Status.String()),
+			error:     errors.New("Error while executing query: " + responseExecute.Status.String()),
 			ErrorCode: int(*responseExecute.Status.ErrorCode),
 		}
 		return
@@ -536,7 +536,7 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 		return nil
 	}
 	if !success(responsePoll.GetStatus()) {
-		c.Err = errors.New("closing the operation: " + responsePoll.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responsePoll.Status.String())
 		return nil
 	}
 	return responsePoll
@@ -589,7 +589,7 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore(ctx) {
-			c.Err = errors.New("no more rows are left")
+			c.Err = errors.New("No more rows are left")
 			return
 		}
 		if c.Err != nil {
@@ -736,7 +736,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*[]byte)
 			if !ok {
-				c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
+				c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
 				return
 			}
 			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
@@ -753,7 +753,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int8)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
 					return
 				}
 
@@ -775,7 +775,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int16)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
 					return
 				}
 
@@ -796,7 +796,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int32)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
 					return
 				}
 
@@ -817,7 +817,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int64)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
 					return
 				}
 
@@ -838,7 +838,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**string)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
 					return
 				}
 
@@ -859,7 +859,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**float64)
 				if !ok {
-					c.Err = errors.Errorf("unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
 					return
 				}
 
@@ -919,7 +919,7 @@ func (c *Cursor) Description() [][]string {
 		return c.description
 	}
 	if c.operationHandle == nil {
-		c.Err = errors.Errorf("description can only be called after after a Poll or after an async request")
+		c.Err = errors.Errorf("Description can only be called after after a Poll or after an async request")
 	}
 
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
@@ -1017,7 +1017,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		// Wait for goroutine to finish
 		case <-rowsAvailable:
 		}
-		err = errors.New("context is done")
+		err = errors.New("Context is done")
 	}
 
 	if err != nil {
@@ -1025,7 +1025,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	}
 
 	if len(c.queue) < n {
-		return errors.Errorf("only %d rows where received", len(c.queue))
+		return errors.Errorf("Only %d rows where received", len(c.queue))
 	}
 	return nil
 }
@@ -1071,7 +1071,7 @@ func (c *Cursor) resetState() error {
 			return err
 		}
 		if !success(responseClose.GetStatus()) {
-			return errors.New("closing the operation: " + responseClose.Status.String())
+			return errors.New("Error closing the operation: " + responseClose.Status.String())
 		}
 		return nil
 	}
