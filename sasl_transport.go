@@ -103,11 +103,11 @@ func (p *TSaslTransport) Open() (err error) {
 			p.sendSaslMsg(p.OpeningContext, OK, proccessed)
 		} else if status == COMPLETE {
 			if !p.saslClient.Complete() {
-				return thrift.NewTTransportException(thrift.NOT_OPEN, "The server erroneously indicated that SASL negotiation was complete")
+				return thrift.NewTTransportException(thrift.NOT_OPEN, "the server erroneously indicated that SASL negotiation was complete")
 			}
 			break
 		} else {
-			return thrift.NewTTransportExceptionFromError(errors.Errorf("Bad SASL negotiation status: %d (%s)", status, challenge))
+			return thrift.NewTTransportExceptionFromError(errors.Errorf("bad SASL negotiation status: %d (%s)", status, challenge))
 		}
 	}
 	return nil
