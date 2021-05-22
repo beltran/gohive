@@ -893,7 +893,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].BoolVal.Values[c.columnIndex]
 			}
 		} else {
-			c.Err = errors.Errorf("empty column %v", c.queue[i])
+			c.Err = errors.Errorf("Empty column %v", c.queue[i])
 			return
 		}
 	}
