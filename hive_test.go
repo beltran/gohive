@@ -668,6 +668,26 @@ func TestFetchLogs(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestFetchLogsDuringExecution(t *testing.T) {
+	connection, cursor := prepareTable(t, 2, 1000)
+	// Buffered so we only have to read at end
+	
+	logs := make(chan []string, 30)
+	defer close(logs)
+	
+	cursor.Logs = logs
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	if len(logs) == 0 {
+		t.Fatal("Logs should be non-empty")
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestHiveError(t *testing.T) {
 	connection, cursor := prepareTable(t, 2, 1000)
 	cursor.Execute(context.Background(), "SELECT * FROM table_doesnt_exist", false)
