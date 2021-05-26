@@ -9,6 +9,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gosasl"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -106,7 +107,7 @@ func (p *TSaslTransport) Open() (err error) {
 			}
 			break
 		} else {
-			return thrift.NewTTransportExceptionFromError(fmt.Errorf("Bad SASL negotiation status: %d (%s)", status, challenge))
+			return thrift.NewTTransportExceptionFromError(errors.Errorf("Bad SASL negotiation status: %d (%s)", status, challenge))
 		}
 	}
 	return nil

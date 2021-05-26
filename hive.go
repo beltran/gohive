@@ -19,6 +19,7 @@ import (
 	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
 	"github.com/go-zookeeper/zk"
+	"github.com/pkg/errors"
 )
 
 const DEFAULT_FETCH_SIZE int64 = 1000
@@ -113,10 +114,10 @@ func ConnectZookeeper(hosts string, auth string,
 			}
 			return conn, nil
 		}
-		return nil, fmt.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
+		return nil, errors.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
 			configuration.ZookeeperNamespace)
 	} else {
-		return nil, fmt.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
+		return nil, errors.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
 			configuration.ZookeeperNamespace)
 	}
 
@@ -188,7 +189,7 @@ func innerConnect(host string, port int, auth string,
 	if configuration.Username == "" {
 		_user, err := user.Current()
 		if err != nil {
-			return nil, fmt.Errorf("Can't determine the username")
+			return nil, errors.New("Can't determine the username")
 		}
 		configuration.Username = strings.Replace(_user.Name, " ", "", -1)
 	}
@@ -219,7 +220,7 @@ func innerConnect(host string, port int, auth string,
 				return nil, err
 			}
 			if len(token) == 0 {
-				return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
+				return nil, errors.New("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
 			}
 
 			httpClient, protocol, err := getHTTPClient(configuration)
@@ -246,7 +247,7 @@ func innerConnect(host string, port int, auth string,
 		if auth == "NOSASL" {
 			transport = thrift.NewTBufferedTransport(socket, 4096)
 			if transport == nil {
-				return nil, fmt.Errorf("BufferedTransport was nil")
+				return nil, errors.New("BufferedTransport was nil")
 			}
 		} else if auth == "NONE" || auth == "LDAP" || auth == "CUSTOM" {
 			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
@@ -275,7 +276,7 @@ func innerConnect(host string, port int, auth string,
 			}
 		}
 	} else {
-		panic(fmt.Sprintf("Unrecognized transport mode %s", configuration.TransportMode))
+		panic("Unrecognized transport mode " + configuration.TransportMode)
 	}
 
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
@@ -356,7 +357,7 @@ func (c *Connection) Close() error {
 		return err
 	}
 	if !success(responseClose.GetStatus()) {
-		return fmt.Errorf("Error closing the session: %s", responseClose.Status.String())
+		return errors.New("Error closing the session: " + responseClose.Status.String())
 	}
 	return nil
 }
@@ -419,7 +420,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 				if msg == nil {
 					*msg = fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
 				}
-				c.Err = fmt.Errorf(*msg)
+				c.Err = errors.New(*msg)
 			}
 			break
 		}
@@ -430,7 +431,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		time.Sleep(time.Duration(time.Duration(c.conn.configuration.PollIntervalInMillis)) * time.Millisecond)
 		mux.Lock()
 		if contextDone {
-			c.Err = fmt.Errorf("Context was done before the query was executed")
+			c.Err = errors.New("Context was done before the query was executed")
 			c.state = _CONTEXT_DONE
 			mux.Unlock()
 			return
@@ -462,7 +463,7 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 			if c.state == _CONTEXT_DONE {
 				c.handleDoneContext()
 			} else if c.state == _ERROR {
-				c.Err = fmt.Errorf("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
+				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 			}
 			return
 		}
@@ -509,7 +510,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 	if !success(responseExecute.GetStatus()) {
 		c.Err = HiveError{
-			error:     fmt.Errorf("Error while executing query: %s", responseExecute.Status.String()),
+			error:     errors.New("Error while executing query: " + responseExecute.Status.String()),
 			ErrorCode: int(*responseExecute.Status.ErrorCode),
 		}
 		return
@@ -535,7 +536,7 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 		return nil
 	}
 	if !success(responsePoll.GetStatus()) {
-		c.Err = fmt.Errorf("Error closing the operation: %s", responsePoll.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responsePoll.Status.String())
 		return nil
 	}
 	return responsePoll
@@ -588,7 +589,7 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.HasMore(ctx) {
-			c.Err = fmt.Errorf("No more rows are left")
+			c.Err = errors.New("No more rows are left")
 			return
 		}
 		if c.Err != nil {
@@ -724,7 +725,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 	}
 
 	if len(c.queue) != len(dests) {
-		c.Err = fmt.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
+		c.Err = errors.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
 		return
 	}
 	for i := 0; i < len(c.queue); i++ {
@@ -735,7 +736,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*[]byte)
 			if !ok {
-				c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
+				c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex])
 				return
 			}
 			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
@@ -752,7 +753,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int8)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex])
 					return
 				}
 
@@ -774,7 +775,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int16)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex])
 					return
 				}
 
@@ -795,7 +796,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int32)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex])
 					return
 				}
 
@@ -816,7 +817,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int64)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex])
 					return
 				}
 
@@ -837,7 +838,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**string)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex])
 					return
 				}
 
@@ -858,7 +859,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**float64)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex])
 					return
 				}
 
@@ -879,7 +880,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**bool)
 				if !ok {
-					c.Err = fmt.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T)", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex])
 					return
 				}
 
@@ -892,7 +893,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 				*d = c.queue[i].BoolVal.Values[c.columnIndex]
 			}
 		} else {
-			c.Err = fmt.Errorf("Empty column %v", c.queue[i])
+			c.Err = errors.Errorf("Empty column %v", c.queue[i])
 			return
 		}
 	}
@@ -918,7 +919,7 @@ func (c *Cursor) Description() [][]string {
 		return c.description
 	}
 	if c.operationHandle == nil {
-		c.Err = fmt.Errorf("Description can only be called after after a Poll or after an async request")
+		c.Err = errors.Errorf("Description can only be called after after a Poll or after an async request")
 	}
 
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
@@ -929,7 +930,7 @@ func (c *Cursor) Description() [][]string {
 		return nil
 	}
 	if metaResponse.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-		c.Err = fmt.Errorf(metaResponse.Status.String())
+		c.Err = errors.New(metaResponse.Status.String())
 		return nil
 	}
 	m := make([][]string, len(metaResponse.Schema.Columns))
@@ -989,7 +990,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			c.response = responseFetch
 
 			if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-				rowsAvailable <- fmt.Errorf(responseFetch.Status.String())
+				rowsAvailable <- errors.New(responseFetch.Status.String())
 				return
 			}
 			err = c.parseResults(responseFetch)
@@ -1016,7 +1017,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		// Wait for goroutine to finish
 		case <-rowsAvailable:
 		}
-		err = fmt.Errorf("Context is done")
+		err = errors.New("Context is done")
 	}
 
 	if err != nil {
@@ -1024,7 +1025,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	}
 
 	if len(c.queue) < n {
-		return fmt.Errorf("Only %d rows where received", len(c.queue))
+		return errors.Errorf("Only %d rows where received", len(c.queue))
 	}
 	return nil
 }
@@ -1041,7 +1042,7 @@ func (c *Cursor) Cancel() {
 		return
 	}
 	if !success(responseCancel.GetStatus()) {
-		c.Err = fmt.Errorf("Error closing the operation: %s", responseCancel.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responseCancel.Status.String())
 	}
 	return
 }
@@ -1070,7 +1071,7 @@ func (c *Cursor) resetState() error {
 			return err
 		}
 		if !success(responseClose.GetStatus()) {
-			return fmt.Errorf("Error closing the operation: %s", responseClose.Status.String())
+			return errors.New("Error closing the operation: " + responseClose.Status.String())
 		}
 		return nil
 	}
@@ -1107,10 +1108,10 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 		} else if el.IsSetStringVal() {
 			return len(el.StringVal.Values), nil
 		} else {
-			return -1, fmt.Errorf("Unrecognized column type %T", el)
+			return -1, errors.Errorf("Unrecognized column type %T", el)
 		}
 	}
-	return 0, fmt.Errorf("All columns seem empty")
+	return 0, errors.New("All columns seem empty")
 }
 
 type inMemoryCookieJar struct {
