@@ -32,6 +32,16 @@ func TestConnectDefault(t *testing.T) {
 	connection.Close()
 }
 
+
+func TestConnectZookeeper(t *testing.T) {
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	_, err := ConnectZookeeper("host1:port1,host2:port2", getAuth(), configuration)
+	if err == nil {
+		t.Fatal("error was expected")
+	}
+}
+
 func TestDomainDoesntExist(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	auth := os.Getenv("AUTH")

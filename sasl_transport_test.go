@@ -47,6 +47,7 @@ func TestSaslTransportThrift(t *testing.T) {
 		t.Fatal(err)
 	}
 	trans.Open()
+	trans.SetMaxLength(1638400)
 	socket.Reset()
 	TransportTest(t, trans, trans)
 	if trans.RemainingBytes() != 0 {
