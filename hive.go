@@ -383,7 +383,7 @@ type Cursor struct {
 	description     [][]string
 
 	// Caller is responsible for managing this channel
-	Logs			chan<- []string
+	Logs chan<- []string
 }
 
 // WaitForCompletion waits for an async operation to finish
@@ -676,7 +676,7 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 			} else {
 				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
 			}
-		} else if columnType == "STRING_TYPE" {
+		} else if columnType == "STRING_TYPE" || columnType == "VARCHAR_TYPE" {
 			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
 				m[columnName] = nil
 			} else {
