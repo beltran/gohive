@@ -38,20 +38,20 @@ function install_deps() {
 
     python3.6 -m pip install --user -r requirements.txt
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive.cfg
-    sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive_and_metastore_and_kerberos.cfg
     sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.1/g' ./config/hive.cfg
-    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.1/g' ./config/hive_and_kerberos.cfg
-    sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.1/g' ./config/hive_and_metastore_and_kerberos.cfg
+    sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_metastore_and_kerberos.cfg
     popd
 }
 
 function setHttpTransport() {
     pushd dhive
-    echo "hive.server2.transport.mode = http" >> ./config/hive_and_kerberos.cfg
-    echo "hive.server2.thrift.http.port = 10000" >> ./config/hive_and_kerberos.cfg
-    echo "hive.server2.use.SSL = true" >> ./config/hive_and_kerberos.cfg
-    echo "hive.server2.keystore.path = /var/keytabs/hive.jks" >> ./config/hive_and_kerberos.cfg
-    echo "hive.server2.keystore.password = changeme" >> ./config/hive_and_kerberos.cfg
+    echo "hive.server2.transport.mode = http" >> ./config/hive_and_metastore_and_kerberos.cfg
+    echo "hive.server2.thrift.http.port = 10000" >> ./config/hive_and_metastore_and_kerberos.cfg
+    echo "hive.server2.use.SSL = true" >> ./config/hive_and_metastore_and_kerberos.cfg
+    echo "hive.server2.keystore.path = /var/keytabs/hive.jks" >> ./config/hive_and_metastore_and_kerberos.cfg
+    echo "hive.server2.keystore.password = changeme" >> ./config/hive_and_metastore_and_kerberos.cfg
     popd
 }
 
@@ -63,7 +63,7 @@ function setHive() {
 
 function tearDown() {
     pushd dhive
-    DHIVE_CONFIG_FILE=config/hive_and_kerberos.cfg make dclean
+    DHIVE_CONFIG_FILE=config/hive_and_metastore_and_kerberos.cfg make dclean
     popd
 }
 
@@ -88,7 +88,7 @@ function bringCredentials() {
 
 function  binaryKerberos() {
   # Tests with binary transport and kerberos authentication
-  setHive config/hive_and_kerberos.cfg
+  setHive config/hive_and_metastore_and_kerberos.cfg
   wait_for_hive || { echo 'Failed waiting for hive' ; exit 1; }
 
   bringCredentials
@@ -103,7 +103,7 @@ function  binaryKerberos() {
 function httpKerberos() {
   # Tests with http transport and kerberos authentication
   setHttpTransport
-  setHive config/hive_and_kerberos.cfg
+  setHive config/hive_and_metastore_and_kerberos.cfg
   wait_for_hive || exit 1
 
   bringCredentials
