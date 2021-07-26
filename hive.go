@@ -676,7 +676,7 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 			} else {
 				m[columnName] = c.queue[i].DoubleVal.Values[c.columnIndex]
 			}
-		} else if columnType == "STRING_TYPE" || columnType == "VARCHAR_TYPE" {
+		} else if columnType == "STRING_TYPE" || columnType == "VARCHAR_TYPE" || columnType == "CHAR_TYPE" {
 			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
 				m[columnName] = nil
 			} else {
