@@ -630,6 +630,9 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	}
 
 	d := c.Description()
+	if c.Err != nil || len(d) != len(c.queue) {
+		return nil
+	}
 	m := make(map[string]interface{}, len(c.queue))
 	for i := 0; i < len(c.queue); i++ {
 		columnName := d[i][0]
