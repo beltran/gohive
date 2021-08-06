@@ -421,7 +421,8 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 					msg = s.ErrorMessage
 				}
 				if msg == nil {
-					*msg = fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
+					msgv := fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
+					msg = &msgv
 				}
 				c.Err = errors.New(*msg)
 			}
