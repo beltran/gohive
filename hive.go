@@ -78,6 +78,8 @@ func NewConnectConfiguration() *ConnectConfiguration {
 type HiveError struct {
 	error
 
+	// Simple error message, without the full stack trace. Surfaced from Thrift.
+	Message string
 	// See https://github.com/apache/hive/blob/master/common/src/java/org/apache/hadoop/hive/ql/ErrorMsg.java for info about error codes
 	ErrorCode int
 }
@@ -422,7 +424,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 				}
 				if msg == nil {
 					errormsg := fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
-					msg = &errormsg 
+					msg = &errormsg
 				}
 				c.Err = errors.New(*msg)
 			}
@@ -535,6 +537,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	if !success(responseExecute.GetStatus()) {
 		c.Err = HiveError{
 			error:     errors.New("Error while executing query: " + responseExecute.Status.String()),
+			Message:   *responseExecute.Status.ErrorMessage,
 			ErrorCode: int(*responseExecute.Status.ErrorCode),
 		}
 		return
