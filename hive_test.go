@@ -714,6 +714,9 @@ func TestHiveError(t *testing.T) {
 	if hiveErr.ErrorCode != 10001 {
 		t.Fatalf("expected error code 10001, got %d", hiveErr.ErrorCode)
 	}
+	if hiveErr.Message != "Error while compiling statement: FAILED: SemanticException [Error 10001]: Line 1:14 Table not found 'table_doesnt_exist'" {
+		t.Fatalf("expected error message: 10001, got %s", hiveErr.Message)
+	}
 
 	closeAll(t, connection, cursor)
 }
