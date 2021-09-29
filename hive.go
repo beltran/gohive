@@ -359,7 +359,7 @@ func (c *Connection) Close() error {
 		return err
 	}
 	if !success(responseClose.GetStatus()) {
-		return errors.New("Error closing the session: " + responseClose.Status.String())
+		return errors.New("Error closing the session: " + responseClose.GetStatus().String())
 	}
 	return nil
 }
@@ -518,7 +518,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
 	executeReq.RunAsync = true
-	var responseExecute *hiveserver.TExecuteStatementResp
+	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 
@@ -527,7 +527,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 			c.state = _CONTEXT_DONE
 			if responseExecute == nil {
 				c.state = _ERROR
-			} else {
+			} else if responseExecute != nil {
 				// We may need this to cancel the operation
 				c.operationHandle = responseExecute.OperationHandle
 			}
@@ -536,9 +536,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 	if !success(responseExecute.GetStatus()) {
 		c.Err = HiveError{
-			error:     errors.New("Error while executing query: " + responseExecute.Status.String()),
-			Message:   *responseExecute.Status.ErrorMessage,
-			ErrorCode: int(*responseExecute.Status.ErrorCode),
+			error:     errors.New("Error while executing query: " + responseExecute.GetStatus().String()),
+			Message:   *responseExecute.GetStatus().ErrorMessage,
+			ErrorCode: int(*responseExecute.GetStatus().ErrorCode),
 		}
 		return
 	}
@@ -563,7 +563,7 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 		return nil
 	}
 	if !success(responsePoll.GetStatus()) {
-		c.Err = errors.New("Error closing the operation: " + responsePoll.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responsePoll.GetStatus().String())
 		return nil
 	}
 	return responsePoll
@@ -960,7 +960,7 @@ func (c *Cursor) Description() [][]string {
 		return nil
 	}
 	if metaResponse.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-		c.Err = errors.New(metaResponse.Status.String())
+		c.Err = errors.New(metaResponse.GetStatus().String())
 		return nil
 	}
 	m := make([][]string, len(metaResponse.Schema.Columns))
@@ -1019,8 +1019,8 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			}
 			c.response = responseFetch
 
-			if responseFetch.Status.StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
-				rowsAvailable <- errors.New(responseFetch.Status.String())
+			if responseFetch.GetStatus().StatusCode != hiveserver.TStatusCode_SUCCESS_STATUS {
+				rowsAvailable <- errors.New(responseFetch.GetStatus().String())
 				return
 			}
 			err = c.parseResults(responseFetch)
@@ -1072,7 +1072,7 @@ func (c *Cursor) Cancel() {
 		return
 	}
 	if !success(responseCancel.GetStatus()) {
-		c.Err = errors.New("Error closing the operation: " + responseCancel.Status.String())
+		c.Err = errors.New("Error closing the operation: " + responseCancel.GetStatus().String())
 	}
 	return
 }
@@ -1101,7 +1101,7 @@ func (c *Cursor) resetState() error {
 			return err
 		}
 		if !success(responseClose.GetStatus()) {
-			return errors.New("Error closing the operation: " + responseClose.Status.String())
+			return errors.New("Error closing the operation: " + responseClose.GetStatus().String())
 		}
 		return nil
 	}
