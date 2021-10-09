@@ -1180,7 +1180,7 @@ func newCookieJar() inMemoryCookieJar {
 }
 
 func safeStatus(status *hiveserver.TStatus) *hiveserver.TStatus {
-	if (status == nil) {
+	if status == nil {
 		return &DEFAULT_STATUS
 	}
 	return status
@@ -1189,11 +1189,10 @@ func safeStatus(status *hiveserver.TStatus) *hiveserver.TStatus {
 var DEFAULT_SQL_STATE = ""
 var DEFAULT_ERROR_CODE = int32(-1)
 var DEFAULT_ERROR_MESSAGE = "unknown error"
-var DEFAULT_STATUS = hiveserver.TStatus {
-        StatusCode: 	hiveserver.TStatusCode_ERROR_STATUS,
-        InfoMessages: 	nil,
-        SqlState: 	&DEFAULT_SQL_STATE,
-        ErrorCode: 	&DEFAULT_ERROR_CODE,
-        ErrorMessage: 	&DEFAULT_ERROR_MESSAGE,
+var DEFAULT_STATUS = hiveserver.TStatus{
+	StatusCode:   hiveserver.TStatusCode_ERROR_STATUS,
+	InfoMessages: nil,
+	SqlState:     &DEFAULT_SQL_STATE,
+	ErrorCode:    &DEFAULT_ERROR_CODE,
+	ErrorMessage: &DEFAULT_ERROR_MESSAGE,
 }
-
