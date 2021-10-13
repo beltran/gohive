@@ -14,6 +14,7 @@ branches:
   only:
   - master
   - coveralls
+  - thrift_0.12
 
 addons:
   apt:
