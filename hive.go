@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os/user"
@@ -24,6 +25,8 @@ import (
 
 const DEFAULT_FETCH_SIZE int64 = 1000
 const ZOOKEEPER_DEFAULT_NAMESPACE = "hiveserver2"
+
+type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // Connection holds the information for getting a cursor to hive
 type Connection struct {
@@ -56,6 +59,8 @@ type ConnectConfiguration struct {
 	TLSConfig            *tls.Config
 	ZookeeperNamespace   string
 	Database             string
+	Timeout              time.Duration
+	DialContext          DialContextFunc
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -109,7 +114,7 @@ func ConnectZookeeper(hosts string, auth string,
 			if err != nil {
 				continue
 			}
-			conn, err := innerConnect(node["host"], port, auth, configuration)
+			conn, err := innerConnect(context.TODO(), node["host"], port, auth, configuration)
 			if err != nil {
 				// Let's try to connect to the next one
 				continue
@@ -128,7 +133,7 @@ func ConnectZookeeper(hosts string, auth string,
 // Connect to hive server
 func Connect(host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
-	return innerConnect(host, port, auth, configuration)
+	return innerConnect(context.TODO(), host, port, auth, configuration)
 }
 
 func parseHiveServer2Info(hsInfos []string) []map[string]string {
@@ -165,22 +170,58 @@ func parseHiveServer2Info(hsInfos []string) []map[string]string {
 	return results[0:actualCount]
 }
 
-func innerConnect(host string, port int, auth string,
+func dial(ctx context.Context, addr string, dialFn DialContextFunc, timeout time.Duration) (net.Conn, error) {
+	dctx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		dctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+	return dialFn(dctx, "tcp", addr)
+}
+
+func innerConnect(ctx context.Context, host string, port int, auth string,
 	configuration *ConnectConfiguration) (conn *Connection, err error) {
 
 	var socket thrift.TTransport
-	if configuration.TLSConfig != nil {
-		socket, err = thrift.NewTSSLSocket(fmt.Sprintf("%s:%d", host, port), configuration.TLSConfig)
+	addr := fmt.Sprintf("%s:%d", host, port)
+	if configuration.DialContext != nil {
+		var netConn net.Conn
+		netConn, err = dial(ctx, addr, configuration.DialContext, configuration.Timeout)
+		if err != nil {
+			return
+		}
+		if configuration.TLSConfig != nil {
+			socket = thrift.NewTSSLSocketFromConnConf(netConn, &thrift.TConfiguration{
+				ConnectTimeout: configuration.Timeout,
+				SocketTimeout:  configuration.Timeout,
+				TLSConfig:      configuration.TLSConfig,
+			})
+		} else {
+			socket = thrift.NewTSocketFromConnConf(netConn, &thrift.TConfiguration{
+				ConnectTimeout: configuration.Timeout,
+				SocketTimeout:  configuration.Timeout,
+			})
+		}
 	} else {
-		socket, err = thrift.NewTSocket(fmt.Sprintf("%s:%d", host, port))
-	}
-
-	if err != nil {
-		return
-	}
-
-	if err = socket.Open(); err != nil {
-		return
+		if configuration.TLSConfig != nil {
+			socket, err = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
+				ConnectTimeout: configuration.Timeout,
+				SocketTimeout:  configuration.Timeout,
+				TLSConfig:      configuration.TLSConfig,
+			})
+		} else {
+			socket, err = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
+				ConnectTimeout: configuration.Timeout,
+				SocketTimeout:  configuration.Timeout,
+			})
+		}
+		if err != nil {
+			return
+		}
+		if err = socket.Open(); err != nil {
+			return
+		}
 	}
 
 	var transport thrift.TTransport
@@ -324,11 +365,21 @@ func innerConnect(host string, port int, auth string,
 
 func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
 	if configuration.TLSConfig != nil {
-		transport := &http.Transport{TLSClientConfig: configuration.TLSConfig}
-		httpClient = &http.Client{Transport: transport}
+		httpClient = &http.Client{
+			Timeout: configuration.Timeout,
+			Transport: &http.Transport{
+				TLSClientConfig: configuration.TLSConfig,
+				DialContext:     configuration.DialContext,
+			},
+		}
 		protocol = "https"
 	} else {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{
+			Timeout: configuration.Timeout,
+			Transport: &http.Transport{
+				DialContext: configuration.DialContext,
+			},
+		}
 		protocol = "http"
 	}
 	return
