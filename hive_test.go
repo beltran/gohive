@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"reflect"
 	"strconv"
@@ -576,6 +577,174 @@ func TestSimpleSelect(t *testing.T) {
 	}
 
 	closeAll(t, connection, cursor)
+}
+
+func NoopDialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
+	var d net.Dialer
+	return d.DialContext(ctx, network, addr)
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) {
+    select {
+    case <-ctx.Done():
+    case <-time.After(delay):
+    }
+}
+
+func SleepDialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
+	var d net.Dialer
+	sleepContext(ctx, 10 * time.Second)
+	return d.DialContext(ctx, network, addr)
+}
+
+func TestSimpleSelectWithDialFunction(t *testing.T) {
+	configuration := NewConnectConfiguration()
+	configuration.DialContext = NoopDialContext
+	configuration.TransportMode = getTransport()
+	configuration.Service = "hive"
+	configuration.FetchSize = 1000
+
+	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
+	createTable(t, cursor)
+	insertInTableSingleValue(t, cursor, 1)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var s string
+	var i int32
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestSimpleSelectWithDialFunctionAndTimeout(t *testing.T) {
+	configuration := NewConnectConfiguration()
+	configuration.DialContext = NoopDialContext
+	configuration.TransportMode = getTransport()
+	configuration.Service = "hive"
+	configuration.FetchSize = 1000
+	configuration.Timeout = time.Hour
+
+	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
+	createTable(t, cursor)
+	insertInTableSingleValue(t, cursor, 1)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var s string
+	var i int32
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestSimpleSelectWithTimeout(t *testing.T) {
+	configuration := NewConnectConfiguration()
+	configuration.Timeout = time.Hour
+	configuration.TransportMode = getTransport()
+	configuration.Service = "hive"
+	configuration.FetchSize = 1000
+
+	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
+	createTable(t, cursor)
+	insertInTableSingleValue(t, cursor, 1)
+	cursor.Execute(context.Background(), "SELECT * FROM pokes", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+	var s string
+	var i int32
+	cursor.FetchOne(context.Background(), &i, &s)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	closeAll(t, connection, cursor)
+}
+
+func TestConnectTimeoutWithDialFn(t *testing.T) {
+	mode := getTransport()
+	ssl := getSsl()
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	configuration.TransportMode = mode
+	configuration.Timeout = 3 * time.Second
+	configuration.DialContext = SleepDialContext
+
+	if ssl {
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TLSConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var port int = 10000
+	if mode == "http" {
+		configuration.HTTPPath = "cliservice"
+	}
+	start := time.Now()
+	connection, errConn := Connect("hs2.example.com", port, getAuth(), configuration)
+	elapsed := time.Since(start)
+	if errConn == nil {
+		connection.Close()
+		t.Fatal("Error was expected because the target port is blocked")
+	}
+	if !strings.Contains(errConn.Error(), "timeout") {
+		t.Fatalf("Expected a timeout error, but received: %+v", errConn)
+	}
+	if elapsed <= 2 * time.Second {
+		t.Fatalf("Timed out too fast: %v", elapsed)
+	}
+	if elapsed >= 4 * time.Second {
+		t.Fatalf("Timed out too slow: %v", elapsed)
+	}
+}
+
+func TestConnectTimeout(t *testing.T) {
+	mode := getTransport()
+	ssl := getSsl()
+	configuration := NewConnectConfiguration()
+	configuration.Service = "hive"
+	configuration.TransportMode = mode
+	configuration.Timeout = 3 * time.Second
+
+	if ssl {
+		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
+		configuration.TLSConfig = tlsConfig
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var port int = 10001
+	if mode == "http" {
+		configuration.HTTPPath = "cliservice"
+	}
+	start := time.Now()
+	connection, errConn := Connect("example.com", port, getAuth(), configuration)
+	elapsed := time.Since(start)
+	if errConn == nil {
+		connection.Close()
+		t.Fatal("Error was expected because the target port is blocked")
+	}
+	if !strings.Contains(errConn.Error(), "timeout") {
+		t.Fatalf("Expected a timeout error, but received: %+v", errConn)
+	}
+	if elapsed <= 2 * time.Second {
+		t.Fatalf("Timed out too fast: %v", elapsed)
+	}
+	if elapsed >= 4 * time.Second {
+		t.Fatalf("Timed out too slow: %v", elapsed)
+	}
 }
 
 func TestSimpleSelectWithNil(t *testing.T) {
