@@ -59,7 +59,9 @@ type ConnectConfiguration struct {
 	TLSConfig            *tls.Config
 	ZookeeperNamespace   string
 	Database             string
-	Timeout              time.Duration
+	ConnectTimeout       time.Duration
+	SocketTimeout        time.Duration
+	HttpReadTimeout      time.Duration
 	DialContext          DialContextFunc
 }
 
@@ -187,33 +189,33 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	addr := fmt.Sprintf("%s:%d", host, port)
 	if configuration.DialContext != nil {
 		var netConn net.Conn
-		netConn, err = dial(ctx, addr, configuration.DialContext, configuration.Timeout)
+		netConn, err = dial(ctx, addr, configuration.DialContext, configuration.ConnectTimeout)
 		if err != nil {
 			return
 		}
 		if configuration.TLSConfig != nil {
 			socket = thrift.NewTSSLSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.Timeout,
-				SocketTimeout:  configuration.Timeout,
+				ConnectTimeout: configuration.ConnectTimeout,
+				SocketTimeout:  configuration.SocketTimeout,
 				TLSConfig:      configuration.TLSConfig,
 			})
 		} else {
 			socket = thrift.NewTSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.Timeout,
-				SocketTimeout:  configuration.Timeout,
+				ConnectTimeout: configuration.ConnectTimeout,
+				SocketTimeout:  configuration.SocketTimeout,
 			})
 		}
 	} else {
 		if configuration.TLSConfig != nil {
 			socket, err = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.Timeout,
-				SocketTimeout:  configuration.Timeout,
+				ConnectTimeout: configuration.ConnectTimeout,
+				SocketTimeout:  configuration.SocketTimeout,
 				TLSConfig:      configuration.TLSConfig,
 			})
 		} else {
 			socket, err = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.Timeout,
-				SocketTimeout:  configuration.Timeout,
+				ConnectTimeout: configuration.ConnectTimeout,
+				SocketTimeout:  configuration.SocketTimeout,
 			})
 		}
 		if err != nil {
@@ -366,7 +368,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
 	if configuration.TLSConfig != nil {
 		httpClient = &http.Client{
-			Timeout: configuration.Timeout,
+			Timeout: configuration.HttpReadTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: configuration.TLSConfig,
 				DialContext:     configuration.DialContext,
@@ -375,7 +377,7 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 		protocol = "https"
 	} else {
 		httpClient = &http.Client{
-			Timeout: configuration.Timeout,
+			Timeout: configuration.HttpReadTimeout,
 			Transport: &http.Transport{
 				DialContext: configuration.DialContext,
 			},

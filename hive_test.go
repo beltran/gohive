@@ -1,3 +1,4 @@
+//go:build all || integration
 // +build all integration
 
 package gohive
@@ -585,15 +586,15 @@ func NoopDialContext(ctx context.Context, network string, addr string) (net.Conn
 }
 
 func sleepContext(ctx context.Context, delay time.Duration) {
-    select {
-    case <-ctx.Done():
-    case <-time.After(delay):
-    }
+	select {
+	case <-ctx.Done():
+	case <-time.After(delay):
+	}
 }
 
 func SleepDialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
 	var d net.Dialer
-	sleepContext(ctx, 10 * time.Second)
+	sleepContext(ctx, 10*time.Second)
 	return d.DialContext(ctx, network, addr)
 }
 
@@ -627,7 +628,7 @@ func TestSimpleSelectWithDialFunctionAndTimeout(t *testing.T) {
 	configuration.TransportMode = getTransport()
 	configuration.Service = "hive"
 	configuration.FetchSize = 1000
-	configuration.Timeout = time.Hour
+	configuration.ConnectTimeout = time.Hour
 
 	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
 	createTable(t, cursor)
@@ -648,7 +649,7 @@ func TestSimpleSelectWithDialFunctionAndTimeout(t *testing.T) {
 
 func TestSimpleSelectWithTimeout(t *testing.T) {
 	configuration := NewConnectConfiguration()
-	configuration.Timeout = time.Hour
+	configuration.ConnectTimeout = time.Hour
 	configuration.TransportMode = getTransport()
 	configuration.Service = "hive"
 	configuration.FetchSize = 1000
@@ -676,7 +677,7 @@ func TestConnectTimeoutWithDialFn(t *testing.T) {
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	configuration.TransportMode = mode
-	configuration.Timeout = 3 * time.Second
+	configuration.ConnectTimeout = 3 * time.Second
 	configuration.DialContext = SleepDialContext
 
 	if ssl {
@@ -701,10 +702,10 @@ func TestConnectTimeoutWithDialFn(t *testing.T) {
 	if !strings.Contains(errConn.Error(), "timeout") {
 		t.Fatalf("Expected a timeout error, but received: %+v", errConn)
 	}
-	if elapsed <= 2 * time.Second {
+	if elapsed <= 2*time.Second {
 		t.Fatalf("Timed out too fast: %v", elapsed)
 	}
-	if elapsed >= 4 * time.Second {
+	if elapsed >= 4*time.Second {
 		t.Fatalf("Timed out too slow: %v", elapsed)
 	}
 }
@@ -715,7 +716,7 @@ func TestConnectTimeout(t *testing.T) {
 	configuration := NewConnectConfiguration()
 	configuration.Service = "hive"
 	configuration.TransportMode = mode
-	configuration.Timeout = 3 * time.Second
+	configuration.ConnectTimeout = 3 * time.Second
 
 	if ssl {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
@@ -739,10 +740,10 @@ func TestConnectTimeout(t *testing.T) {
 	if !strings.Contains(errConn.Error(), "timeout") {
 		t.Fatalf("Expected a timeout error, but received: %+v", errConn)
 	}
-	if elapsed <= 2 * time.Second {
+	if elapsed <= 2*time.Second {
 		t.Fatalf("Timed out too fast: %v", elapsed)
 	}
-	if elapsed >= 4 * time.Second {
+	if elapsed >= 4*time.Second {
 		t.Fatalf("Timed out too slow: %v", elapsed)
 	}
 }
