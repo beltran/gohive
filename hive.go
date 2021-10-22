@@ -61,7 +61,7 @@ type ConnectConfiguration struct {
 	Database             string
 	ConnectTimeout       time.Duration
 	SocketTimeout        time.Duration
-	HttpReadTimeout      time.Duration
+	HttpTimeout          time.Duration
 	DialContext          DialContextFunc
 }
 
@@ -368,7 +368,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
 	if configuration.TLSConfig != nil {
 		httpClient = &http.Client{
-			Timeout: configuration.HttpReadTimeout,
+			Timeout: configuration.HttpTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: configuration.TLSConfig,
 				DialContext:     configuration.DialContext,
@@ -377,7 +377,7 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 		protocol = "https"
 	} else {
 		httpClient = &http.Client{
-			Timeout: configuration.HttpReadTimeout,
+			Timeout: configuration.HttpTimeout,
 			Transport: &http.Transport{
 				DialContext: configuration.DialContext,
 			},
