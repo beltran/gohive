@@ -819,7 +819,7 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*[]byte)
 			if !ok {
-				c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex],i)
+				c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex], i)
 				return
 			}
 			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
@@ -836,13 +836,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int8)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(int8)
+					}
 					**d = c.queue[i].ByteVal.Values[c.columnIndex]
 				}
 			} else {
@@ -858,13 +861,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int16)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(int16)
+					}
 					**d = c.queue[i].I16Val.Values[c.columnIndex]
 				}
 			} else {
@@ -879,13 +885,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int32)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(int32)
+					}
 					**d = c.queue[i].I32Val.Values[c.columnIndex]
 				}
 			} else {
@@ -900,13 +909,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**int64)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(int64)
+					}
 					**d = c.queue[i].I64Val.Values[c.columnIndex]
 				}
 			} else {
@@ -921,13 +933,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**string)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(string)
+					}
 					**d = c.queue[i].StringVal.Values[c.columnIndex]
 				}
 			} else {
@@ -942,13 +957,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**float64)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(float64)
+					}
 					**d = c.queue[i].DoubleVal.Values[c.columnIndex]
 				}
 			} else {
@@ -963,13 +981,16 @@ func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
 			if !ok {
 				d, ok := dests[i].(**bool)
 				if !ok {
-					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex],i)
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex], i)
 					return
 				}
 
 				if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
 					*d = nil
 				} else {
+					if *d == nil {
+						*d = new(bool)
+					}
 					**d = c.queue[i].BoolVal.Values[c.columnIndex]
 				}
 			} else {
