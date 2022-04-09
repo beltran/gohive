@@ -126,6 +126,11 @@ To differentiate between these two values (`NULL` and `0`) the following will se
 var i *int32 = new(int32)
 cursor.FetchOne(context.Background(), &i)
 ```
+which will produce the same result as:
+```
+var i *int32
+cursor.FetchOne(context.Background(), &i)
+```
 Alternatively, using the rowmap API, `m := cursor.RowMap(context.Background())`,
  `m` would be `map[string]interface{}{"table_name.column_name": nil}` for a `NULL` value. It will return a map
 where the keys are `table_name.column_name`. This works fine with hive but using [Spark Thirft SQL server](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) `table_name` is not present and the keys are `column_name` and it can [lead to problems](https://github.com/beltran/gohive/issues/120) if two tables have the same column name so the `FetchOne` API should be used in this case.

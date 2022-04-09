@@ -1688,7 +1688,7 @@ func TestTypesWithPointer(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestTypesWithoutPointer(t *testing.T) {
+func TestTypesWithoutInitializedPointer(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTable(t, cursor)
 	var b bool
