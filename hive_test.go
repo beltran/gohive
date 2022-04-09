@@ -1688,6 +1688,43 @@ func TestTypesWithPointer(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
+func TestTypesWithoutInitializedPointer(t *testing.T) {
+	connection, cursor := makeConnection(t, 1000)
+	prepareAllTypesTable(t, cursor)
+	var b bool
+	var tinyInt *int8
+	var smallInt *int16
+	var normalInt *int32
+	var bigInt *int64
+	var floatType *float64
+	var double *float64
+	var s *string
+	var timeStamp *string
+	var binary []byte
+	var array *string
+	var mapType *string
+	var structType *string
+	var union *string
+	var decimal *string
+
+	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	if cursor.Error() != nil {
+		t.Fatal(cursor.Error())
+	}
+
+	cursor.FetchOne(context.Background(), &b, &tinyInt, &smallInt, &normalInt, &bigInt,
+		&floatType, &double, &s, &timeStamp, &binary, &array, &mapType, &structType, &union, &decimal)
+	if cursor.Err != nil {
+		t.Fatal(cursor.Err)
+	}
+
+	if *tinyInt != 127 || *smallInt != 32767 || *bigInt != 9223372036854775807 || binary == nil || *array != "[1,2]" || *s != "a string" {
+		t.Fatalf("Unexpected value, tinyInt: %d, smallInt: %d, bigInt: %d, binary: %x, array: %s, s: %s", *tinyInt, *smallInt, *bigInt, binary, *array, *s)
+	}
+
+	closeAll(t, connection, cursor)
+}
+
 func TestTypesWithNulls(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTableWithNull(t, cursor)
