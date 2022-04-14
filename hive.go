@@ -249,6 +249,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			if err != nil {
 				return nil, err
 			}
+			httpClient.Jar = newCookieJar()
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
 			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
 			if err != nil {
@@ -1219,38 +1220,20 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 }
 
 type inMemoryCookieJar struct {
-	given   *bool
-	storage map[string][]http.Cookie
+	storage map[string][]*http.Cookie
 }
 
 func (jar inMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	for _, cookie := range cookies {
-		jar.storage["cliservice"] = []http.Cookie{*cookie}
-	}
-	*jar.given = false
+	jar.storage[u.Host] = cookies
 }
 
 func (jar inMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
-	cookiesArray := []*http.Cookie{}
-	for pattern, cookies := range jar.storage {
-		if strings.Contains(u.String(), pattern) {
-			for i := range cookies {
-				cookiesArray = append(cookiesArray, &cookies[i])
-			}
-		}
-	}
-	if !*jar.given {
-		*jar.given = true
-		return cookiesArray
-	} else {
-		return nil
-	}
+	return jar.storage[u.Host]
 }
 
 func newCookieJar() inMemoryCookieJar {
-	storage := make(map[string][]http.Cookie)
-	f := false
-	return inMemoryCookieJar{&f, storage}
+	storage := make(map[string][]*http.Cookie)
+	return inMemoryCookieJar{storage}
 }
 
 func safeStatus(status *hiveserver.TStatus) *hiveserver.TStatus {
