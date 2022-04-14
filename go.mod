@@ -1,4 +1,4 @@
-module github.com/beltran/gohive
+module github.com/ContextLogic/gohive
 
 go 1.14
 
