@@ -1220,20 +1220,47 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 }
 
 type inMemoryCookieJar struct {
-	storage map[string][]*http.Cookie
+	previousStorage map[string]bool
+	storage map[string][]http.Cookie
 }
 
 func (jar inMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	jar.storage[u.Host] = cookies
+	for _, cookie := range cookies {
+		// Skip setting duplicate cookies
+		if jar.previousStorage[cookie.Name] {
+			continue
+		}
+
+		jar.storage["cliservice"] = append(jar.storage["cliservice"], *cookie)
+	}
 }
 
 func (jar inMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
-	return jar.storage[u.Host]
+	cookiesArray := []*http.Cookie{}
+	for pattern, cookies := range jar.storage {
+		if strings.Contains(u.String(), pattern) {
+			for i := range cookies {
+				cookiesArray = append(cookiesArray, &cookies[i])
+			}
+
+			// Delete from storage
+			delete(jar.storage, pattern)
+		}
+	}
+
+	// Make sure never to return cookie again
+	// This is to avoid HTTP 431 (Request Header Fields Too Large)
+	for _, cookie := range cookiesArray {
+		jar.previousStorage[cookie.Name] = true
+	}
+
+	return cookiesArray
 }
 
 func newCookieJar() inMemoryCookieJar {
-	storage := make(map[string][]*http.Cookie)
-	return inMemoryCookieJar{storage}
+	storage := make(map[string][]http.Cookie)
+	previousStorage := make(map[string]bool)
+	return inMemoryCookieJar{previousStorage, storage}
 }
 
 func safeStatus(status *hiveserver.TStatus) *hiveserver.TStatus {
