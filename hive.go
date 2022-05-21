@@ -465,7 +465,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 			return
 		}
 		status := operationStatus.OperationState
-		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
+		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE || *status == hiveserver.TOperationState_PENDING_STATE)
 		if finished {
 			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
 				msg := operationStatus.TaskStatus
