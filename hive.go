@@ -25,6 +25,7 @@ import (
 
 const DEFAULT_FETCH_SIZE int64 = 1000
 const ZOOKEEPER_DEFAULT_NAMESPACE = "hiveserver2"
+const DEFAULT_MAX_LENGTH = 16384000
 
 type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 
@@ -63,6 +64,8 @@ type ConnectConfiguration struct {
 	SocketTimeout        time.Duration
 	HttpTimeout          time.Duration
 	DialContext          DialContextFunc
+	// Maximum length of the data in bytes. Used for SASL.
+	MaxSize            uint32
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
@@ -78,6 +81,7 @@ func NewConnectConfiguration() *ConnectConfiguration {
 		HTTPPath:             "cliservice",
 		TLSConfig:            nil,
 		ZookeeperNamespace:   ZOOKEEPER_DEFAULT_NAMESPACE,
+		MaxSize:              DEFAULT_MAX_LENGTH,
 	}
 }
 
@@ -296,19 +300,19 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			}
 		} else if auth == "NONE" || auth == "LDAP" || auth == "CUSTOM" {
 			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
-			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration)
+			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, configuration.MaxSize)
 			if err != nil {
 				return
 			}
 		} else if auth == "KERBEROS" {
 			saslConfiguration := map[string]string{"service": configuration.Service}
-			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration)
+			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, configuration.MaxSize)
 			if err != nil {
 				return
 			}
 		} else if auth == "DIGEST-MD5" {
 			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password, "service": configuration.Service}
-			transport, err = NewTSaslTransport(socket, host, "DIGEST-MD5", saslConfiguration)
+			transport, err = NewTSaslTransport(socket, host, "DIGEST-MD5", saslConfiguration, configuration.MaxSize)
 			if err != nil {
 				return
 			}

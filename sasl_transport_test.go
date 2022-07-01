@@ -12,7 +12,7 @@ func TestSaslTransport(t *testing.T) {
 	configuration := map[string]string{
 		"username": "jmarhuenda",
 	}
-	trans, err := NewTSaslTransport(thrift.NewTMemoryBuffer(), "localhost", "PLAIN", configuration)
+	trans, err := NewTSaslTransport(thrift.NewTMemoryBuffer(), "localhost", "PLAIN", configuration, 16384000)
 	if err != nil {
 		t.Fatal("Error creating transport")
 	}
@@ -42,7 +42,7 @@ func TestSaslTransportThrift(t *testing.T) {
 	setup()
 
 	socket := thrift.NewTMemoryBuffer()
-	trans, err := NewTSaslTransport(socket, "localhost", "PLAIN", configuration)
+	trans, err := NewTSaslTransport(socket, "localhost", "PLAIN", configuration, 16384000)
 	if err != nil {
 		t.Fatal(err)
 	}

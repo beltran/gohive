@@ -20,8 +20,6 @@ const (
 	COMPLETE = 5
 )
 
-const DEFAULT_MAX_LENGTH = 16384000
-
 // TSaslTransport is a tranport thrift struct that uses SASL
 type TSaslTransport struct {
 	service        string
@@ -40,7 +38,7 @@ type TSaslTransport struct {
 }
 
 // NewTSaslTransport return a TSaslTransport
-func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName string, configuration map[string]string) (*TSaslTransport, error) {
+func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName string, configuration map[string]string, maxLength uint32) (*TSaslTransport, error) {
 	var mechanism gosasl.Mechanism
 	if mechanismName == "PLAIN" {
 		mechanism = gosasl.NewPlainMechanism(configuration["username"], configuration["password"])
@@ -56,12 +54,11 @@ func NewTSaslTransport(trans thrift.TTransport, host string, mechanismName strin
 		panic("Mechanism not supported")
 	}
 	client := gosasl.NewSaslClient(host, mechanism)
-
 	return &TSaslTransport{
 		saslClient:     client,
 		tp:             trans,
 		mechanism:      mechanismName,
-		maxLength:      DEFAULT_MAX_LENGTH,
+		maxLength:      maxLength,
 		principal:      configuration["principal"],
 		OpeningContext: context.Background(),
 	}, nil
@@ -206,8 +203,11 @@ func (p *TSaslTransport) readFrameHeader() (uint32, error) {
 		return 0, err
 	}
 	size := binary.BigEndian.Uint32(buf)
-	if size < 0 || size > p.maxLength {
+	if size < 0 {
 		return 0, thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, fmt.Sprintf("Incorrect frame size (%d)", size))
+	}
+	if size > p.maxLength {
+		return 0, thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, fmt.Sprintf("Frame size is bigger than allowed, set configuration.MaxLength (%d)", size))
 	}
 	return size, nil
 }

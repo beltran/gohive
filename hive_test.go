@@ -1959,6 +1959,7 @@ func makeConnectionWithConfiguration(t *testing.T, fetchSize int64, hiveConfigur
 	configuration.FetchSize = fetchSize
 	configuration.TransportMode = mode
 	configuration.HiveConfiguration = hiveConfiguration
+	configuration.MaxSize = 16384001
 
 	if ssl {
 		tlsConfig, err := getTlsConfiguration("client.cer.pem", "client.cer.key")
