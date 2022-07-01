@@ -65,7 +65,7 @@ type ConnectConfiguration struct {
 	HttpTimeout          time.Duration
 	DialContext          DialContextFunc
 	// Maximum length of the data in bytes. Used for SASL.
-	MaxSize            uint32
+	MaxSize uint32
 }
 
 // NewConnectConfiguration returns a connect configuration, all with empty fields
