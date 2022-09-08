@@ -64,6 +64,7 @@ type ConnectConfiguration struct {
 	SocketTimeout        time.Duration
 	HttpTimeout          time.Duration
 	DialContext          DialContextFunc
+	DisableKeepAlives    bool
 	// Maximum length of the data in bytes. Used for SASL.
 	MaxSize uint32
 }
@@ -374,8 +375,9 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 		httpClient = &http.Client{
 			Timeout: configuration.HttpTimeout,
 			Transport: &http.Transport{
-				TLSClientConfig: configuration.TLSConfig,
-				DialContext:     configuration.DialContext,
+				TLSClientConfig:   configuration.TLSConfig,
+				DialContext:       configuration.DialContext,
+				DisableKeepAlives: configuration.DisableKeepAlives,
 			},
 		}
 		protocol = "https"
@@ -383,7 +385,8 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 		httpClient = &http.Client{
 			Timeout: configuration.HttpTimeout,
 			Transport: &http.Transport{
-				DialContext: configuration.DialContext,
+				DialContext:       configuration.DialContext,
+				DisableKeepAlives: configuration.DisableKeepAlives,
 			},
 		}
 		protocol = "http"
