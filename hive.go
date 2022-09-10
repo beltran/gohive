@@ -595,10 +595,11 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 		return
 	}
 	if !success(safeStatus(responseExecute.GetStatus())) {
+		status := safeStatus(responseExecute.GetStatus())
 		c.Err = HiveError{
-			error:     errors.New("Error while executing query: " + safeStatus(responseExecute.GetStatus()).String()),
-			Message:   *safeStatus(responseExecute.GetStatus()).ErrorMessage,
-			ErrorCode: int(*safeStatus(responseExecute.GetStatus()).ErrorCode),
+			error:     errors.New("Error while executing query: " + status.String()),
+			Message:   status.GetErrorMessage(),
+			ErrorCode: int(status.GetErrorCode()),
 		}
 		return
 	}
