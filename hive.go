@@ -109,7 +109,7 @@ func ConnectZookeeper(hosts string, auth string,
 
 	hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if len(hsInfos) > 0 {
 		nodes := parseHiveServer2Info(hsInfos)
