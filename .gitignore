@@ -19,3 +19,6 @@ hive.jks
 dhive
 client.cer.key
 client.cer.pem
+
+# .idea
+.idea/
