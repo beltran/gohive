@@ -106,6 +106,7 @@ func ConnectZookeeper(hosts string, auth string,
 	if err != nil {
 		return nil, err
 	}
+	defer zkConn.Close()
 
 	hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
 	if err != nil {
