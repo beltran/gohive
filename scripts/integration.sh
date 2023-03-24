@@ -34,11 +34,11 @@ function install_deps() {
     fi
     pushd dhive
     #git reset --hard 750e11b9c07d79d97aea1e182ef12965fc4e922d
-    sed -i.bak 's/python3/python3.7.1/g' ./Makefile
+    sed -i.bak 's/python3/python3.8/g' ./Makefile
     sed -i.bak 's/\.load/\.safe_load/g' ./dhive.py
     sed -i.bak 's/centos:8/centos:7/g' ./dhive/containers/base/Dockerfile
 
-    python3.7.1 -m pip install --user -r requirements.txt
+    python3.8 -m pip install --user -r requirements.txt
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive.cfg
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive.cfg
