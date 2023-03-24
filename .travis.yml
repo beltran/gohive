@@ -36,9 +36,9 @@ env:
 
 script:
   - pyenv versions
-  - pyenv global 3.7.1
+  - pyenv global 3.8
   - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-  - python3.7.1 get-pip.py --user
+  - python3.8 get-pip.py --user
   - set -e
   - go vet ./...
   - go fmt ./...
