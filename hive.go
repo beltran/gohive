@@ -641,7 +641,7 @@ func (c *Cursor) FetchLogs() []string {
 	logRequest.FetchType = 1
 
 	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
-	if err != nil {
+	if err != nil || resp == nil || resp.Results == nil {
 		c.Err = err
 		return nil
 	}
