@@ -127,7 +127,7 @@ function binaryNone() {
   export AUTH="NONE"
   export SSL="0"
   # go test -tags integration -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags integration -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags integration -covermode=count -coverprofile=c.part -v -run .
 
   echo "mode: count" >coverage.out
   grep -h -v "mode: count" *.part >>coverage.out

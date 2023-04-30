@@ -7,14 +7,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
-	"net"
 	"os"
-	"reflect"
-	"strconv"
-	"strings"
 	"testing"
-	"time"
 )
 
 func TestConnectDefault(t *testing.T) {
