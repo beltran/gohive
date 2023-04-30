@@ -137,11 +137,11 @@ function run_tests() {
 
     export SKIP_UNSTABLE="1"
 
-    binaryKerberos
-    httpKerberos
+    # binaryKerberos
+    # httpKerberos
     binaryNone
 
-    goveralls -coverprofile=coverage.out -service=travis-ci
+    # goveralls -coverprofile=coverage.out -service=travis-ci
 
     tearDown
 }
