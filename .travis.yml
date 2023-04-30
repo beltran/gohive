@@ -6,7 +6,7 @@ services:
   - docker
 
 go:
-  - "1.17"
+  - "1.19"
 
 branches:
   only:
@@ -23,7 +23,7 @@ addons:
     - kerberos.example.com
 
 before_install:
-  - go get github.com/mattn/goveralls
+  - go install github.com/mattn/goveralls@latest
   - sudo apt-get -y install krb5-user
   - cat scripts/create_krbconf.sh
   - sudo bash scripts/create_krbconf.sh
