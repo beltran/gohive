@@ -120,8 +120,8 @@ function httpKerberos() {
 
 function binaryNone() {
   # Tests with binary transport and none authentication
-  setHive config/hive.cfg
-  wait_for_hive || exit 1
+  # setHive config/hive.cfg
+  # wait_for_hive || exit 1
 
   export TRANSPORT="binary"
   export AUTH="NONE"
