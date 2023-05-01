@@ -213,19 +213,16 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 		}
 	} else {
 		if configuration.TLSConfig != nil {
-			socket, err = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
+			socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
 				ConnectTimeout: configuration.ConnectTimeout,
 				SocketTimeout:  configuration.SocketTimeout,
 				TLSConfig:      configuration.TLSConfig,
 			})
 		} else {
-			socket, err = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
+			socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
 				ConnectTimeout: configuration.ConnectTimeout,
 				SocketTimeout:  configuration.SocketTimeout,
 			})
-		}
-		if err != nil {
-			return
 		}
 		if err = socket.Open(); err != nil {
 			return
