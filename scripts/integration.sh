@@ -141,7 +141,7 @@ function run_tests() {
     httpKerberos
     binaryNone
 
-    goveralls -coverprofile=coverage.out -service=travis-ci
+    # goveralls -coverprofile=coverage.out -service=travis-ci
 
     tearDown
 }
