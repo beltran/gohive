@@ -4,6 +4,8 @@
 
 GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) in go that supports connection mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and HTTP transport, with and without SSL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
+GoHive also offers support to query the Hive metastore with various connection mechanisms, including KERBEROS.
+
 ## Installation
 GoHive can be installed with:
 ```
@@ -21,6 +23,8 @@ go get -tags kerberos github.com/beltran/gohive
 ```
 
 ## Quickstart
+
+### Connection to Hive
 
 ```go
     connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
@@ -56,6 +60,20 @@ go get -tags kerberos github.com/beltran/gohive
 `cursor.HasMore` may query Hive for more rows if not all of them have been received. Once the row is
 read is discarded from memory so as long as the fetch size is not too big there's no limit to how much
 data can be queried.
+
+### Connection to the Hive Metastore
+
+```go
+    client_meta, err := gohive.OpenMetaStore("hm.example.com", 9083, "KERBEROS")
+    if err != nil {
+        log.Fatal(err)
+    }
+    databases, err := client_meta.GetAllDatabases()
+    log.Println("databases", databases)
+    client_meta.Close()
+```
+
+The rest of these docs are pertinent to connect to Hive.
 
 ## Supported connections
 ### Connect with Sasl kerberos:
