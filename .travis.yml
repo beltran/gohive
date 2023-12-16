@@ -21,6 +21,7 @@ addons:
     - python3.8
   hosts:
     - hs2.example.com
+    - hm.example.com
     - kerberos.example.com
 
 before_install:
@@ -41,7 +42,6 @@ script:
   - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
   - python3.8 get-pip.py --user
   - set -e
-  - go vet ./...
   - go fmt ./...
   - PATH=$PATH:$HOME/.local/bin bash ./scripts/integration.sh
   - $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci

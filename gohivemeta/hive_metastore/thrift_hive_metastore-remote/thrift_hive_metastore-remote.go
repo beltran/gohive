@@ -4,11 +4,11 @@ package main
 
 import (
 	"context"
-	"fb303"
+	"github.com/beltran/gohive/gohivemeta/fb303"
 	"flag"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-	"hive_metastore"
+	"github.com/beltran/gohive/gohivemeta/hive_metastore"
 	"math"
 	"net"
 	"net/url"

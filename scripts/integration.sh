@@ -40,11 +40,11 @@ function install_deps() {
 
     python3.8 -m pip install --user -r requirements.txt
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive.cfg
-    sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive_and_metastore_and_kerberos.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive.cfg
     sed -i.bak 's/hive_version.*/hive_version = 3.1.2/g' ./config/hive_and_metastore_and_kerberos.cfg
-    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.1/g' ./config/hive.cfg
-    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.1/g' ./config/hive_and_metastore_and_kerberos.cfg
+    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.2/g' ./config/hive.cfg
+    sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.2/g' ./config/hive_and_metastore_and_kerberos.cfg
     sed -i.bak 's/hive.server2.thrift.sasl.qop.*/hive.server2.thrift.sasl.qop = auth-conf/g' ./config/hive_and_metastore_and_kerberos.cfg
     popd
 }
