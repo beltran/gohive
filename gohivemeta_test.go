@@ -8,8 +8,7 @@ import (
 )
 
 func TestConnectDefaultMeta(t *testing.T) {
-	auth := os.Getenv("AUTH")
-	client, err := OpenMetaStore("hm.example.com", 9083, auth)
+	client, err := OpenMetaStore("hm.example.com", 9083, getAuthForMeta())
 	if err != nil {
 		log.Fatal(err)
 	}
