@@ -86,7 +86,7 @@ func Open(host string, port int, auth string) (client *HiveMetastoreClient, err 
 
 	if auth == "KERBEROS" {
 		saslConfiguration := map[string]string{"service": "hive", "javax.security.sasl.qop": auth, "javax.security.sasl.server.authentication": "true"}
-		transport, err = gohive.NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration)
+		transport, err = gohive.NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, 16384000)
 		if err != nil {
 			return
 		}
@@ -122,7 +122,7 @@ func Open(host string, port int, auth string) (client *HiveMetastoreClient, err 
 		}
 	} else if auth == "NONE" {
 		saslConfiguration := map[string]string{"username": "hive", "password": "pass"}
-		transport, err = gohive.NewTSaslTransport(socket, host, "PLAIN", saslConfiguration)
+		transport, err = gohive.NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, 16384000)
 		if err != nil {
 			return
 		}
