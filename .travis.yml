@@ -12,6 +12,7 @@ branches:
   only:
   - master
   - coveralls
+  - metastore_client
 
 addons:
   sources:
