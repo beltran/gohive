@@ -70,7 +70,7 @@ data can be queried.
         log.Fatal(err)
     }
     databases, err := client_meta.GetAllDatabases(context.Background())
-    log.Println("databases", databases)
+    log.Println("databases ", databases)
     client_meta.Close()
 ```
 
