@@ -64,11 +64,11 @@ data can be queried.
 ### Connection to the Hive Metastore
 
 ```go
-    client_meta, err := gohive.OpenMetaStore("hm.example.com", 9083, "KERBEROS")
+    client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS")
     if err != nil {
         log.Fatal(err)
     }
-    databases, err := client_meta.GetAllDatabases()
+    databases, err := client_meta.GetAllDatabases(context.Background())
     log.Println("databases", databases)
     client_meta.Close()
 ```

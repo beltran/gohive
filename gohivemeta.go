@@ -13,37 +13,13 @@ import (
 	"encoding/base64"
 )
 
-type TableType int
-
-const (
-	TableTypeManaged TableType = iota
-	TableTypeExternal
-	TableTypeView
-	TableTypeIndex
-)
-
-// String representation of table types, consumed by Hive
-var tableTypes = []string{
-	"MANAGED_TABLE",
-	"EXTERNAL_TABLE",
-	"VIRTUAL_VIEW",
-	"INDEX_TABLE",
-}
-
-const (
-	bufferSize = 1024 * 1024
-)
-
-// HiveMetastoreClient.
 type HiveMetastoreClient struct {
-	context   context.Context
 	transport thrift.TTransport
 	client    *hive_metastore.ThriftHiveMetastoreClient
 	server    string
 	port      int
 }
 
-// Database is a container of other objects in Hive.
 type Database struct {
 	Name        string                       `json:"name"`
 	Description string                       `json:"description,omitempty"`
@@ -53,12 +29,8 @@ type Database struct {
 	Parameters  map[string]string            `json:"parameters,omitempty"`
 }
 
-func (val TableType) String() string {
-	return tableTypes[val]
-}
-
-// Open connection to metastore and return client handle.
-func OpenMetaStore(host string, port int, auth string) (client *HiveMetastoreClient, err error) {
+// Open connection to the metastore.
+func ConnectToMetastore(host string, port int, auth string) (client *HiveMetastoreClient, err error) {
 	server := host
 	portStr := strconv.Itoa(port)
 	if strings.Contains(host, ":") {
@@ -142,7 +114,6 @@ func OpenMetaStore(host string, port int, auth string) (client *HiveMetastoreCli
 		}
 	}
 	return &HiveMetastoreClient{
-		context:   context.Background(),
 		transport: transport,
 		client:    c,
 		server:    host,
@@ -150,19 +121,12 @@ func OpenMetaStore(host string, port int, auth string) (client *HiveMetastoreCli
 	}, nil
 }
 
-// Close connection to metastore.
 func (c *HiveMetastoreClient) Close() {
 	c.transport.Close()
 }
 
-// GetAllDatabases returns list of all Hive databases.
-func (c *HiveMetastoreClient) GetAllDatabases() ([]string, error) {
-	return c.client.GetAllDatabases(c.context)
-}
-
-// GetDatabases returns list of all databases matching pattern. The pattern is interpreted by HMS.
-func (c *HiveMetastoreClient) GetDatabases(pattern string) ([]string, error) {
-	return c.client.GetDatabases(c.context, pattern)
+func (c *HiveMetastoreClient, ) GetAllDatabases(context context.Context) ([]string, error) {
+	return c.client.GetAllDatabases(context)
 }
 
 func getHTTPClientForMeta() (httpClient *http.Client, protocol string, err error) {
