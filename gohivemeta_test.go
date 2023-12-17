@@ -8,7 +8,7 @@ import (
 )
 
 func TestConnectDefaultMeta(t *testing.T) {
-	if "http" == os.Getenv("TRANSPORT") {
+	if "http" == os.Getenv("TRANSPORT") || "NONE" == os.Getenv("AUTH") {
 		t.Skip("we don't set the metastore for http in integration tests.");
 	}
 	client, err := OpenMetaStore("hm.example.com", 9083, getAuthForMeta())
