@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 	"fmt"
+	"reflect"
 )
 
 func TestConnectDefaultMeta(t *testing.T) {
@@ -18,6 +19,10 @@ func TestConnectDefaultMeta(t *testing.T) {
 		log.Fatal(err)
 	}
 	databases, err := client.GetAllDatabases(context.Background())
+	expected := []string{"default"}
+	if !reflect.DeepEqual(databases, expected) {
+		t.Fatalf("Expected map: %+v, got: %+v", expected, databases)
+	}
 	fmt.Println("databases", databases)
 	client.Close()
 }
