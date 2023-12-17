@@ -12,7 +12,8 @@ func TestConnectDefaultMeta(t *testing.T) {
 	if "http" == os.Getenv("TRANSPORT") || "NONE" == os.Getenv("AUTH") {
 		t.Skip("we don't set the metastore for http in integration tests.");
 	}
-	client, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta())
+	configuration := NewMetastoreConnectConfiguration()
+	client, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -8,8 +8,9 @@ import (
 )
 
 func main() {
-	// Metastore client
-	client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS")
+	configuration := gohive.NewMetastoreConnectConfiguration()
+	configuration.TransportMode = "http"
+	client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
         if err != nil {
                 log.Fatal(err)
         }

@@ -29,8 +29,18 @@ type Database struct {
 	Parameters  map[string]string            `json:"parameters,omitempty"`
 }
 
+type MetastoreConnectConfiguration struct {
+	TransportMode	string
+}
+
+func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration{
+	return &MetastoreConnectConfiguration{
+		TransportMode:	"binary",
+	}
+}
+
 // Open connection to the metastore.
-func ConnectToMetastore(host string, port int, auth string) (client *HiveMetastoreClient, err error) {
+func ConnectToMetastore(host string, port int, auth string, configuration *MetastoreConnectConfiguration) (client *HiveMetastoreClient, err error) {
 	server := host
 	portStr := strconv.Itoa(port)
 	if strings.Contains(host, ":") {
@@ -53,55 +63,63 @@ func ConnectToMetastore(host string, port int, auth string) (client *HiveMetasto
 
 	var transport thrift.TTransport
 
-	if auth == "KERBEROS" {
-		saslConfiguration := map[string]string{"service": "hive", "javax.security.sasl.qop": auth, "javax.security.sasl.server.authentication": "true"}
-		transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, 16384000)
-		if err != nil {
-			return
-		}
-	} else if auth == "HTTP" {
-		mechanism, err := gosasl.NewGSSAPIMechanism("hive")
-		if err != nil {
-			return nil, err
-		}
-		saslClient := gosasl.NewSaslClient(host, mechanism)
-		token, err := saslClient.Start()
-		if err != nil {
-			return nil, err
-		}
-		if len(token) == 0 {
-			return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
-		}
-
-		httpClient, protocol, err := getHTTPClientForMeta()
-		if err != nil {
-			return nil, err
-		}
-
-		httpOptions := thrift.THttpClientOptions{
-			Client: httpClient,
-		}
-		transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+"cliservice", host, port), httpOptions).GetTransport(socket)
-		httpTransport, ok := transport.(*thrift.THttpClient)
-		if ok {
-			httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
-		}
-		if err != nil {
-			return nil, err
-		}
-	} else if auth == "NONE" {
-		saslConfiguration := map[string]string{"username": "hive", "password": "pass"}
-		transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, 16384000)
-		if err != nil {
-			return
-		}
-	} else if auth == "NOSASL" {
-		transport = thrift.NewTBufferedTransport(socket, 4096)
-			if transport == nil {
-				return nil, fmt.Errorf("BufferedTransport was nil")
+	if configuration.TransportMode == "binary" {
+		if auth == "KERBEROS" {
+			saslConfiguration := map[string]string{"service": "hive", "javax.security.sasl.qop": auth, "javax.security.sasl.server.authentication": "true"}
+			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, 16384000)
+			if err != nil {
+				return
 			}
+		} else if auth == "NONE" {
+			saslConfiguration := map[string]string{"username": "hive", "password": "pass"}
+			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, 16384000)
+			if err != nil {
+				return
+			}
+		} else if auth == "NOSASL" {
+			transport = thrift.NewTBufferedTransport(socket, 4096)
+				if transport == nil {
+					return nil, fmt.Errorf("BufferedTransport was nil")
+				}
+		} else {
+			panic("Unrecognized auth")
+		}
+	} else if configuration.TransportMode == "http" {
+		if auth == "KERBEROS" {
+			mechanism, err := gosasl.NewGSSAPIMechanism("hive")
+			if err != nil {
+				return nil, err
+			}
+			saslClient := gosasl.NewSaslClient(host, mechanism)
+			token, err := saslClient.Start()
+			if err != nil {
+				return nil, err
+			}
+			if len(token) == 0 {
+				return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
+			}
+
+			httpClient, protocol, err := getHTTPClientForMeta()
+			if err != nil {
+				return nil, err
+			}
+
+			httpOptions := thrift.THttpClientOptions{
+				Client: httpClient,
+			}
+			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+"cliservice", host, port), httpOptions).GetTransport(socket)
+			httpTransport, ok := transport.(*thrift.THttpClient)
+			if ok {
+				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
+			}
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			 panic("Unrecognized auth")
+		}
 	} else {
-		panic("Unrecognized auth")
+		panic("Unrecognized transport mode " + configuration.TransportMode)
 	}
 
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
