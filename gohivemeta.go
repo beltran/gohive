@@ -8,6 +8,8 @@ import (
 	"github.com/beltran/gosasl"
 	"github.com/beltran/gohive/gohivemeta/hive_metastore"
 	"encoding/base64"
+	"strings"
+	"os/user"
 )
 
 type HiveMetastoreClient struct {
@@ -28,11 +30,16 @@ type Database struct {
 
 type MetastoreConnectConfiguration struct {
 	TransportMode	string
+	Username	string
+	Password	string
+
 }
 
 func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration{
 	return &MetastoreConnectConfiguration{
 		TransportMode:	"binary",
+		Username: "",
+		Password: "",
 	}
 }
 
@@ -53,13 +60,24 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 	if configuration.TransportMode == "binary" {
 		if auth == "KERBEROS" {
 			saslConfiguration := map[string]string{"service": "hive", "javax.security.sasl.qop": auth, "javax.security.sasl.server.authentication": "true"}
-			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, 16384000)
+			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, DEFAULT_MAX_LENGTH)
 			if err != nil {
 				return
 			}
 		} else if auth == "NONE" {
-			saslConfiguration := map[string]string{"username": "hive", "password": "pass"}
-			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, 16384000)
+			if configuration.Password == "" {
+				configuration.Password = "x"
+			}
+			var _user *user.User
+			if configuration.Username == "" {
+				_user, err = user.Current()
+				if err != nil {
+					return
+				}
+				configuration.Username = strings.Replace(_user.Name, " ", "", -1)
+			}
+			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
+			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, DEFAULT_MAX_LENGTH)
 			if err != nil {
 				return
 			}
