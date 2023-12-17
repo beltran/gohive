@@ -7,9 +7,6 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gosasl"
 	"github.com/beltran/gohive/gohivemeta/hive_metastore"
-	"net"
-	"strconv"
-	"strings"
 	"encoding/base64"
 )
 
@@ -41,18 +38,8 @@ func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration{
 
 // Open connection to the metastore.
 func ConnectToMetastore(host string, port int, auth string, configuration *MetastoreConnectConfiguration) (client *HiveMetastoreClient, err error) {
-	server := host
-	portStr := strconv.Itoa(port)
-	if strings.Contains(host, ":") {
-		s, pStr, err := net.SplitHostPort(host)
-		if err != nil {
-			return nil, err
-		}
-		server = s
-		portStr = pStr
-	}
-
-	socket, err := thrift.NewTSocket(net.JoinHostPort(server, portStr))
+	addr := fmt.Sprintf("%s:%d", host, port)
+	socket, err := thrift.NewTSocket(addr)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving address %s: %v", host, err)
 	}

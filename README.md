@@ -64,7 +64,8 @@ data can be queried.
 ### Connection to the Hive Metastore
 
 ```go
-    client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS")
+    configuration := gohive.NewMetastoreConnectConfiguration()
+    client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
     if err != nil {
         log.Fatal(err)
     }
