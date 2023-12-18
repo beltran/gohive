@@ -2,17 +2,19 @@ package gohive
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gosasl"
-	"github.com/beltran/gohive/gohivemeta/hive_metastore"
-	"encoding/base64"
-	"strings"
 	"os/user"
+	"strings"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/beltran/gohive/gohivemeta/hive_metastore"
+	"github.com/beltran/gosasl"
 )
 
 type HiveMetastoreClient struct {
+	context   context.Context
 	transport thrift.TTransport
 	client    *hive_metastore.ThriftHiveMetastoreClient
 	server    string
@@ -20,17 +22,16 @@ type HiveMetastoreClient struct {
 }
 
 type MetastoreConnectConfiguration struct {
-	TransportMode	string
-	Username	string
-	Password	string
-
+	TransportMode string
+	Username      string
+	Password      string
 }
 
-func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration{
+func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration {
 	return &MetastoreConnectConfiguration{
-		TransportMode:	"binary",
-		Username: "",
-		Password: "",
+		TransportMode: "binary",
+		Username:      "",
+		Password:      "",
 	}
 }
 
@@ -74,9 +75,9 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 			}
 		} else if auth == "NOSASL" {
 			transport = thrift.NewTBufferedTransport(socket, 4096)
-				if transport == nil {
-					return nil, fmt.Errorf("BufferedTransport was nil")
-				}
+			if transport == nil {
+				return nil, fmt.Errorf("BufferedTransport was nil")
+			}
 		} else {
 			panic("Unrecognized auth")
 		}
@@ -112,7 +113,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 				return nil, err
 			}
 		} else {
-			 panic("Unrecognized auth")
+			panic("Unrecognized auth")
 		}
 	} else {
 		panic("Unrecognized transport mode " + configuration.TransportMode)
@@ -128,6 +129,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 		}
 	}
 	return &HiveMetastoreClient{
+		context:   context.Background(),
 		transport: transport,
 		client:    c,
 		server:    host,
@@ -139,8 +141,8 @@ func (c *HiveMetastoreClient) Close() {
 	c.transport.Close()
 }
 
-func (c *HiveMetastoreClient, ) GetAllDatabases(context context.Context) ([]string, error) {
-	return c.client.GetAllDatabases(context)
+func (c *HiveMetastoreClient) GetAllDatabases() ([]string, error) {
+	return c.client.GetAllDatabases(c.context)
 }
 
 func getHTTPClientForMeta() (httpClient *http.Client, protocol string, err error) {
