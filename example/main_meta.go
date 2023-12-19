@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 
 	"github.com/beltran/gohive"
@@ -13,7 +12,7 @@ func main() {
         if err != nil {
                 log.Fatal(err)
         }
-        databases, err := client_meta.GetAllDatabases(context.Background())
+        databases, err := client_meta.GetAllDatabases()
         log.Println("databases", databases)
         client_meta.Close()
 }
