@@ -71,9 +71,19 @@ The thrift client is directly exposed, so the API exposed by the Hive metastore 
     if err != nil {
         log.Fatal(err)
     }
+    database := hive_metastore.Database{
+        Name:        "my_new_database",
+        LocationUri: "/"}
+    err = connection.Client.CreateDatabase(context.Background(), &database)
+    if err != nil {
+        log.Fatal(err)
+    }
     databases, err := connection.Client.GetAllDatabases(context.Background())
+    if err != nil {
+        log.Fatal(err)
+    }
     log.Println("databases ", databases)
-    client_meta.Close()
+    connection.Close()
 ```
 
 The rest of these docs are pertinent to connect to Hive.

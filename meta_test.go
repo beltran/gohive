@@ -2,7 +2,7 @@ package gohive
 
 import (
 	"context"
-	"github.com/beltran/gohive/gohivemeta/hive_metastore"
+	"github.com/beltran/gohive/hive_metastore"
 	"log"
 	"os"
 	"fmt"

@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/gohivemeta/hive_metastore"
+	"github.com/beltran/gohive/hive_metastore"
 	"github.com/beltran/gosasl"
 	"net/http"
 	"os/user"
