@@ -103,6 +103,7 @@ function  binaryKerberos() {
   export TRANSPORT="binary"
   export AUTH="KERBEROS"
   export SSL="0"
+  export METASTORE="1"
   go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go test -tags "integration kerberos" -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go run -tags "kerberos" example/main.go
