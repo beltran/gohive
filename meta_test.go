@@ -51,6 +51,9 @@ func Contains(c []string, s string) bool {
 }
 
 func TestDatabaseOperations(t *testing.T) {
+	if "http" == os.Getenv("TRANSPORT") {
+		t.Skip("we don't set the metastore for http in integration tests.")
+	}
 	configuration := NewMetastoreConnectConfiguration()
 	connection, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
 	if err != nil {
