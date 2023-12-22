@@ -30,8 +30,8 @@ func GetDatabaseName() string {
 }
 
 func TestConnectDefaultMeta(t *testing.T) {
-	if "http" == os.Getenv("TRANSPORT") {
-		t.Skip("we don't set the metastore for http in integration tests.")
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("metastore not set.")
 	}
 	configuration := NewMetastoreConnectConfiguration()
 	client, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
@@ -51,8 +51,8 @@ func Contains(c []string, s string) bool {
 }
 
 func TestDatabaseOperations(t *testing.T) {
-	if "http" == os.Getenv("TRANSPORT") {
-		t.Skip("we don't set the metastore for http in integration tests.")
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("metastore not set.")
 	}
 	configuration := NewMetastoreConnectConfiguration()
 	connection, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
