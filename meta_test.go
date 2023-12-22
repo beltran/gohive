@@ -2,27 +2,89 @@ package gohive
 
 import (
 	"context"
+	"github.com/beltran/gohive/gohivemeta/hive_metastore"
 	"log"
 	"os"
+	"fmt"
 	"testing"
-	"reflect"
+	"math/rand"
 )
 
+var lettersDb = []rune("abcdefghijklmnopqrstuvwxyz")
+
+func randSeqDb(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = lettersDb[rand.Intn(len(lettersDb))]
+	}
+	return string(b)
+}
+
+var tableIdDb = 0
+var randNameDb = randSeq(10)
+
+func GetDatabaseName() string {
+	tableName := fmt.Sprintf("db_pokes_%s%d", randNameDb, tableIdDb)
+	tableIdDb+= 1
+	return tableName
+}
+
 func TestConnectDefaultMeta(t *testing.T) {
-	if "http" == os.Getenv("TRANSPORT") || "NONE" == os.Getenv("AUTH") {
-		t.Skip("we don't set the metastore for http in integration tests.");
+	if "http" == os.Getenv("TRANSPORT") {
+		t.Skip("we don't set the metastore for http in integration tests.")
 	}
 	configuration := NewMetastoreConnectConfiguration()
 	client, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
 	if err != nil {
 		log.Fatal(err)
 	}
-	databases, err := client.GetAllDatabases(context.Background())
-	expected := []string{"default"}
-	if !reflect.DeepEqual(databases, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, databases)
-	}
 	client.Close()
+}
+
+func Contains(c []string, s string) bool {
+	for _, v := range c {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func TestDatabaseOperations(t *testing.T) {
+	configuration := NewMetastoreConnectConfiguration()
+	connection, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	name := GetDatabaseName()
+
+	database := hive_metastore.Database{
+		Name:        name,
+		LocationUri: "/"}
+	err = connection.Client.CreateDatabase(context.Background(), &database)
+	if err != nil {
+		log.Fatal(err)
+	}
+	databases, err := connection.Client.GetAllDatabases(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !Contains(databases, name) {
+		t.Fatalf("%s not found, databases: %+v", name, databases)
+	}
+	err = connection.Client.DropDatabase(context.Background(), name, false, false)
+	if err != nil {
+		log.Fatal(err)
+	}
+	databases, err = connection.Client.GetAllDatabases(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if Contains(databases, name) {
+		t.Fatalf("%s should have been deleted, databases: %+v", name, databases)
+	}
+	connection.Close()
 }
 
 func getAuthForMeta() string {

@@ -65,11 +65,11 @@ data can be queried.
 
 ```go
     configuration := gohive.NewMetastoreConnectConfiguration()
-    client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
+    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
     if err != nil {
         log.Fatal(err)
     }
-    databases, err := client_meta.GetAllDatabases(context.Background())
+    databases, err := connection.Client.GetAllDatabases(context.Background())
     log.Println("databases ", databases)
     client_meta.Close()
 ```

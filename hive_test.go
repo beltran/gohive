@@ -40,7 +40,7 @@ func TestConnectDefault(t *testing.T) {
 	auth := os.Getenv("AUTH")
 	ssl := os.Getenv("SSL")
 	if auth != "KERBEROS" || transport != "binary" || ssl == "1" {
-		return
+		t.Skip("not testing this combination.");
 	}
 
 	configuration := NewConnectConfiguration()
