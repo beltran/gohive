@@ -40,7 +40,7 @@ func TestConnectDefault(t *testing.T) {
 	auth := os.Getenv("AUTH")
 	ssl := os.Getenv("SSL")
 	if auth != "KERBEROS" || transport != "binary" || ssl == "1" {
-		return
+		t.Skip("not testing this combination.");
 	}
 
 	configuration := NewConnectConfiguration()
@@ -768,7 +768,9 @@ func TestConnectTimeout(t *testing.T) {
 }
 
 func TestSimpleSelectWithNil(t *testing.T) {
-	t.Skip("skipping test because the local metastore is not working correctly.");
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("skipping test because the local metastore is not working correctly.");
+	}
 	connection, cursor, tableName := prepareTable(t, 1, 1000)
 	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES (1, NULL) ", tableName), false)
 	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
@@ -1024,7 +1026,9 @@ func TestRowMapAllTypes(t *testing.T) {
 }
 
 func TestRowMapAllTypesWithNull(t *testing.T) {
-	t.Skip("skipping test because the local metastore is not working correctly.");
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("skipping test because the local metastore is not working correctly.");
+	}
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTableWithNull(t, cursor)
 
@@ -1749,7 +1753,9 @@ func TestTypesWithoutInitializedPointer(t *testing.T) {
 }
 
 func TestTypesWithNulls(t *testing.T) {
-	t.Skip("skipping test because the local metastore is not working correctly.");
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("skipping test because the local metastore is not working correctly.")
+	}
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTableWithNull(t, cursor)
 	var b bool

@@ -63,15 +63,27 @@ data can be queried.
 
 ### Connection to the Hive Metastore
 
+The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
+
 ```go
     configuration := gohive.NewMetastoreConnectConfiguration()
-    client_meta, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
+    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
     if err != nil {
         log.Fatal(err)
     }
-    databases, err := client_meta.GetAllDatabases(context.Background())
+    database := hive_metastore.Database{
+        Name:        "my_new_database",
+        LocationUri: "/"}
+    err = connection.Client.CreateDatabase(context.Background(), &database)
+    if err != nil {
+        log.Fatal(err)
+    }
+    databases, err := connection.Client.GetAllDatabases(context.Background())
+    if err != nil {
+        log.Fatal(err)
+    }
     log.Println("databases ", databases)
-    client_meta.Close()
+    connection.Close()
 ```
 
 The rest of these docs are pertinent to connect to Hive.
@@ -159,4 +171,4 @@ Tests can be run with:
 ```
 ./scripts/integration
 ```
-This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with Hive and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/beltran/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.
+This uses [dhive](https://github.com/beltran/dhive) and it will start two docker instances with Hive, the Hive metastore, and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/beltran/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.

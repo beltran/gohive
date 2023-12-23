@@ -1,36 +1,34 @@
 package gohive
 
 import (
-	"context"
-	"fmt"
-	"net/http"
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gosasl"
-	"github.com/beltran/gohive/gohivemeta/hive_metastore"
 	"encoding/base64"
-	"strings"
+	"fmt"
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/beltran/gohive/hive_metastore"
+	"github.com/beltran/gosasl"
+	"net/http"
 	"os/user"
+	"strings"
 )
 
 type HiveMetastoreClient struct {
 	transport thrift.TTransport
-	client    *hive_metastore.ThriftHiveMetastoreClient
+	Client    *hive_metastore.ThriftHiveMetastoreClient
 	server    string
 	port      int
 }
 
 type MetastoreConnectConfiguration struct {
-	TransportMode	string
-	Username	string
-	Password	string
-
+	TransportMode string
+	Username      string
+	Password      string
 }
 
-func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration{
+func NewMetastoreConnectConfiguration() *MetastoreConnectConfiguration {
 	return &MetastoreConnectConfiguration{
-		TransportMode:	"binary",
-		Username: "",
-		Password: "",
+		TransportMode: "binary",
+		Username:      "",
+		Password:      "",
 	}
 }
 
@@ -74,9 +72,9 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 			}
 		} else if auth == "NOSASL" {
 			transport = thrift.NewTBufferedTransport(socket, 4096)
-				if transport == nil {
-					return nil, fmt.Errorf("BufferedTransport was nil")
-				}
+			if transport == nil {
+				return nil, fmt.Errorf("BufferedTransport was nil")
+			}
 		} else {
 			panic("Unrecognized auth")
 		}
@@ -112,7 +110,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 				return nil, err
 			}
 		} else {
-			 panic("Unrecognized auth")
+			panic("Unrecognized auth")
 		}
 	} else {
 		panic("Unrecognized transport mode " + configuration.TransportMode)
@@ -129,7 +127,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 	}
 	return &HiveMetastoreClient{
 		transport: transport,
-		client:    c,
+		Client:    c,
 		server:    host,
 		port:      port,
 	}, nil
@@ -137,10 +135,6 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 
 func (c *HiveMetastoreClient) Close() {
 	c.transport.Close()
-}
-
-func (c *HiveMetastoreClient, ) GetAllDatabases(context context.Context) ([]string, error) {
-	return c.client.GetAllDatabases(context)
 }
 
 func getHTTPClientForMeta() (httpClient *http.Client, protocol string, err error) {
