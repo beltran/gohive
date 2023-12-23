@@ -1,11 +1,9 @@
 package gohive
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hive_metastore"
-	"github.com/beltran/gosasl"
 	"net/http"
 	"os/user"
 	"strings"
@@ -78,40 +76,6 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 		} else {
 			panic("Unrecognized auth")
 		}
-	} else if configuration.TransportMode == "http" {
-		if auth == "KERBEROS" {
-			mechanism, err := gosasl.NewGSSAPIMechanism("hive")
-			if err != nil {
-				return nil, err
-			}
-			saslClient := gosasl.NewSaslClient(host, mechanism)
-			token, err := saslClient.Start()
-			if err != nil {
-				return nil, err
-			}
-			if len(token) == 0 {
-				return nil, fmt.Errorf("Gssapi init context returned an empty token. Probably the service is empty in the configuration")
-			}
-
-			httpClient, protocol, err := getHTTPClientForMeta()
-			if err != nil {
-				return nil, err
-			}
-
-			httpOptions := thrift.THttpClientOptions{
-				Client: httpClient,
-			}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+"cliservice", host, port), httpOptions).GetTransport(socket)
-			httpTransport, ok := transport.(*thrift.THttpClient)
-			if ok {
-				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
-			}
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			panic("Unrecognized auth")
-		}
 	} else {
 		panic("Unrecognized transport mode " + configuration.TransportMode)
 	}
@@ -135,10 +99,4 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 
 func (c *HiveMetastoreClient) Close() {
 	c.transport.Close()
-}
-
-func getHTTPClientForMeta() (httpClient *http.Client, protocol string, err error) {
-	httpClient = http.DefaultClient
-	protocol = "http"
-	return
 }
