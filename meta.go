@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hive_metastore"
-	"net/http"
 	"os/user"
 	"strings"
 )
