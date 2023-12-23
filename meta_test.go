@@ -21,7 +21,7 @@ func randSeqDb(n int) string {
 }
 
 var tableIdDb = 0
-var randNameDb = randSeq(10)
+var randNameDb = randSeqDb(10)
 
 func GetDatabaseName() string {
 	tableName := fmt.Sprintf("db_pokes_%s%d", randNameDb, tableIdDb)
@@ -34,6 +34,7 @@ func TestConnectDefaultMeta(t *testing.T) {
 		t.Skip("metastore not set.")
 	}
 	configuration := NewMetastoreConnectConfiguration()
+	configuration.TransportMode = getTransportForMeta()
 	client, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
 	if err != nil {
 		log.Fatal(err)
@@ -55,6 +56,7 @@ func TestDatabaseOperations(t *testing.T) {
 		t.Skip("metastore not set.")
 	}
 	configuration := NewMetastoreConnectConfiguration()
+	configuration.TransportMode = getTransportForMeta()
 	connection, err := ConnectToMetastore("hm.example.com", 9083, getAuthForMeta(), configuration)
 	if err != nil {
 		log.Fatal(err)
@@ -97,4 +99,12 @@ func getAuthForMeta() string {
 		auth = "KERBEROS"
 	}
 	return auth
+}
+
+func getTransportForMeta() string {
+	transport := os.Getenv("TRANSPORT")
+	if transport == "" {
+		transport = "binary"
+	}
+	return transport
 }
