@@ -42,6 +42,20 @@ func TestConnectDefaultMeta(t *testing.T) {
 	client.Close()
 }
 
+
+func TestConnectNoneMetaFails(t *testing.T) {
+	if os.Getenv("METASTORE_SKIP") == "1" {
+		t.Skip("metastore not set.")
+	}
+	configuration := NewMetastoreConnectConfiguration()
+	configuration.TransportMode = getTransportForMeta()
+	client, err := ConnectToMetastore("hm.example.com", 9083, "NONE", configuration)
+	if err == nil {
+		log.Fatal("auth shouldn't have succeeded")
+	}
+	client.Close()
+}
+
 func Contains(c []string, s string) bool {
 	for _, v := range c {
 		if v == s {
