@@ -103,7 +103,7 @@ function  binaryKerberos() {
   export TRANSPORT="binary"
   export AUTH="KERBEROS"
   export SSL="0"
-  export METASTORE_SKIP="1"
+  export METASTORE_SKIP="0"
   go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go test -tags "integration kerberos" -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go run -tags "kerberos" example/main.go
@@ -120,6 +120,7 @@ function httpKerberos() {
   export TRANSPORT="http"
   export AUTH="KERBEROS"
   export SSL="1"
+  export METASTORE_SKIP="1"
   # go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go test -tags "integration kerberos" -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 }
@@ -132,6 +133,7 @@ function binaryNone() {
   export TRANSPORT="binary"
   export AUTH="NONE"
   export SSL="0"
+  export METASTORE_SKIP="1"
   # go test -tags integration -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go test -tags integration -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
 

@@ -768,10 +768,7 @@ func TestConnectTimeout(t *testing.T) {
 }
 
 func TestSimpleSelectWithNil(t *testing.T) {
-	if os.Getenv("METASTORE_SKIP") == "1" {
-		t.Skip("skipping test because the local metastore is not working correctly.");
-	}
-	connection, cursor, tableName := prepareTable(t, 1, 1000)
+	connection, cursor, tableName := prepareTable(t, 0, 1000)
 	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES (1, NULL) ", tableName), false)
 	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
 	if cursor.Error() != nil {
@@ -1026,7 +1023,7 @@ func TestRowMapAllTypes(t *testing.T) {
 }
 
 func TestRowMapAllTypesWithNull(t *testing.T) {
-	if os.Getenv("METASTORE_SKIP") == "1" {
+	if os.Getenv("METASTORE_SKIP") != "1" {
 		t.Skip("skipping test because the local metastore is not working correctly.");
 	}
 	connection, cursor := makeConnection(t, 1000)
@@ -1753,7 +1750,7 @@ func TestTypesWithoutInitializedPointer(t *testing.T) {
 }
 
 func TestTypesWithNulls(t *testing.T) {
-	if os.Getenv("METASTORE_SKIP") == "1" {
+	if os.Getenv("METASTORE_SKIP") != "1" {
 		t.Skip("skipping test because the local metastore is not working correctly.")
 	}
 	connection, cursor := makeConnection(t, 1000)
