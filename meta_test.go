@@ -49,11 +49,12 @@ func TestConnectNoneMetaFails(t *testing.T) {
 	}
 	configuration := NewMetastoreConnectConfiguration()
 	configuration.TransportMode = getTransportForMeta()
-	client, err := ConnectToMetastore("hm.example.com", 9083, "NONE", configuration)
+	_, err := ConnectToMetastore("hm.example.com", 9083, "NONE", configuration)
 	if err == nil {
-		log.Fatal("auth shouldn't have succeeded")
+		log.Fatal("auth shouldn't have succeeded, none")
 	}
-	client.Close()
+
+	_, err = ConnectToMetastore("hm.example.com", 9083, "NOSASL", configuration)
 }
 
 func Contains(c []string, s string) bool {
