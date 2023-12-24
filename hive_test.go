@@ -1753,7 +1753,7 @@ func TestTypesWithoutInitializedPointer(t *testing.T) {
 }
 
 func TestTypesWithNulls(t *testing.T) {
-	if os.Getenv("METASTORE_SKIP") == "1" {
+	if os.Getenv("METASTORE_SKIP") != "1" {
 		t.Skip("skipping test because the local metastore is not working correctly.")
 	}
 	connection, cursor := makeConnection(t, 1000)
