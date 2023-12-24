@@ -1099,7 +1099,7 @@ func TestSmallFetchSize(t *testing.T) {
 
 func TestWithContextSync(t *testing.T) {
 	if os.Getenv("TRANSPORT") == "http" {
-		if os.Getenv("SKIP_UNSTABLE") = "1" {
+		if os.Getenv("SKIP_UNSTABLE") == "1" {
 			return
 		}
 	}
