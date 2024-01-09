@@ -29,7 +29,7 @@ const DEFAULT_MAX_LENGTH = 16384000
 
 type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 
-// Connection holds the information for getting a cursor to hive
+// Connection holds the information for getting a cursor to hive.
 type Connection struct {
 	host                string
 	port                int
