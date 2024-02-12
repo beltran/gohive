@@ -406,6 +406,9 @@ func (c *Connection) Close() error {
 	closeRequest.SessionHandle = c.sessionHandle
 	// This context is ignored
 	responseClose, err := c.client.CloseSession(context.Background(), closeRequest)
+	if gocqlDebug {
+		log.Println(responseClose)
+	}
 
 	if c.transport != nil {
 		errTransport := c.transport.Close()
@@ -579,7 +582,9 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
-
+	if gocqlDebug {
+		log.Println(responseExecute)
+	}
 	if c.Err != nil {
 		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
 			c.state = _CONTEXT_DONE
@@ -618,6 +623,9 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
 	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
+	if gocqlDebug {
+		log.Println(responsePoll)
+	}
 	if c.Err != nil {
 		return nil
 	}
@@ -1035,6 +1043,9 @@ func (c *Cursor) Description() [][]string {
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
 	metaRequest.OperationHandle = c.operationHandle
 	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
+	if gocqlDebug {
+		log.Println(metaResponse)
+	}
 	if err != nil {
 		c.Err = err
 		return nil
@@ -1093,6 +1104,9 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
+			if gocqlDebug {
+				log.Println(responseFetch)
+			}
 			if err != nil {
 				rowsAvailable <- err
 				return
@@ -1148,6 +1162,9 @@ func (c *Cursor) Cancel() {
 	var responseCancel *hiveserver.TCancelOperationResp
 	// This context is simply ignored
 	responseCancel, c.Err = c.conn.client.CancelOperation(context.Background(), cancelRequest)
+	if gocqlDebug {
+		log.Println(responseCancel)
+	}
 	if c.Err != nil {
 		return
 	}
@@ -1176,6 +1193,9 @@ func (c *Cursor) resetState() error {
 		closeRequest.OperationHandle = c.operationHandle
 		// This context is ignored
 		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
+		if gocqlDebug {
+			log.Println(responseClose)
+		}
 		c.operationHandle = nil
 		if err != nil {
 			return err
