@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os/user"
 	"strconv"
@@ -21,6 +22,7 @@ import (
 	"github.com/beltran/gosasl"
 	"github.com/go-zookeeper/zk"
 	"github.com/pkg/errors"
+	"golang.org/x/net/publicsuffix"
 )
 
 const DEFAULT_FETCH_SIZE int64 = 1000
@@ -252,6 +254,12 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			if err != nil {
 				return nil, err
 			}
+
+			httpClient.Jar, err = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+			if err != nil {
+				return nil, err
+			}
+
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
 			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
 			if err != nil {
@@ -359,6 +367,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 
 	if configuration.Database != "" {
 		cursor := connection.Cursor()
+		defer cursor.Close()
 		cursor.Exec(context.Background(), "USE "+configuration.Database)
 		if cursor.Err != nil {
 			return nil, cursor.Err
@@ -684,7 +693,7 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	}
 }
 
-//RowMap returns one row as a map. Advances the cursor one
+// RowMap returns one row as a map. Advances the cursor one
 func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
@@ -1163,6 +1172,12 @@ func (c *Cursor) Close() {
 }
 
 func (c *Cursor) resetState() error {
+	// Remove the cookie otherwise it gets appended on every call
+	t, ok := c.conn.transport.(*thrift.THttpClient)
+	if ok {
+		t.DelHeader("Cookie")
+	}
+
 	c.response = nil
 	c.Err = nil
 	c.queue = nil
