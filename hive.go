@@ -377,6 +377,29 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	return connection, nil
 }
 
+type CookieDedupTransport struct {
+	http.RoundTripper
+}
+
+// RoundTrip removes duplicate cookies (cookies with the same name) from the request
+// This is a mitigation for the issue where Hive/Impala cookies get duplicated in the response
+func (d *CookieDedupTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	cookieMap := map[string]string{}
+	for _, cookie := range req.Cookies() {
+		cookieMap[cookie.Name] = cookie.Value
+	}
+
+	req.Header.Set("Cookie", "")
+
+	for key, value := range cookieMap {
+		req.AddCookie(&http.Cookie{Name: key, Value: value})
+	}
+
+	resp, err := d.RoundTripper.RoundTrip(req)
+
+	return resp, err
+}
+
 func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
 	if configuration.TLSConfig != nil {
 		httpClient = &http.Client{
@@ -398,6 +421,9 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 		}
 		protocol = "http"
 	}
+
+	httpClient.Transport = &CookieDedupTransport{httpClient.Transport}
+
 	return
 }
 
@@ -1172,12 +1198,6 @@ func (c *Cursor) Close() {
 }
 
 func (c *Cursor) resetState() error {
-	// Remove the cookie otherwise it gets appended on every call
-	t, ok := c.conn.transport.(*thrift.THttpClient)
-	if ok {
-		t.DelHeader("Cookie")
-	}
-
 	c.response = nil
 	c.Err = nil
 	c.queue = nil
