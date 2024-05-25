@@ -283,7 +283,10 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			if err != nil {
 				return nil, err
 			}
-			httpClient.Jar = newCookieJar()
+			httpClient.Jar, err = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+			if err != nil {
+				return nil, err
+			}
 
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
@@ -1257,41 +1260,6 @@ func getTotalRows(columns []*hiveserver.TColumn) (int, error) {
 		}
 	}
 	return 0, errors.New("All columns seem empty")
-}
-
-type inMemoryCookieJar struct {
-	given   *bool
-	storage map[string][]http.Cookie
-}
-
-func (jar inMemoryCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	for _, cookie := range cookies {
-		jar.storage["cliservice"] = []http.Cookie{*cookie}
-	}
-	*jar.given = false
-}
-
-func (jar inMemoryCookieJar) Cookies(u *url.URL) []*http.Cookie {
-	cookiesArray := []*http.Cookie{}
-	for pattern, cookies := range jar.storage {
-		if strings.Contains(u.String(), pattern) {
-			for i := range cookies {
-				cookiesArray = append(cookiesArray, &cookies[i])
-			}
-		}
-	}
-	if !*jar.given {
-		*jar.given = true
-		return cookiesArray
-	} else {
-		return nil
-	}
-}
-
-func newCookieJar() inMemoryCookieJar {
-	storage := make(map[string][]http.Cookie)
-	f := false
-	return inMemoryCookieJar{&f, storage}
 }
 
 func safeStatus(status *hiveserver.TStatus) *hiveserver.TStatus {
