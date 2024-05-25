@@ -283,7 +283,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			if err != nil {
 				return nil, err
 			}
-			httpClient.Jar = newCookieJar()
+			// httpClient.Jar = newCookieJar()
 
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
