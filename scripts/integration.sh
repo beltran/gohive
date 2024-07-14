@@ -36,7 +36,7 @@ function install_deps() {
     #git reset --hard 750e11b9c07d79d97aea1e182ef12965fc4e922d
     sed -i.bak 's/python3/python3.8/g' ./Makefile
     sed -i.bak 's/\.load/\.safe_load/g' ./dhive.py
-    sed -i.bak 's/centos:8/centos:7/g' ./dhive/containers/base/Dockerfile
+    sed -i.bak 's/centos:8/centos:7\nRUN sed -i s\/mirror.centos.org\/vault.centos.org\/g \/etc\/yum.repos.d\/*.repo\nRUN sed -i s\/^#.*baseurl=http\/baseurl=http\/g \/etc\/yum.repos.d\/*.repo\nRUN sed -i s\/^mirrorlist=http\/#mirrorlist=http\/g \/etc\/yum.repos.d\/*.repo/g' ./dhive/containers/base/Dockerfile
 
     python3.8 -m pip install --user -r requirements.txt
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive.cfg
