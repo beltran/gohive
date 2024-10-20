@@ -1,6 +1,6 @@
 module github.com/beltran/gohive
 
-go 1.19
+go 1.23
 
 require (
 	github.com/apache/thrift v0.18.1
