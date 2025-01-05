@@ -4,7 +4,7 @@
 
 GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) in go that supports connection mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and HTTP transport, with and without SSL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
-GoHive also offers support to query the Hive metastore with various connection mechanisms, including KERBEROS.
+GoHive also offers support to query the Hive metastore with various authentication mechanisms, including KERBEROS.
 
 ## Installation
 GoHive can be installed with:
@@ -85,8 +85,6 @@ The thrift client is directly exposed, so the API exposed by the Hive metastore 
     log.Println("databases ", databases)
     connection.Close()
 ```
-
-The rest of these docs are pertinent to connect to Hive.
 
 ## Supported connections
 ### Connect with Sasl kerberos:
