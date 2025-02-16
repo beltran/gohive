@@ -12,9 +12,9 @@ function wait_for_hive () {
           break
         fi
         counter=$((counter+1))
-        if [[ "$counter" -gt 30 ]]; then
+        if [[ "$counter" -gt 18 ]]; then
           # Just fail because the port didn't open
-          echo "Waited for five minutes and hive didn't appear to start"
+          echo "Waited for three minutes and hive didn't appear to start"
           docker logs hs2.example
           exit 1
         fi
@@ -42,9 +42,9 @@ function install_deps() {
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive.cfg
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/tez_version.*/tez_version = 0.9.2/g' ./config/hive_and_metastore_and_kerberos.cfg
-    sed -i.bak 's/hive_version.*/hive_version = hive-4.0.1/g' ./config/hive.cfg
-    sed -i.bak 's/hive_version.*/hive_version = 4.0.1/g' ./config/hive_and_kerberos.cfg
-    sed -i.bak 's/hive_version.*/hive_version = 4.0.1/g' ./config/hive_and_metastore_and_kerberos.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.3/g' ./config/hive.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.3/g' ./config/hive_and_kerberos.cfg
+    sed -i.bak 's/hive_version.*/hive_version = 3.1.3/g' ./config/hive_and_metastore_and_kerberos.cfg
     sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.2/g' ./config/hive.cfg
     sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.2/g' ./config/hive_and_kerberos.cfg
     sed -i.bak 's/hadoop_version.*/hadoop_version = 2.10.2/g' ./config/hive_and_metastore_and_kerberos.cfg
