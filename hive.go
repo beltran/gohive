@@ -490,33 +490,25 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 	done := make(chan interface{}, 1)
 	defer close(done)
 
-	var mux sync.Mutex
 	var contextDone bool
 
 	go func() {
 		select {
 		case <-done:
 		case <-ctx.Done():
-			mux.Lock()
 			contextDone = true
-			mux.Unlock()
 		}
 	}()
 
 	for {
 		operationStatus := c.Poll(true)
-		c.mu.Lock()
 		if c.Err != nil {
-			c.mu.Unlock()
 			return
 		}
-		c.mu.Unlock()
 
 		status := operationStatus.OperationState
 		if status == nil {
-			c.mu.Lock()
 			c.Err = errors.New("received nil operation state")
-			c.mu.Unlock()
 			return
 		}
 
@@ -537,9 +529,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 					errormsg := fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
 					msg = &errormsg
 				}
-				c.mu.Lock()
 				c.Err = errors.New(*msg)
-				c.mu.Unlock()
 			}
 			break
 		}
@@ -562,16 +552,11 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 
 		time.Sleep(time.Duration(c.conn.configuration.PollIntervalInMillis) * time.Millisecond)
 
-		mux.Lock()
 		if contextDone {
-			c.mu.Lock()
 			c.Err = errors.New("context was done before the query was executed")
 			c.state = _CONTEXT_DONE
-			c.mu.Unlock()
-			mux.Unlock()
 			return
 		}
-		mux.Unlock()
 	}
 	done <- nil
 }
