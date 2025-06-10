@@ -482,7 +482,7 @@ func TestSQLContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// defer db.Close()
+	defer db.Close()
 
 	tableName := getTestTableName("test_context")
 
@@ -498,11 +498,11 @@ func TestSQLContext(t *testing.T) {
 	defer cancel()
 
 	// Test context with Query
-	_, err = db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", tableName))
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", tableName))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// defer rows.Close()
+	defer rows.Close()
 
 	// Test context with Exec
 	_, err = db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (3, 'test3')", tableName))

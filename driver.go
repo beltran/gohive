@@ -101,7 +101,7 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	}
 
 	// Create configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Username = username
 	config.Password = password
 	config.Database = database
@@ -112,7 +112,7 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	}
 
 	// Connect to Hive
-	conn, err := Connect(hostname, port, auth, config)
+	conn, err := connect(hostname, port, auth, config)
 	if err != nil {
 		return nil, err
 	}
@@ -122,12 +122,12 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 
 // connector implements driver.Connector
 type connector struct {
-	conn *Connection
+	conn *connection
 }
 
 // Connect returns a connection to the database.
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
-	return &connection{conn: c.conn}, nil
+	return &sqlConnection{conn: c.conn}, nil
 }
 
 // Driver returns the underlying Driver of the Connector.
@@ -135,50 +135,50 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{}
 }
 
-// connection implements driver.Conn
-type connection struct {
-	conn   *Connection
-	cursor *Cursor // Single cursor per connection
+// sqlConnection implements driver.Conn
+type sqlConnection struct {
+	conn   *connection
+	cursor *cursor // Single cursor per connection
 	mu     sync.Mutex
 }
 
 // Prepare returns a prepared statement, bound to this connection.
-func (c *connection) Prepare(query string) (driver.Stmt, error) {
+func (c *sqlConnection) Prepare(query string) (driver.Stmt, error) {
 	return c.PrepareContext(context.Background(), query)
 }
 
 // PrepareContext returns a prepared statement, bound to this connection.
-func (c *connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	return &stmt{conn: c, query: query}, nil
 }
 
 // Close invalidates and potentially stops any current
 // prepared statements and transactions, marking this
 // connection as no longer in use.
-func (c *connection) Close() error {
+func (c *sqlConnection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.cursor != nil {
-		c.cursor.Close()
+		c.cursor.close()
 		c.cursor = nil
 	}
 	return nil
 }
 
 // Begin starts and returns a new transaction.
-func (c *connection) Begin() (driver.Tx, error) {
+func (c *sqlConnection) Begin() (driver.Tx, error) {
 	return c.BeginTx(context.Background(), driver.TxOptions{})
 }
 
 // BeginTx starts and returns a new transaction.
-func (c *connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+func (c *sqlConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	return nil, fmt.Errorf("transactions are not supported")
 }
 
 // stmt implements driver.Stmt
 type stmt struct {
-	conn  *connection
+	conn  *sqlConnection
 	query string
 }
 
@@ -221,14 +221,14 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Res
 
 	s.conn.mu.Lock()
 	if s.conn.cursor == nil {
-		s.conn.cursor = s.conn.conn.Cursor()
+		s.conn.cursor = s.conn.conn.cursor()
 	}
 	cursor := s.conn.cursor
 	s.conn.mu.Unlock()
 
-	cursor.Exec(ctx, query)
-	if cursor.Error() != nil {
-		return nil, cursor.Error()
+	cursor.exec(ctx, query)
+	if cursor.error() != nil {
+		return nil, cursor.error()
 	}
 	return &result{cursor: cursor, query: query}, nil
 }
@@ -261,21 +261,21 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Ro
 
 	s.conn.mu.Lock()
 	if s.conn.cursor == nil {
-		s.conn.cursor = s.conn.conn.Cursor()
+		s.conn.cursor = s.conn.conn.cursor()
 	}
 	cursor := s.conn.cursor
 	s.conn.mu.Unlock()
 
-	cursor.Exec(ctx, query)
-	if cursor.Error() != nil {
-		return nil, cursor.Error()
+	cursor.exec(ctx, query)
+	if cursor.error() != nil {
+		return nil, cursor.error()
 	}
 	return &rows{cursor: cursor}, nil
 }
 
 // result implements driver.Result
 type result struct {
-	cursor *Cursor
+	cursor *cursor
 	query  string
 }
 
@@ -286,8 +286,8 @@ func (r *result) LastInsertId() (int64, error) {
 	// if the query was an INSERT with an explicit ID
 	if strings.HasPrefix(strings.ToUpper(r.query), "INSERT") {
 		// Try to extract the ID from the last row
-		if r.cursor.HasMore(context.Background()) {
-			row := r.cursor.RowMap(context.Background())
+		if r.cursor.hasMore(context.Background()) {
+			row := r.cursor.rowMap(context.Background())
 			if id, ok := row["id"].(int64); ok {
 				return id, nil
 			}
@@ -302,8 +302,8 @@ func (r *result) RowsAffected() (int64, error) {
 	query := strings.ToUpper(r.query)
 	if strings.HasPrefix(query, "INSERT") || strings.HasPrefix(query, "UPDATE") || strings.HasPrefix(query, "DELETE") {
 		// Try to get the number of affected rows from the cursor
-		if r.cursor.HasMore(context.Background()) {
-			row := r.cursor.RowMap(context.Background())
+		if r.cursor.hasMore(context.Background()) {
+			row := r.cursor.rowMap(context.Background())
 			if count, ok := row["count"].(int64); ok {
 				return count, nil
 			}
@@ -314,12 +314,12 @@ func (r *result) RowsAffected() (int64, error) {
 
 // rows implements driver.Rows
 type rows struct {
-	cursor *Cursor
+	cursor *cursor
 }
 
 // Columns returns the names of the columns.
 func (r *rows) Columns() []string {
-	desc := r.cursor.Description()
+	desc := r.cursor.description()
 	columns := make([]string, len(desc))
 	for i, col := range desc {
 		columns[i] = col[0]
@@ -339,17 +339,17 @@ func (r *rows) Next(dest []driver.Value) error {
 	if r.cursor == nil {
 		return sql.ErrNoRows
 	}
-	if !r.cursor.HasMore(context.Background()) {
+	if !r.cursor.hasMore(context.Background()) {
 		return io.EOF
 	}
 
-	row := r.cursor.RowMap(context.Background())
-	if r.cursor.Error() != nil {
-		return r.cursor.Error()
+	row := r.cursor.rowMap(context.Background())
+	if r.cursor.error() != nil {
+		return r.cursor.error()
 	}
 
 	columns := r.Columns()
-	desc := r.cursor.Description()
+	desc := r.cursor.description()
 	for i := range dest {
 		colName := columns[i]
 		val := row[colName]
@@ -408,7 +408,7 @@ func (r *rows) Next(dest []driver.Value) error {
 
 // ColumnTypeScanType returns the Go type that should be used to scan values into.
 func (r *rows) ColumnTypeScanType(index int) reflect.Type {
-	desc := r.cursor.Description()
+	desc := r.cursor.description()
 	if index >= len(desc) {
 		return reflect.TypeOf(nil)
 	}
@@ -446,7 +446,7 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 
 // ColumnTypeDatabaseTypeName returns the database system type name.
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
-	desc := r.cursor.Description()
+	desc := r.cursor.description()
 	if index >= len(desc) {
 		return ""
 	}

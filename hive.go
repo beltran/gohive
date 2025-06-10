@@ -31,8 +31,8 @@ const DEFAULT_MAX_LENGTH = 16384000
 
 type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 
-// Connection holds the information for getting a cursor to hive.
-type Connection struct {
+// connection holds the information for getting a cursor to hive.
+type connection struct {
 	host                string
 	port                int
 	username            string
@@ -42,14 +42,14 @@ type Connection struct {
 	password            string
 	sessionHandle       *hiveserver.TSessionHandle
 	client              *hiveserver.TCLIServiceClient
-	configuration       *ConnectConfiguration
+	configuration       *connectConfiguration
 	transport           thrift.TTransport
 }
 
-// ConnectConfiguration is the configuration for the connection
+// connectConfiguration is the configuration for the connection
 // The fields have to be filled manually but not all of them are required
 // Depends on the auth and kind of connection.
-type ConnectConfiguration struct {
+type connectConfiguration struct {
 	Username             string
 	Principal            string
 	Password             string
@@ -71,9 +71,9 @@ type ConnectConfiguration struct {
 	MaxSize uint32
 }
 
-// NewConnectConfiguration returns a connect configuration, all with empty fields
-func NewConnectConfiguration() *ConnectConfiguration {
-	return &ConnectConfiguration{
+// newConnectConfiguration returns a connect configuration, all with empty fields
+func newConnectConfiguration() *connectConfiguration {
+	return &connectConfiguration{
 		Username:             "",
 		Password:             "",
 		Service:              "",
@@ -88,8 +88,8 @@ func NewConnectConfiguration() *ConnectConfiguration {
 	}
 }
 
-// HiveError represents an error surfaced from Hive. We attach the specific Error code along with the usual message.
-type HiveError struct {
+// hiveError represents an error surfaced from Hive. We attach the specific Error code along with the usual message.
+type hiveError struct {
 	error
 
 	// Simple error message, without the full stack trace. Surfaced from Thrift.
@@ -98,10 +98,10 @@ type HiveError struct {
 	ErrorCode int
 }
 
-// Connect to zookeper to get hive hosts and then connect to hive.
+// connectZookeeper to zookeper to get hive hosts and then connect to hive.
 // hosts is in format host1:port1,host2:port2,host3:port3 (zookeeper hosts).
-func ConnectZookeeper(hosts string, auth string,
-	configuration *ConnectConfiguration) (conn *Connection, err error) {
+func connectZookeeper(hosts string, auth string,
+	configuration *connectConfiguration) (conn *connection, err error) {
 	// consider host as zookeeper quorum
 	zkHosts := strings.Split(hosts, ",")
 	zkConn, _, err := zk.Connect(zkHosts, time.Second)
@@ -137,12 +137,11 @@ func ConnectZookeeper(hosts string, auth string,
 		return nil, errors.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
 			configuration.ZookeeperNamespace)
 	}
-
 }
 
-// Connect to hive server
-func Connect(host string, port int, auth string,
-	configuration *ConnectConfiguration) (conn *Connection, err error) {
+// connect to hive server
+func connect(host string, port int, auth string,
+	configuration *connectConfiguration) (conn *connection, err error) {
 	return innerConnect(context.TODO(), host, port, auth, configuration)
 }
 
@@ -191,7 +190,7 @@ func dial(ctx context.Context, addr string, dialFn DialContextFunc, timeout time
 }
 
 func innerConnect(ctx context.Context, host string, port int, auth string,
-	configuration *ConnectConfiguration) (conn *Connection, err error) {
+	configuration *connectConfiguration) (conn *connection, err error) {
 
 	var socket thrift.TTransport
 	addr := fmt.Sprintf("%s:%d", host, port)
@@ -234,7 +233,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	var transport thrift.TTransport
 
 	if configuration == nil {
-		configuration = NewConnectConfiguration()
+		configuration = newConnectConfiguration()
 	}
 	if configuration.Username == "" {
 		_user, err := user.Current()
@@ -356,7 +355,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	if database == "" {
 		database = "default"
 	}
-	connection := &Connection{
+	conn = &connection{
 		host:                host,
 		port:                port,
 		database:            database,
@@ -369,15 +368,15 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	}
 
 	if configuration.Database != "" {
-		cursor := connection.Cursor()
-		defer cursor.Close()
-		cursor.Exec(context.Background(), "USE "+configuration.Database)
+		cursor := conn.cursor()
+		defer cursor.close()
+		cursor.exec(context.Background(), "USE "+configuration.Database)
 		if cursor.Err != nil {
 			return nil, cursor.Err
 		}
 	}
 
-	return connection, nil
+	return conn, nil
 }
 
 type CookieDedupTransport struct {
@@ -403,7 +402,7 @@ func (d *CookieDedupTransport) RoundTrip(req *http.Request) (*http.Response, err
 	return resp, err
 }
 
-func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client, protocol string, err error) {
+func getHTTPClient(configuration *connectConfiguration) (httpClient *http.Client, protocol string, err error) {
 	if configuration.TLSConfig != nil {
 		httpClient = &http.Client{
 			Timeout: configuration.HttpTimeout,
@@ -430,47 +429,9 @@ func getHTTPClient(configuration *ConnectConfiguration) (httpClient *http.Client
 	return
 }
 
-// Cursor creates a cursor from a connection
-func (c *Connection) Cursor() *Cursor {
-	return &Cursor{
-		conn:  c,
-		queue: make([]*hiveserver.TColumn, 0),
-		id:    fmt.Sprintf("cursor_%d", time.Now().UnixNano()),
-	}
-}
-
-// Close closes a session
-func (c *Connection) Close() error {
-	closeRequest := hiveserver.NewTCloseSessionReq()
-	closeRequest.SessionHandle = c.sessionHandle
-	// This context is ignored
-	responseClose, err := c.client.CloseSession(context.Background(), closeRequest)
-
-	if c.transport != nil {
-		errTransport := c.transport.Close()
-		if errTransport != nil {
-			return errTransport
-		}
-	}
-	if err != nil {
-		return err
-	}
-	if !success(safeStatus(responseClose.GetStatus())) {
-		return errors.New("Error closing the session: " + safeStatus(responseClose.GetStatus()).String())
-	}
-	return nil
-}
-
-const _RUNNING = 0
-const _FINISHED = 1
-const _NONE = 2
-const _CONTEXT_DONE = 3
-const _ERROR = 4
-const _ASYNC_ENDED = 5
-
-// Cursor is used for fetching the rows after a query
-type Cursor struct {
-	conn            *Connection
+// cursor is used for fetching the rows after a query
+type cursor struct {
+	conn            *connection
 	operationHandle *hiveserver.TOperationHandle
 	queue           []*hiveserver.TColumn
 	response        *hiveserver.TFetchResultsResp
@@ -487,122 +448,52 @@ type Cursor struct {
 	Logs chan<- []string
 }
 
-// Exec issues a synchronous query.
-func (c *Cursor) Exec(ctx context.Context, query string) {
+// exec issues a synchronous query.
+func (c *cursor) exec(ctx context.Context, query string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Execute(ctx, query, false)
+	c.execute(ctx, query)
 }
 
-// Execute sends a query to hive for execution with a context
-func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
-	c.executeAsync(ctx, query)
-	if !async {
-		// We cannot trust in setting executeReq.RunAsync = true
-		// because if the context ends the operation can't be cancelled cleanly
-		if c.Err != nil {
-			if c.state == _CONTEXT_DONE {
-				c.handleDoneContext()
-			}
-			return
+// execute sends a query to hive for execution with a context
+func (c *cursor) execute(ctx context.Context, query string) {
+	c.executeSync(ctx, query)
+	// We cannot trust in setting executeReq.RunAsync = true
+	// because if the context ends the operation can't be cancelled cleanly
+	if c.Err != nil {
+		if c.state == _CONTEXT_DONE {
+			c.handleDoneContext()
 		}
-		c.WaitForCompletion(ctx)
-		if c.Err != nil {
-			if c.state == _CONTEXT_DONE {
-				c.handleDoneContext()
-			} else if c.state == _ERROR {
-				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
-			}
-			return
-		}
-
-		// Flush logs after execution is finished
-		if c.Logs != nil {
-			logs := c.FetchLogs()
-			if c.Error() != nil {
-				c.state = _ASYNC_ENDED
-				return
-			}
-			c.Logs <- logs
-		}
-
-		c.state = _ASYNC_ENDED
+		return
 	}
-}
 
-// WaitForCompletion waits for an async operation to finish
-func (c *Cursor) WaitForCompletion(ctx context.Context) {
-	done := make(chan interface{}, 1)
-	defer close(done)
-
-	var mux sync.Mutex
-	var contextDone bool = false
-
-	go func() {
-		select {
-		case <-done:
-		case <-ctx.Done():
-			mux.Lock()
-			contextDone = true
-			mux.Unlock()
+	if c.Err != nil {
+		if c.state == _CONTEXT_DONE {
+			c.handleDoneContext()
+		} else if c.state == _ERROR {
+			c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 		}
-	}()
-
-	for true {
-		operationStatus := c.Poll(true)
-		if c.Err != nil {
-			return
-		}
-		status := operationStatus.OperationState
-		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE || *status == hiveserver.TOperationState_PENDING_STATE)
-		if finished {
-			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
-				msg := operationStatus.TaskStatus
-				if msg == nil || *msg == "[]" {
-					msg = operationStatus.ErrorMessage
-				}
-				if s := operationStatus.Status; msg == nil && s != nil {
-					msg = s.ErrorMessage
-				}
-				if msg == nil {
-					errormsg := fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
-					msg = &errormsg
-				}
-				c.Err = errors.New(*msg)
-			}
-			break
-		}
-
-		if c.Error() != nil {
-			return
-		}
-
-		if c.Logs != nil {
-			logs := c.FetchLogs()
-			if c.Error() != nil {
-				return
-			}
-			c.Logs <- logs
-		}
-
-		time.Sleep(time.Duration(time.Duration(c.conn.configuration.PollIntervalInMillis)) * time.Millisecond)
-		mux.Lock()
-		if contextDone {
-			c.Err = errors.New("Context was done before the query was executed")
-			c.state = _CONTEXT_DONE
-			mux.Unlock()
-			return
-		}
-		mux.Unlock()
+		return
 	}
-	done <- nil
+
+	// Flush logs after execution is finished
+	if c.Logs != nil {
+		logs := c.fetchLogs()
+		if c.error() != nil {
+			c.state = _ASYNC_ENDED
+			return
+		}
+		c.Logs <- logs
+	}
+
+	c.state = _ASYNC_ENDED
 }
 
-func (c *Cursor) handleDoneContext() {
+func (c *cursor) handleDoneContext() {
 	originalError := c.Err
 	if c.operationHandle != nil {
-		c.Cancel()
+		c.cancel()
 		if c.Err != nil {
 			return
 		}
@@ -612,14 +503,14 @@ func (c *Cursor) handleDoneContext() {
 	c.state = _FINISHED
 }
 
-func (c *Cursor) executeAsync(ctx context.Context, query string) {
+func (c *cursor) executeSync(ctx context.Context, query string) {
 	c.resetState()
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
-	executeReq.RunAsync = true
+	executeReq.RunAsync = false
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
@@ -638,7 +529,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 	if !success(safeStatus(responseExecute.GetStatus())) {
 		status := safeStatus(responseExecute.GetStatus())
-		c.Err = HiveError{
+		c.Err = hiveError{
 			error:     errors.New("Error while executing query: " + status.String()),
 			Message:   status.GetErrorMessage(),
 			ErrorCode: int(status.GetErrorCode()),
@@ -652,8 +543,8 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	}
 }
 
-// Poll returns the current status of the last operation
-func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
+// poll returns the current status of the last operation
+func (c *cursor) poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
 	c.Err = nil
 	progressGet := getProgress
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
@@ -672,8 +563,8 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	return responsePoll
 }
 
-// FetchLogs returns all the Hive execution logs for the latest query up to the current point
-func (c *Cursor) FetchLogs() []string {
+// fetchLogs returns all the Hive execution logs for the latest query up to the current point
+func (c *cursor) fetchLogs() []string {
 	logRequest := hiveserver.NewTFetchResultsReq()
 	logRequest.OperationHandle = c.operationHandle
 	logRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
@@ -698,9 +589,9 @@ func (c *Cursor) FetchLogs() []string {
 	return logs
 }
 
-// Finished returns true if the last async operation has finished
-func (c *Cursor) Finished() bool {
-	operationStatus := c.Poll(true)
+// finished returns true if the last async operation has finished
+func (c *cursor) finished() bool {
+	operationStatus := c.poll(true)
 
 	if c.Err != nil {
 		return true
@@ -714,11 +605,11 @@ func success(status *hiveserver.TStatus) bool {
 	return statusCode == hiveserver.TStatusCode_SUCCESS_STATUS || statusCode == hiveserver.TStatusCode_SUCCESS_WITH_INFO_STATUS
 }
 
-func (c *Cursor) fetchIfEmpty(ctx context.Context) {
+func (c *cursor) fetchIfEmpty(ctx context.Context) {
 	c.Err = nil
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
-		if !c.HasMore(ctx) {
+		if !c.hasMore(ctx) {
 			c.Err = errors.New("No more rows are left")
 			return
 		}
@@ -728,15 +619,15 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	}
 }
 
-// RowMap returns one row as a map. Advances the cursor one
-func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
+// rowMap returns one row as a map. Advances the cursor one
+func (c *cursor) rowMap(ctx context.Context) map[string]interface{} {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
 	if c.Err != nil {
 		return nil
 	}
 
-	d := c.Description()
+	d := c.description()
 	if c.Err != nil || len(d) != len(c.queue) {
 		return nil
 	}
@@ -849,8 +740,8 @@ func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	return m
 }
 
-// FetchOne returns one row and advances the cursor one
-func (c *Cursor) FetchOne(ctx context.Context, dests ...interface{}) {
+// fetchOne returns one row and advances the cursor one
+func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
 	if c.Err != nil {
@@ -1065,10 +956,10 @@ func isNull(nulls []byte, position int) bool {
 	return false
 }
 
-// Description return a map with the names of the columns and their types
+// description return a map with the names of the columns and their types
 // must be called after a FetchResult request
 // a context should be added here but seems to be ignored by thrift
-func (c *Cursor) Description() [][]string {
+func (c *cursor) description() [][]string {
 	if c.description != nil {
 		return c.description
 	}
@@ -1097,8 +988,8 @@ func (c *Cursor) Description() [][]string {
 	return m
 }
 
-// HasMore returns whether more rows can be fetched from the server
-func (c *Cursor) HasMore(ctx context.Context) bool {
+// hasMore returns whether more rows can be fetched from the server
+func (c *cursor) hasMore(ctx context.Context) bool {
 	c.Err = nil
 	if c.response == nil && c.state != _FINISHED {
 		c.Err = c.pollUntilData(ctx, 1)
@@ -1113,11 +1004,11 @@ func (c *Cursor) HasMore(ctx context.Context) bool {
 	return c.state != _FINISHED || c.totalRows != c.columnIndex
 }
 
-func (c *Cursor) Error() error {
+func (c *cursor) error() error {
 	return c.Err
 }
 
-func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
+func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	rowsAvailable := make(chan error)
 	var stopLock sync.Mutex
 	var done = false
@@ -1184,8 +1075,8 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 	return nil
 }
 
-// Cancels the current operation
-func (c *Cursor) Cancel() {
+// cancel cancels the current operation
+func (c *cursor) cancel() {
 	c.Err = nil
 	cancelRequest := hiveserver.NewTCancelOperationReq()
 	cancelRequest.OperationHandle = c.operationHandle
@@ -1201,15 +1092,15 @@ func (c *Cursor) Cancel() {
 	return
 }
 
-// Close closes the cursor
-func (c *Cursor) Close() {
+// close closes the cursor
+func (c *cursor) close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.Err = c.resetState()
 }
 
-func (c *Cursor) resetState() error {
+func (c *cursor) resetState() error {
 	c.response = nil
 	c.Err = nil
 	c.queue = nil
@@ -1236,7 +1127,7 @@ func (c *Cursor) resetState() error {
 	return nil
 }
 
-func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error) {
+func (c *cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error) {
 	c.queue = response.Results.GetColumns()
 	c.columnIndex = 0
 	c.totalRows, err = getTotalRows(c.queue)
@@ -1288,4 +1179,21 @@ var DEFAULT_STATUS = hiveserver.TStatus{
 	SqlState:     &DEFAULT_SQL_STATE,
 	ErrorCode:    &DEFAULT_ERROR_CODE,
 	ErrorMessage: &DEFAULT_ERROR_MESSAGE,
+}
+
+// cursor creates a cursor from a connection
+func (c *connection) cursor() *cursor {
+	return &cursor{
+		conn: c,
+	}
+}
+
+// close closes a session
+func (c *connection) close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.transport != nil {
+		return c.transport.Close()
+	}
+	return nil
 }

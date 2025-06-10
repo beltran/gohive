@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"reflect"
@@ -15,21 +16,20 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"math/rand"
 )
 
 func init() {
-    rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyz")
 
 func randSeq(n int) string {
-    b := make([]rune, n)
-    for i := range b {
-        b[i] = letters[rand.Intn(len(letters))]
-    }
-    return string(b)
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 var tableId = 0
@@ -40,7 +40,7 @@ func TestConnectDefault(t *testing.T) {
 	auth := os.Getenv("AUTH")
 	ssl := os.Getenv("SSL")
 	if auth != "KERBEROS" || transport != "binary" || ssl == "1" {
-		t.Skip("not testing this combination.");
+		t.Skip("not testing this combination.")
 	}
 
 	configuration := NewConnectConfiguration()
@@ -97,14 +97,14 @@ func TestConnectDigestMd5(t *testing.T) {
 
 func TestResuseConnection(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	cursor.Exec(context.Background(), "SHOW DATABASES")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 	cursor.Close()
 
 	newCursor := connection.Cursor()
-	cursor.Execute(context.Background(), "SHOW DATABASES", false)
+	cursor.Exec(context.Background(), "SHOW DATABASES")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -170,9 +170,8 @@ func TestClosedPort(t *testing.T) {
 }
 
 func TestFetchDatabase(t *testing.T) {
-	async := false
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "SHOW DATABASES", async)
+	cursor.Exec(context.Background(), "SHOW DATABASES")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -189,20 +188,19 @@ func TestFetchDatabase(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
-	async := false
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS pokes6")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+	cursor.Exec(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
 	// Now it should fail because the table already exists
-	cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+	cursor.Exec(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)")
 	if cursor.Error() == nil {
 		t.Fatal("Error should have happened")
 	}
@@ -210,21 +208,20 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestManyFailures(t *testing.T) {
-	async := false
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS pokes6", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS pokes6")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+	cursor.Exec(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
 	for i := 0; i < 20; i++ {
 		// Now it should fail because the table already exists
-		cursor.Execute(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)", async)
+		cursor.Exec(context.Background(), "CREATE TABLE pokes6 (foo INT, bar INT)")
 		if cursor.Error() == nil {
 			t.Fatal("Error should have happened")
 		}
@@ -234,7 +231,6 @@ func TestManyFailures(t *testing.T) {
 }
 
 func TestDescription(t *testing.T) {
-	async := false
 	connection, cursor, tableName := prepareTable(t, 2, 1000)
 
 	// We come from an insert
@@ -247,7 +243,7 @@ func TestDescription(t *testing.T) {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), async)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -288,10 +284,9 @@ func TestDescription(t *testing.T) {
 }
 
 func TestDescriptionAsync(t *testing.T) {
-	async := true
 	connection, cursor, tableName := prepareTable(t, 2, 1000)
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), async)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -301,11 +296,6 @@ func TestDescriptionAsync(t *testing.T) {
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
 	}
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	cursor.WaitForCompletion(context.Background())
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -408,36 +398,34 @@ func TestSelect(t *testing.T) {
 }
 
 func TestUseDatabase(t *testing.T) {
-	async := false
-
 	connection, cursor := makeConnection(t, 1000)
 
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS db.pokes", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS db.pokes")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS db", async)
+	cursor.Exec(context.Background(), "DROP DATABASE IF EXISTS db")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "CREATE DATABASE db", async)
+	cursor.Exec(context.Background(), "CREATE DATABASE db")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "CREATE TABLE db.pokes (foo INT, bar INT)", async)
+	cursor.Exec(context.Background(), "CREATE TABLE db.pokes (foo INT, bar INT)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "USE db", async)
+	cursor.Exec(context.Background(), "USE db")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "INSERT INTO pokes VALUES(1, 1111)", async)
+	cursor.Exec(context.Background(), "INSERT INTO pokes VALUES(1, 1111)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -455,12 +443,12 @@ func TestUseDatabase(t *testing.T) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
 	}
 
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS db.pokes", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS db.pokes")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS db", async)
+	cursor.Exec(context.Background(), "DROP DATABASE IF EXISTS db")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -469,18 +457,17 @@ func TestUseDatabase(t *testing.T) {
 }
 
 func TestSetDatabaseConfig(t *testing.T) {
-	async := false
 	connection, cursor := makeConnection(t, 1000)
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS dpokes", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS dpokes")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "CREATE DATABASE IF NOT EXISTS datbas", async)
+	cursor.Exec(context.Background(), "CREATE DATABASE IF NOT EXISTS datbas")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -494,12 +481,12 @@ func TestSetDatabaseConfig(t *testing.T) {
 
 	connection, cursor = makeConnectionWithConnectConfiguration(t, configuration)
 
-	cursor.Execute(context.Background(), "CREATE TABLE datbas.dpokes (foo INT, bar INT)", async)
+	cursor.Exec(context.Background(), "CREATE TABLE datbas.dpokes (foo INT, bar INT)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "INSERT INTO dpokes VALUES(1, 1111)", async)
+	cursor.Exec(context.Background(), "INSERT INTO dpokes VALUES(1, 1111)")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -517,12 +504,12 @@ func TestSetDatabaseConfig(t *testing.T) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
 	}
 
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes", async)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS datbas.dpokes")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), "DROP DATABASE IF EXISTS datbas", async)
+	cursor.Exec(context.Background(), "DROP DATABASE IF EXISTS datbas")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -531,14 +518,13 @@ func TestSetDatabaseConfig(t *testing.T) {
 }
 
 func TestSelectNull(t *testing.T) {
-	async := false
 	connection, cursor, tableName := prepareTableSingleValue(t, 6000, 1000)
 	cursor.Exec(context.Background(), fmt.Sprintf("INSERT into %s(a) values(1);", tableName))
 	closeAll(t, connection, cursor)
 
 	connection, cursor = makeConnection(t, 199)
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), async)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -585,7 +571,7 @@ func TestSelectNull(t *testing.T) {
 
 func TestSimpleSelect(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 1, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -627,7 +613,7 @@ func TestSimpleSelectWithDialFunction(t *testing.T) {
 	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
 	tableName := createTable(t, cursor)
 	insertInTableSingleValue(t, cursor, tableName, 1)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -652,7 +638,7 @@ func TestSimpleSelectWithDialFunctionAndTimeout(t *testing.T) {
 	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
 	tableName := createTable(t, cursor)
 	insertInTableSingleValue(t, cursor, tableName, 1)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -676,7 +662,7 @@ func TestSimpleSelectWithTimeout(t *testing.T) {
 	connection, cursor := makeConnectionWithConnectConfiguration(t, configuration)
 	tableName := createTable(t, cursor)
 	insertInTableSingleValue(t, cursor, tableName, 1)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -769,8 +755,8 @@ func TestConnectTimeout(t *testing.T) {
 
 func TestSimpleSelectWithNil(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES (1, NULL) ", tableName), false)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES (1, NULL) ", tableName))
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -787,7 +773,7 @@ func TestSimpleSelectWithNil(t *testing.T) {
 
 func TestIsRow(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 1, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -825,7 +811,7 @@ func TestIsRow(t *testing.T) {
 
 func TestFetchContext(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 2, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -845,7 +831,7 @@ func TestFetchContext(t *testing.T) {
 
 func TestFetchLogs(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 2, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -874,7 +860,7 @@ func TestFetchLogsDuringExecution(t *testing.T) {
 	defer close(logs)
 
 	cursor.Logs = logs
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -888,7 +874,7 @@ func TestFetchLogsDuringExecution(t *testing.T) {
 
 func TestHiveError(t *testing.T) {
 	connection, cursor, _ := prepareTable(t, 2, 1000)
-	cursor.Execute(context.Background(), "SELECT * FROM table_doesnt_exist", false)
+	cursor.Exec(context.Background(), "SELECT * FROM table_doesnt_exist")
 	if cursor.Error() == nil {
 		t.Fatal("Querying a non-existing table should cause an error")
 	}
@@ -911,7 +897,7 @@ func TestHiveError(t *testing.T) {
 
 func TestHasMoreContext(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 2, 1)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -932,7 +918,7 @@ func TestHasMoreContext(t *testing.T) {
 
 func TestRowMap(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 2, 1)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -992,7 +978,7 @@ func TestRowMapAllTypes(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTable(t, cursor)
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1024,12 +1010,12 @@ func TestRowMapAllTypes(t *testing.T) {
 
 func TestRowMapAllTypesWithNull(t *testing.T) {
 	if os.Getenv("METASTORE_SKIP") != "1" {
-		t.Skip("skipping test because the local metastore is not working correctly.");
+		t.Skip("skipping test because the local metastore is not working correctly.")
 	}
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTableWithNull(t, cursor)
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1059,14 +1045,13 @@ func TestRowMapAllTypesWithNull(t *testing.T) {
 }
 
 func TestSmallFetchSize(t *testing.T) {
-	async := false
 	connection, cursor, tableName := prepareTable(t, 4, 2)
 
 	var i int32
 	var s string
 	var j int
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), async)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1110,7 +1095,7 @@ func TestWithContextSync(t *testing.T) {
 	for _, value := range values {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
 		defer cancel()
-		cursor.Execute(ctx, fmt.Sprintf("SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM %s a JOIN %s b", tableName, tableName), false)
+		cursor.Exec(ctx, fmt.Sprintf("SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM %s a JOIN %s b", tableName, tableName))
 		if cursor.Error() == nil {
 			t.Fatal("Error should be context has been done")
 		}
@@ -1142,7 +1127,7 @@ func TestWithContextAsync(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
 		defer cancel()
 		time.Sleep(100 * time.Millisecond)
-		cursor.Execute(ctx, fmt.Sprintf("SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM %s a JOIN %s b", tableName, tableName), true)
+		cursor.Exec(ctx, fmt.Sprintf("SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM %s a JOIN %s b", tableName, tableName))
 		if cursor.Error() != nil {
 			t.Fatal("Error shouldn't happen despite the context being done: ", cursor.Err)
 		}
@@ -1154,16 +1139,13 @@ func TestWithContextAsync(t *testing.T) {
 func TestExecute(t *testing.T) {
 	transport := os.Getenv("TRANSPORT")
 	auth := os.Getenv("AUTH")
-	if auth == "KERBEROS" && transport == "http" || true {
-		return
+	if auth == "KERBEROS" && transport == "http" {
+		t.Skip("Skipping test for KERBEROS auth with HTTP transport")
 	}
 
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	cursor.Execute(ctx, fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1176,12 +1158,12 @@ func TestExecute(t *testing.T) {
 		t.Fatal(cursor.Err)
 	}
 
-	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(2, '2')", tableName), true)
+	cursor.Exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(2, '2')", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1213,189 +1195,22 @@ func TestConsecutiveAsyncStatements(t *testing.T) {
 	async_statements := []string{fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName), "USE DEFAULT", "USE DEFAULT", fmt.Sprintf("SELECT * FROM %s", tableName), fmt.Sprintf("SELECT * FROM %s", tableName)}
 
 	for _, stm := range async_statements {
-		cursor.Execute(context.Background(), stm, true)
+		cursor.Exec(context.Background(), stm)
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
 
-		cursor.WaitForCompletion(context.Background())
-
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
 	}
-	closeAll(t, connection, cursor)
-}
-
-func TestAsync(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	start := time.Now()
-
-	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName), true)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-	stop := time.Now()
-	elapsed := stop.Sub(start)
-	if elapsed > time.Duration(time.Second*7) {
-		t.Fatal("It shouldn't have taken more than 7 seconds to run the query in async mode")
-	}
-
-	for !cursor.Finished() {
-		if cursor.Error() != nil {
-			t.Fatal(cursor.Error())
-		}
-		time.Sleep(time.Duration(100 * time.Millisecond))
-	}
-
-	if cursor.HasMore(context.Background()) {
-		t.Fatal("Shouldn't have any more rows")
-	}
-
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	var i int32
-	var s string
-	cursor.FetchOne(context.Background(), &i, &s)
-	if cursor.Err != nil {
-		t.Fatal(cursor.Err)
-	}
-
-	if cursor.HasMore(context.Background()) {
-		t.Fatal("All rows should have been read")
-	}
-
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	if i != 1 || s != "1" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-
-	closeAll(t, connection, cursor)
-}
-
-func TestWaitForCompletion(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName), true)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	cursor.WaitForCompletion(context.Background())
-
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	var i int32
-	var s string
-	cursor.FetchOne(context.Background(), &i, &s)
-	if cursor.Err != nil {
-		t.Fatal(cursor.Err)
-	}
-
-	if cursor.HasMore(context.Background()) {
-		t.Fatal("All rows should have been read")
-	}
-
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	if i != 1 || s != "1" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-
-	closeAll(t, connection, cursor)
-}
-
-func TestWaitForCompletionContext(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s d, %s e, %s f order by d.a, e.a, f.a", tableName, tableName, tableName), true)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	values := []int{0, 0, 0}
-	for _, value := range values {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(0)*time.Millisecond)
-		defer cancel()
-		time.Sleep(time.Duration(value) * time.Millisecond)
-		cursor.WaitForCompletion(ctx)
-
-		if cursor.Error() == nil {
-			t.Fatal("Context should have been done")
-		}
-	}
-
-	closeAll(t, connection, cursor)
-}
-
-func TestCancel(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	start := time.Now()
-	cursor.Execute(context.Background(),
-		fmt.Sprintf("INSERT INTO %s values(1, '1')", tableName), true)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-	stop := time.Now()
-	elapsed := stop.Sub(start)
-	if elapsed > time.Duration(time.Second*8) {
-		t.Fatal("It shouldn't have taken more than 8 seconds to run the query in async mode")
-	}
-	cursor.Cancel()
-	if cursor.Err != nil {
-		t.Fatal(cursor.Err)
-	}
-
-	for !cursor.Finished() {
-		if cursor.Error() != nil {
-			t.Fatal(cursor.Error())
-		}
-		time.Sleep(time.Duration(100 * time.Millisecond))
-	}
-
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT count(*) FROM %s", tableName), false)
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	var i int64 = 10
-	cursor.FetchOne(context.Background(), &i)
-	if cursor.Err != nil {
-		t.Fatal(cursor.Err)
-	}
-
-	if cursor.HasMore(context.Background()) {
-		t.Fatal("All rows should have been read")
-	}
-
-	if cursor.Error() != nil {
-		t.Fatal(cursor.Error())
-	}
-
-	if i != 0 {
-		t.Fatal("Table should have zero rows")
-	}
-
 	closeAll(t, connection, cursor)
 }
 
 func TestNoResult(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1413,7 +1228,7 @@ func TestNoResult(t *testing.T) {
 
 func TestHasMore(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 5, 1000)
-	cursor.Execute(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1471,7 +1286,7 @@ func TestTypesError(t *testing.T) {
 	var decimal string
 	var dummy chan<- int
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1622,7 +1437,7 @@ func TestTypes(t *testing.T) {
 	var union string
 	var decimal string
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1640,7 +1455,7 @@ func TestTypesInterface(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	prepareAllTypesTable(t, cursor)
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1694,7 +1509,7 @@ func TestTypesWithPointer(t *testing.T) {
 	var union *string = new(string)
 	var decimal *string = new(string)
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1731,7 +1546,7 @@ func TestTypesWithoutInitializedPointer(t *testing.T) {
 	var union *string
 	var decimal *string
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1771,7 +1586,7 @@ func TestTypesWithNulls(t *testing.T) {
 	var structType string
 	var decimal string
 
-	cursor.Execute(context.Background(), "SELECT * FROM all_types", false)
+	cursor.Exec(context.Background(), "SELECT * FROM all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1820,7 +1635,7 @@ func prepareAllTypesTableWithNull(t *testing.T, cursor *Cursor) {
 }
 
 func createAllTypesTable(t *testing.T, cursor *Cursor) {
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1841,14 +1656,14 @@ func createAllTypesTable(t *testing.T, cursor *Cursor) {
 		"`struct` STRUCT<a: int, b: int>," +
 		"`union` UNIONTYPE<int, string>," +
 		"`decimal` DECIMAL(10, 1))"
-	cursor.Execute(context.Background(), createAll, false)
+	cursor.Exec(context.Background(), createAll)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 }
 
 func createAllTypesTableNoUnion(t *testing.T, cursor *Cursor) {
-	cursor.Execute(context.Background(), "DROP TABLE IF EXISTS all_types", false)
+	cursor.Exec(context.Background(), "DROP TABLE IF EXISTS all_types")
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1868,7 +1683,7 @@ func createAllTypesTableNoUnion(t *testing.T, cursor *Cursor) {
 		"`map` MAP<int, int>," +
 		"`struct` STRUCT<a: int, b: int>," +
 		"`decimal` DECIMAL(10, 1))"
-	cursor.Execute(context.Background(), createAll, false)
+	cursor.Exec(context.Background(), createAll)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1891,7 +1706,7 @@ func insertAllTypesTable(t *testing.T, cursor *Cursor) {
 		named_struct('a', 1, 'b', 2),
 		create_union(0, 1, 'test_string'),
 		0.1)`
-	cursor.Execute(context.Background(), insertAll, false)
+	cursor.Exec(context.Background(), insertAll)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1899,7 +1714,7 @@ func insertAllTypesTable(t *testing.T, cursor *Cursor) {
 
 func insertAllTypesTableWithNulls(t *testing.T, cursor *Cursor) {
 	insertAll := "INSERT INTO TABLE all_types(`int`) VALUES(2147483647)"
-	cursor.Execute(context.Background(), insertAll, false)
+	cursor.Exec(context.Background(), insertAll)
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1922,14 +1737,14 @@ func prepareTableSingleValue(t *testing.T, rowsToInsert int, fetchSize int64) (*
 func createTable(t *testing.T, cursor *Cursor) string {
 	tableId++
 	tableName := fmt.Sprintf("pokes_%s%d", randName, tableId)
-	cursor.Execute(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
 	if !cursor.Finished() {
 		t.Fatal("Finished should be true")
 	}
-	cursor.Execute(context.Background(), fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (a INT, b STRING)", tableName), false)
+	cursor.Exec(context.Background(), fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (a INT, b STRING)", tableName))
 	if cursor.Error() != nil {
 		t.Fatal(cursor.Error())
 	}
@@ -1948,7 +1763,7 @@ func insertInTable(t *testing.T, cursor *Cursor, tableName string, rowsToInsert 
 				values += ","
 			}
 		}
-		cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES ", tableName)+values, false)
+		cursor.Exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES ", tableName)+values)
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
@@ -1967,7 +1782,7 @@ func insertInTableSingleValue(t *testing.T, cursor *Cursor, tableName string, ro
 				values += ","
 			}
 		}
-		cursor.Execute(context.Background(), fmt.Sprintf("INSERT INTO %s(b) VALUES ", tableName)+values, false)
+		cursor.Exec(context.Background(), fmt.Sprintf("INSERT INTO %s(b) VALUES ", tableName)+values)
 		if cursor.Error() != nil {
 			t.Fatal(cursor.Error())
 		}
