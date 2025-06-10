@@ -37,13 +37,15 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	name = strings.TrimPrefix(name, "hive://")
 
 	// Split into userinfo and host
-	parts := strings.SplitN(name, "@", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid DSN format: missing @")
+	var userinfo, host string
+	if strings.Contains(name, "@") {
+		parts := strings.SplitN(name, "@", 2)
+		userinfo = parts[0]
+		host = parts[1]
+	} else {
+		userinfo = ""
+		host = name
 	}
-
-	userinfo := parts[0]
-	host := parts[1]
 
 	// Parse userinfo - now optional
 	var username, password string
@@ -102,6 +104,11 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	config.Username = username
 	config.Password = password
 	config.Database = database
+
+	// Set service name for Kerberos authentication
+	if auth == "KERBEROS" {
+		config.Service = "hive"
+	}
 
 	// Connect to Hive
 	conn, err := Connect(hostname, port, auth, config)

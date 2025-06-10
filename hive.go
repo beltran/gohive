@@ -479,6 +479,7 @@ type Cursor struct {
 	newData         bool
 	Err             error
 	description     [][]string
+	mu              sync.Mutex // Mutex to protect shared fields
 
 	// Caller is responsible for managing this channel
 	Logs chan<- []string
@@ -490,7 +491,7 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 	defer close(done)
 
 	var mux sync.Mutex
-	var contextDone bool = false
+	var contextDone bool
 
 	go func() {
 		select {
@@ -502,13 +503,27 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		}
 	}()
 
-	for true {
+	for {
 		operationStatus := c.Poll(true)
+		c.mu.Lock()
 		if c.Err != nil {
+			c.mu.Unlock()
 			return
 		}
+		c.mu.Unlock()
+
 		status := operationStatus.OperationState
-		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE || *status == hiveserver.TOperationState_PENDING_STATE)
+		if status == nil {
+			c.mu.Lock()
+			c.Err = errors.New("received nil operation state")
+			c.mu.Unlock()
+			return
+		}
+
+		finished := !(*status == hiveserver.TOperationState_INITIALIZED_STATE ||
+			*status == hiveserver.TOperationState_RUNNING_STATE ||
+			*status == hiveserver.TOperationState_PENDING_STATE)
+
 		if finished {
 			if *operationStatus.OperationState != hiveserver.TOperationState_FINISHED_STATE {
 				msg := operationStatus.TaskStatus
@@ -522,7 +537,9 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 					errormsg := fmt.Sprintf("gohive: operation in state (%v) without task status or error message", operationStatus.OperationState)
 					msg = &errormsg
 				}
+				c.mu.Lock()
 				c.Err = errors.New(*msg)
+				c.mu.Unlock()
 			}
 			break
 		}
@@ -536,14 +553,21 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 			if c.Error() != nil {
 				return
 			}
-			c.Logs <- logs
+			select {
+			case c.Logs <- logs:
+			default:
+				// Channel is full, skip sending logs
+			}
 		}
 
-		time.Sleep(time.Duration(time.Duration(c.conn.configuration.PollIntervalInMillis)) * time.Millisecond)
+		time.Sleep(time.Duration(c.conn.configuration.PollIntervalInMillis) * time.Millisecond)
+
 		mux.Lock()
 		if contextDone {
-			c.Err = errors.New("Context was done before the query was executed")
+			c.mu.Lock()
+			c.Err = errors.New("context was done before the query was executed")
 			c.state = _CONTEXT_DONE
+			c.mu.Unlock()
 			mux.Unlock()
 			return
 		}
@@ -563,53 +587,79 @@ func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
 	if !async {
 		// We cannot trust in setting executeReq.RunAsync = true
 		// because if the context ends the operation can't be cancelled cleanly
+		c.mu.Lock()
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
+				c.mu.Unlock()
 				c.handleDoneContext()
+			} else {
+				c.mu.Unlock()
 			}
 			return
 		}
+		c.mu.Unlock()
+
 		c.WaitForCompletion(ctx)
+
+		c.mu.Lock()
 		if c.Err != nil {
 			if c.state == _CONTEXT_DONE {
+				c.mu.Unlock()
 				c.handleDoneContext()
 			} else if c.state == _ERROR {
 				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
+				c.mu.Unlock()
+			} else {
+				c.mu.Unlock()
 			}
 			return
 		}
+		c.mu.Unlock()
 
 		// Flush logs after execution is finished
 		if c.Logs != nil {
 			logs := c.FetchLogs()
 			if c.Error() != nil {
+				c.mu.Lock()
 				c.state = _ASYNC_ENDED
+				c.mu.Unlock()
 				return
 			}
 			c.Logs <- logs
 		}
 
+		c.mu.Lock()
 		c.state = _ASYNC_ENDED
+		c.mu.Unlock()
 	}
 }
 
 func (c *Cursor) handleDoneContext() {
+	c.mu.Lock()
 	originalError := c.Err
 	if c.operationHandle != nil {
+		c.mu.Unlock()
 		c.Cancel()
 		if c.Err != nil {
 			return
 		}
+	} else {
+		c.mu.Unlock()
 	}
 	c.resetState()
+	c.mu.Lock()
 	c.Err = originalError
 	c.state = _FINISHED
+	c.mu.Unlock()
 }
 
 func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	c.resetState()
 
+	c.mu.Lock()
 	c.state = _RUNNING
+	c.mu.Unlock()
+
 	executeReq := hiveserver.NewTExecuteStatementReq()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
@@ -618,6 +668,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 
+	c.mu.Lock()
 	if c.Err != nil {
 		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
 			c.state = _CONTEXT_DONE
@@ -628,6 +679,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 				c.operationHandle = responseExecute.OperationHandle
 			}
 		}
+		c.mu.Unlock()
 		return
 	}
 	if !success(safeStatus(responseExecute.GetStatus())) {
@@ -637,6 +689,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 			Message:   status.GetErrorMessage(),
 			ErrorCode: int(status.GetErrorCode()),
 		}
+		c.mu.Unlock()
 		return
 	}
 
@@ -644,11 +697,15 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	if !responseExecute.OperationHandle.HasResultSet {
 		c.state = _FINISHED
 	}
+	c.mu.Unlock()
 }
 
 // Poll returns the current status of the last operation
 func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
+	c.mu.Lock()
 	c.Err = nil
+	c.mu.Unlock()
+
 	progressGet := getProgress
 	pollRequest := hiveserver.NewTGetOperationStatusReq()
 	pollRequest.OperationHandle = c.operationHandle
@@ -656,13 +713,18 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
 	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
+
+	c.mu.Lock()
 	if c.Err != nil {
+		c.mu.Unlock()
 		return nil
 	}
 	if !success(safeStatus(responsePoll.GetStatus())) {
 		c.Err = errors.New("Error closing the operation: " + safeStatus(responsePoll.GetStatus()).String())
+		c.mu.Unlock()
 		return nil
 	}
+	c.mu.Unlock()
 	return responsePoll
 }
 

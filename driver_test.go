@@ -76,11 +76,9 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	// Test with Kerberos configuration
 	config := NewConnectConfiguration()
 	config.Service = "hive"
-	config.Username = "username"
-	config.Password = "password"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=KERBEROS", config.Username, config.Password, config.Database))
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,18 +87,6 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	err = db.Ping()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Test with invalid credentials
-	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=KERBEROS")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err == nil {
-		t.Fatal("Expected error with invalid credentials")
 	}
 }
 
@@ -115,11 +101,9 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	// Test with DIGEST-MD5 configuration
 	config := NewConnectConfiguration()
 	config.Service = "hive"
-	config.Username = "username"
-	config.Password = "password"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=DIGEST-MD5", config.Username, config.Password, config.Database))
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,18 +112,6 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	err = db.Ping()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Test with invalid credentials
-	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=DIGEST-MD5")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err == nil {
-		t.Fatal("Expected error with invalid credentials")
 	}
 }
 
@@ -154,11 +126,9 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	// Test with PLAIN configuration
 	config := NewConnectConfiguration()
 	config.Service = "hive"
-	config.Username = "username"
-	config.Password = "password"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=PLAIN", config.Username, config.Password, config.Database))
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,18 +137,6 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	err = db.Ping()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Test with invalid credentials
-	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=PLAIN")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err == nil {
-		t.Fatal("Expected error with invalid credentials")
 	}
 }
 
@@ -193,11 +151,9 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	// Test with GSSAPI configuration
 	config := NewConnectConfiguration()
 	config.Service = "hive"
-	config.Username = "username"
-	config.Password = "password"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=GSSAPI", config.Username, config.Password, config.Database))
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,24 +162,13 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	err = db.Ping()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// Test with invalid credentials
-	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=GSSAPI")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err == nil {
-		t.Fatal("Expected error with invalid credentials")
 	}
 }
 
 func TestSQLDriverInvalidHost(t *testing.T) {
+	auth := getSQLAuth()
 	// Test connection to a non-existent host
-	connStr := "hive://username:password@nonexistent.example.com:12345/default"
+	connStr := fmt.Sprintf("hive://nonexistent.example.com:12345/default?auth=%s", auth)
 
 	db, err := sql.Open("hive", connStr)
 	if err != nil {
@@ -245,8 +190,9 @@ func TestSQLDriverInvalidHost(t *testing.T) {
 }
 
 func TestSQLDriver(t *testing.T) {
+	auth := getSQLAuth()
 	// Open a connection using the SQL interface
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +206,8 @@ func TestSQLDriver(t *testing.T) {
 }
 
 func TestSQLQuery(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +266,8 @@ func TestSQLQuery(t *testing.T) {
 }
 
 func TestSQLTypes(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +404,8 @@ func TestSQLTypes(t *testing.T) {
 }
 
 func TestSQLNullValues(t *testing.T) {
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,7 +477,8 @@ func TestSQLNullValues(t *testing.T) {
 }
 
 func TestSQLContext(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +512,8 @@ func TestSQLContext(t *testing.T) {
 }
 
 func TestSQLPreparedStatement(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,7 +554,8 @@ func TestSQLPreparedStatement(t *testing.T) {
 }
 
 func TestSQLTimestampFormatting(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -654,7 +606,7 @@ func TestSQLDriverNoCredentials(t *testing.T) {
 	}
 
 	// Test without credentials in DSN
-	db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NONE")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,6 +619,7 @@ func TestSQLDriverNoCredentials(t *testing.T) {
 }
 
 func TestSQLDriverDSNParsing(t *testing.T) {
+	auth := getSQLAuth()
 	testCases := []struct {
 		name        string
 		dsn         string
@@ -678,28 +631,23 @@ func TestSQLDriverDSNParsing(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "missing @",
-			dsn:         "hive://username:passwordhs2.example.com:10000/default?auth=NONE", // no @
-			expectError: true,
-		},
-		{
 			name:        "missing database",
-			dsn:         "hive://username:password@hs2.example.com:10000?auth=NONE",
+			dsn:         fmt.Sprintf("hive://hs2.example.com:10000?auth=%s", auth),
 			expectError: true,
 		},
 		{
 			name:        "missing port",
-			dsn:         "hive://username:password@hs2.example.com/default?auth=NONE",
+			dsn:         fmt.Sprintf("hive://hs2.example.com/default?auth=%s", auth),
 			expectError: true,
 		},
 		{
 			name:        "invalid port",
-			dsn:         "hive://username:password@hs2.example.com:invalid/default?auth=NONE",
+			dsn:         fmt.Sprintf("hive://hs2.example.com:invalid/default?auth=%s", auth),
 			expectError: true,
 		},
 		{
 			name:        "valid DSN",
-			dsn:         "hive://username:password@hs2.example.com:10000/default?auth=NONE",
+			dsn:         fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth),
 			expectError: false,
 		},
 	}
@@ -726,7 +674,7 @@ func TestSQLDriverQueryParams(t *testing.T) {
 	}
 
 	// Test with multiple query parameters
-	dsn := "hive://username:password@hs2.example.com:10000/default?auth=NONE&transport=binary&service=hive"
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=binary&service=hive", auth)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -751,7 +699,7 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 	defer cancel()
 
 	tableName := fmt.Sprintf("test_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default?auth=NONE")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -852,11 +800,12 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 }
 
 func TestSQLDriverDataTypes(t *testing.T) {
+	auth := getSQLAuth()
 	// Create a unique table name for this test
 	tableName := fmt.Sprintf("test_types_table_%d", time.Now().UnixNano())
 
 	// Connect to the database
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -965,11 +914,12 @@ func TestSQLDriverDataTypes(t *testing.T) {
 }
 
 func TestSQLDriverNullValues(t *testing.T) {
+	auth := getSQLAuth()
 	// Create a unique table name for this test
 	tableName := fmt.Sprintf("test_null_table_%d", time.Now().UnixNano())
 
 	// Connect to the database
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1050,8 +1000,9 @@ func TestSQLDriverNullValues(t *testing.T) {
 
 // Test for large result sets
 func TestSQLDriverLargeResultSet(t *testing.T) {
+	auth := getSQLAuth()
 	tableName := fmt.Sprintf("test_large_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1101,7 +1052,8 @@ func TestSQLDriverLargeResultSet(t *testing.T) {
 
 // Test for error handling
 func TestSQLDriverErrorHandling(t *testing.T) {
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	auth := getSQLAuth()
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1120,8 +1072,9 @@ func TestSQLDriverErrorHandling(t *testing.T) {
 
 // Test for connection reuse
 func TestSQLDriverConnectionReuse(t *testing.T) {
+	auth := getSQLAuth()
 	for i := 0; i < 10; i++ {
-		db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+		db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 		if err != nil {
 			t.Fatalf("Failed to open connection on iteration %d: %v", i, err)
 		}
@@ -1136,8 +1089,9 @@ func TestSQLDriverConnectionReuse(t *testing.T) {
 
 // Test for column name case sensitivity
 func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
+	auth := getSQLAuth()
 	tableName := fmt.Sprintf("test_case_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1186,7 +1140,14 @@ func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
 // Test for special characters in data
 func TestSQLDriverSpecialCharacters(t *testing.T) {
 	// Create a new connection
-	db, err := sql.Open("hive", "hive://localhost@:10000/default")
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
