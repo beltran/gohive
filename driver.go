@@ -137,9 +137,8 @@ func (c *connector) Driver() driver.Driver {
 
 // sqlConnection implements driver.Conn
 type sqlConnection struct {
-	conn   *connection
-	cursor *cursor // Single cursor per connection
-	mu     sync.Mutex
+	conn *connection
+	mu   sync.Mutex
 }
 
 // Prepare returns a prepared statement, bound to this connection.
@@ -158,12 +157,7 @@ func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (drive
 func (c *sqlConnection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	if c.cursor != nil {
-		c.cursor.close()
-		c.cursor = nil
-	}
-	return nil
+	return c.conn.close()
 }
 
 // Begin starts and returns a new transaction.
@@ -220,10 +214,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Res
 	}
 
 	s.conn.mu.Lock()
-	if s.conn.cursor == nil {
-		s.conn.cursor = s.conn.conn.cursor()
-	}
-	cursor := s.conn.cursor
+	cursor := s.conn.conn.cursor()
 	s.conn.mu.Unlock()
 
 	cursor.exec(ctx, query)
@@ -260,10 +251,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Ro
 	}
 
 	s.conn.mu.Lock()
-	if s.conn.cursor == nil {
-		s.conn.cursor = s.conn.conn.cursor()
-	}
-	cursor := s.conn.cursor
+	cursor := s.conn.conn.cursor()
 	s.conn.mu.Unlock()
 
 	cursor.exec(ctx, query)
@@ -329,6 +317,9 @@ func (r *rows) Columns() []string {
 
 // Close closes the rows iterator.
 func (r *rows) Close() error {
+	if r.cursor != nil {
+		r.cursor.close()
+	}
 	return nil
 }
 

@@ -55,6 +55,7 @@ type connection struct {
 	configuration       *connectConfiguration
 	transport           thrift.TTransport
 	mu                  sync.Mutex // Mutex to protect connection operations
+	clientMu            sync.Mutex // Mutex to protect client operations
 }
 
 // connectConfiguration is the configuration for the connection
@@ -514,6 +515,7 @@ func (c *cursor) handleDoneContext() {
 	c.state = _FINISHED
 }
 
+// executeSync sends a query to hive for execution with a context
 func (c *cursor) executeSync(ctx context.Context, query string) {
 	c.resetState()
 
@@ -524,7 +526,9 @@ func (c *cursor) executeSync(ctx context.Context, query string) {
 	executeReq.RunAsync = false
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
+	c.conn.clientMu.Lock()
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
+	c.conn.clientMu.Unlock()
 
 	if c.Err != nil {
 		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
@@ -563,7 +567,9 @@ func (c *cursor) poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	pollRequest.GetProgressUpdate = &progressGet
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
+	c.conn.clientMu.Lock()
 	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
+	c.conn.clientMu.Unlock()
 	if c.Err != nil {
 		return nil
 	}
@@ -583,7 +589,9 @@ func (c *cursor) fetchLogs() []string {
 	// FetchType 1 is "logs"
 	logRequest.FetchType = 1
 
+	c.conn.clientMu.Lock()
 	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
+	c.conn.clientMu.Unlock()
 	if err != nil || resp == nil || resp.Results == nil {
 		c.Err = err
 		return nil
@@ -980,7 +988,9 @@ func (c *cursor) description() [][]string {
 
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
 	metaRequest.OperationHandle = c.operationHandle
+	c.conn.clientMu.Lock()
 	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
+	c.conn.clientMu.Unlock()
 	if err != nil {
 		c.Err = err
 		return nil
@@ -1038,7 +1048,9 @@ func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
+			c.conn.clientMu.Lock()
 			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
+			c.conn.clientMu.Unlock()
 			if err != nil {
 				rowsAvailable <- err
 				return
@@ -1093,14 +1105,15 @@ func (c *cursor) cancel() {
 	cancelRequest.OperationHandle = c.operationHandle
 	var responseCancel *hiveserver.TCancelOperationResp
 	// This context is simply ignored
+	c.conn.clientMu.Lock()
 	responseCancel, c.Err = c.conn.client.CancelOperation(context.Background(), cancelRequest)
+	c.conn.clientMu.Unlock()
 	if c.Err != nil {
 		return
 	}
 	if !success(safeStatus(responseCancel.GetStatus())) {
 		c.Err = errors.New("Error closing the operation: " + safeStatus(responseCancel.GetStatus()).String())
 	}
-	return
 }
 
 // close closes the cursor
@@ -1124,7 +1137,9 @@ func (c *cursor) resetState() error {
 		closeRequest := hiveserver.NewTCloseOperationReq()
 		closeRequest.OperationHandle = c.operationHandle
 
+		c.conn.clientMu.Lock()
 		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
+		c.conn.clientMu.Unlock()
 		c.operationHandle = nil
 		if err != nil {
 			return err
