@@ -25,11 +25,21 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-const DEFAULT_FETCH_SIZE int64 = 1000
-const ZOOKEEPER_DEFAULT_NAMESPACE = "hiveserver2"
-const DEFAULT_MAX_LENGTH = 16384000
+const defaultFetchSize int64 = 1000
+const zookeeperDefaultNamespace = "hiveserver2"
+const defaultMaxLength = 16384000
 
-type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+// Cursor states
+const (
+	_NONE = iota
+	_RUNNING
+	_FINISHED
+	_ERROR
+	_CONTEXT_DONE
+	_ASYNC_ENDED
+)
+
+type dialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // connection holds the information for getting a cursor to hive.
 type connection struct {
@@ -44,6 +54,7 @@ type connection struct {
 	client              *hiveserver.TCLIServiceClient
 	configuration       *connectConfiguration
 	transport           thrift.TTransport
+	mu                  sync.Mutex // Mutex to protect connection operations
 }
 
 // connectConfiguration is the configuration for the connection
@@ -65,7 +76,7 @@ type connectConfiguration struct {
 	ConnectTimeout       time.Duration
 	SocketTimeout        time.Duration
 	HttpTimeout          time.Duration
-	DialContext          DialContextFunc
+	DialContext          dialContextFunc
 	DisableKeepAlives    bool
 	// Maximum length of the data in bytes. Used for SASL.
 	MaxSize uint32
@@ -79,12 +90,12 @@ func newConnectConfiguration() *connectConfiguration {
 		Service:              "",
 		HiveConfiguration:    nil,
 		PollIntervalInMillis: 200,
-		FetchSize:            DEFAULT_FETCH_SIZE,
+		FetchSize:            defaultFetchSize,
 		TransportMode:        "binary",
 		HTTPPath:             "cliservice",
 		TLSConfig:            nil,
-		ZookeeperNamespace:   ZOOKEEPER_DEFAULT_NAMESPACE,
-		MaxSize:              DEFAULT_MAX_LENGTH,
+		ZookeeperNamespace:   zookeeperDefaultNamespace,
+		MaxSize:              defaultMaxLength,
 	}
 }
 
@@ -179,7 +190,7 @@ func parseHiveServer2Info(hsInfos []string) []map[string]string {
 	return results[0:actualCount]
 }
 
-func dial(ctx context.Context, addr string, dialFn DialContextFunc, timeout time.Duration) (net.Conn, error) {
+func dial(ctx context.Context, addr string, dialFn dialContextFunc, timeout time.Duration) (net.Conn, error) {
 	dctx := ctx
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -379,13 +390,13 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	return conn, nil
 }
 
-type CookieDedupTransport struct {
+type cookieDedupTransport struct {
 	http.RoundTripper
 }
 
 // RoundTrip removes duplicate cookies (cookies with the same name) from the request
 // This is a mitigation for the issue where Hive/Impala cookies get duplicated in the response
-func (d *CookieDedupTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (d *cookieDedupTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	cookieMap := map[string]string{}
 	for _, cookie := range req.Cookies() {
 		cookieMap[cookie.Name] = cookie.Value
@@ -424,7 +435,7 @@ func getHTTPClient(configuration *connectConfiguration) (httpClient *http.Client
 		protocol = "http"
 	}
 
-	httpClient.Transport = &CookieDedupTransport{httpClient.Transport}
+	httpClient.Transport = &cookieDedupTransport{httpClient.Transport}
 
 	return
 }
@@ -440,7 +451,7 @@ type cursor struct {
 	state           int
 	newData         bool
 	Err             error
-	description     [][]string
+	descriptionData [][]string
 	mu              sync.Mutex // Mutex to protect cursor operations
 	id              string     // Unique identifier for logging
 
@@ -960,8 +971,8 @@ func isNull(nulls []byte, position int) bool {
 // must be called after a FetchResult request
 // a context should be added here but seems to be ignored by thrift
 func (c *cursor) description() [][]string {
-	if c.description != nil {
-		return c.description
+	if c.descriptionData != nil {
+		return c.descriptionData
 	}
 	if c.operationHandle == nil {
 		c.Err = errors.Errorf("Description can only be called after after a Poll or after an async request")
@@ -984,7 +995,7 @@ func (c *cursor) description() [][]string {
 			m[i] = []string{column.ColumnName, typeDesc.PrimitiveEntry.Type.String()}
 		}
 	}
-	c.description = m
+	c.descriptionData = m
 	return m
 }
 
@@ -1107,7 +1118,7 @@ func (c *cursor) resetState() error {
 	c.columnIndex = 0
 	c.totalRows = 0
 	c.state = _NONE
-	c.description = nil
+	c.descriptionData = nil
 	c.newData = false
 	if c.operationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()

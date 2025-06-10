@@ -47,7 +47,7 @@ func TestSQLDriverAuthNone(t *testing.T) {
 	}
 
 	// Test with NONE configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Service = "hive"
 	config.Username = "username"
 	config.Password = "password"
@@ -74,7 +74,7 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	}
 
 	// Test with Kerberos configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Service = "hive"
 	config.Database = "default"
 
@@ -99,7 +99,7 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	}
 
 	// Test with DIGEST-MD5 configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Service = "hive"
 	config.Database = "default"
 
@@ -124,7 +124,7 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	}
 
 	// Test with PLAIN configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Service = "hive"
 	config.Database = "default"
 
@@ -149,7 +149,7 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	}
 
 	// Test with GSSAPI configuration
-	config := NewConnectConfiguration()
+	config := newConnectConfiguration()
 	config.Service = "hive"
 	config.Database = "default"
 
