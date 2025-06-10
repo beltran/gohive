@@ -2,10 +2,11 @@ package gohive
 
 import (
 	"fmt"
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/hive_metastore"
 	"os/user"
 	"strings"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/beltran/gohive/hive_metastore"
 )
 
 type HiveMetastoreClient struct {
@@ -46,7 +47,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 	if configuration.TransportMode == "binary" {
 		if auth == "KERBEROS" {
 			saslConfiguration := map[string]string{"service": "hive", "javax.security.sasl.qop": auth, "javax.security.sasl.server.authentication": "true"}
-			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, DEFAULT_MAX_LENGTH)
+			transport, err = NewTSaslTransport(socket, host, "GSSAPI", saslConfiguration, defaultMaxLength)
 			if err != nil {
 				return
 			}
@@ -63,7 +64,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 				configuration.Username = strings.Replace(_user.Name, " ", "", -1)
 			}
 			saslConfiguration := map[string]string{"username": configuration.Username, "password": configuration.Password}
-			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, DEFAULT_MAX_LENGTH)
+			transport, err = NewTSaslTransport(socket, host, "PLAIN", saslConfiguration, defaultMaxLength)
 			if err != nil {
 				return
 			}

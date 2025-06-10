@@ -12,6 +12,7 @@ branches:
   only:
   - master
   - coveralls
+  - v2
 
 addons:
   sources:
