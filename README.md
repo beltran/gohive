@@ -24,6 +24,51 @@ go get -tags kerberos github.com/beltran/gohive
 
 ## Quickstart
 
+### Using the SQL Interface
+
+GoHive now supports the standard `database/sql` interface, making it easier to use with existing Go code:
+
+```go
+import (
+    "database/sql"
+    _ "github.com/beltran/gohive"
+)
+
+// Open a connection using the SQL interface
+// Format: hive://username:password@host:port/database
+db, err := sql.Open("hive", "hive://username:password@localhost:10000/default")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+
+// Execute a query
+rows, err := db.Query("SELECT * FROM my_table LIMIT 10")
+if err != nil {
+    log.Fatal(err)
+}
+defer rows.Close()
+
+// Process results
+for rows.Next() {
+    var id int
+    var name string
+    if err := rows.Scan(&id, &name); err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("id: %d, name: %s\n", id, name)
+}
+```
+
+The SQL interface supports all the standard `database/sql` features including:
+- Prepared statements
+- Transactions (though Hive doesn't support them)
+- Connection pooling
+- Query cancellation
+- Context support
+
+### Using the Native Interface
+
 ### Connection to Hive
 
 ```go

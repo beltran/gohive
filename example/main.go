@@ -1,52 +1,71 @@
 package main
 
 import (
-	"context"
+	"database/sql"
+	"fmt"
 	"log"
 
-	"github.com/beltran/gohive"
+	_ "github.com/beltran/gohive"
 )
 
 func main() {
-	ctx := context.Background()
-	configuration := gohive.NewConnectConfiguration()
-	configuration.Service = "hive"
-	configuration.FetchSize = 1000
-	// Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-	connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
-	if errConn != nil {
-		log.Fatal(errConn)
+	// Open a connection to Hive using the new SQL interface
+	// Format: hive://username:password@host:port/database
+	db, err := sql.Open("hive", "hive://username:password@localhost:10000/default")
+	if err != nil {
+		log.Fatal(err)
 	}
-	cursor := connection.Cursor()
+	defer db.Close()
 
-	cursor.Exec(ctx, "CREATE TABLE myTable (a INT, b STRING)")
-	if cursor.Err != nil {
-		log.Fatal(cursor.Err)
+	// Test the connection
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	cursor.Exec(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
-	if cursor.Err != nil {
-		log.Fatal(cursor.Err)
+	// Execute a query
+	rows, err := db.Query("SELECT * FROM my_table LIMIT 10")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	// Get column names
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	cursor.Exec(ctx, "SELECT * FROM myTable")
-	if cursor.Err != nil {
-		log.Fatal(cursor.Err)
+	// Prepare a slice to hold the values
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range columns {
+		valuePtrs[i] = &values[i]
 	}
 
-	var i int32
-	var s string
-	for cursor.HasMore(ctx) {
-		if cursor.Err != nil {
-			log.Fatal(cursor.Err)
+	// Iterate through the rows
+	for rows.Next() {
+		err = rows.Scan(valuePtrs...)
+		if err != nil {
+			log.Fatal(err)
 		}
-		cursor.FetchOne(ctx, &i, &s)
-		if cursor.Err != nil {
-			log.Fatal(cursor.Err)
+
+		// Print the values
+		for i, col := range columns {
+			val := values[i]
+			fmt.Printf("%s: %v\n", col, val)
 		}
-		log.Println(i, s)
+		fmt.Println("---")
 	}
 
-	cursor.Close()
-	connection.Close()
+	// Check for errors from iterating over rows
+	if err = rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Execute a non-query statement
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
