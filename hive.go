@@ -435,6 +435,7 @@ func (c *Connection) Cursor() *Cursor {
 	return &Cursor{
 		conn:  c,
 		queue: make([]*hiveserver.TColumn, 0),
+		id:    fmt.Sprintf("cursor_%d", time.Now().UnixNano()),
 	}
 }
 
@@ -479,9 +480,55 @@ type Cursor struct {
 	newData         bool
 	Err             error
 	description     [][]string
+	mu              sync.Mutex // Mutex to protect cursor operations
+	id              string     // Unique identifier for logging
 
 	// Caller is responsible for managing this channel
 	Logs chan<- []string
+}
+
+// Exec issues a synchronous query.
+func (c *Cursor) Exec(ctx context.Context, query string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Execute(ctx, query, false)
+}
+
+// Execute sends a query to hive for execution with a context
+func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
+	c.executeAsync(ctx, query)
+	if !async {
+		// We cannot trust in setting executeReq.RunAsync = true
+		// because if the context ends the operation can't be cancelled cleanly
+		if c.Err != nil {
+			if c.state == _CONTEXT_DONE {
+				c.handleDoneContext()
+			}
+			return
+		}
+		c.WaitForCompletion(ctx)
+		if c.Err != nil {
+			if c.state == _CONTEXT_DONE {
+				c.handleDoneContext()
+			} else if c.state == _ERROR {
+				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
+			}
+			return
+		}
+
+		// Flush logs after execution is finished
+		if c.Logs != nil {
+			logs := c.FetchLogs()
+			if c.Error() != nil {
+				c.state = _ASYNC_ENDED
+				return
+			}
+			c.Logs <- logs
+		}
+
+		c.state = _ASYNC_ENDED
+	}
 }
 
 // WaitForCompletion waits for an async operation to finish
@@ -550,47 +597,6 @@ func (c *Cursor) WaitForCompletion(ctx context.Context) {
 		mux.Unlock()
 	}
 	done <- nil
-}
-
-// Exec issues a synchronous query.
-func (c *Cursor) Exec(ctx context.Context, query string) {
-	c.Execute(ctx, query, false)
-}
-
-// Execute sends a query to hive for execution with a context
-func (c *Cursor) Execute(ctx context.Context, query string, async bool) {
-	c.executeAsync(ctx, query)
-	if !async {
-		// We cannot trust in setting executeReq.RunAsync = true
-		// because if the context ends the operation can't be cancelled cleanly
-		if c.Err != nil {
-			if c.state == _CONTEXT_DONE {
-				c.handleDoneContext()
-			}
-			return
-		}
-		c.WaitForCompletion(ctx)
-		if c.Err != nil {
-			if c.state == _CONTEXT_DONE {
-				c.handleDoneContext()
-			} else if c.state == _ERROR {
-				c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
-			}
-			return
-		}
-
-		// Flush logs after execution is finished
-		if c.Logs != nil {
-			logs := c.FetchLogs()
-			if c.Error() != nil {
-				c.state = _ASYNC_ENDED
-				return
-			}
-			c.Logs <- logs
-		}
-
-		c.state = _ASYNC_ENDED
-	}
 }
 
 func (c *Cursor) handleDoneContext() {
@@ -1197,6 +1203,9 @@ func (c *Cursor) Cancel() {
 
 // Close closes the cursor
 func (c *Cursor) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Err = c.resetState()
 }
 
@@ -1212,14 +1221,15 @@ func (c *Cursor) resetState() error {
 	if c.operationHandle != nil {
 		closeRequest := hiveserver.NewTCloseOperationReq()
 		closeRequest.OperationHandle = c.operationHandle
-		// This context is ignored
+
 		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
 		c.operationHandle = nil
 		if err != nil {
 			return err
 		}
 		if !success(safeStatus(responseClose.GetStatus())) {
-			return errors.New("Error closing the operation: " + safeStatus(responseClose.GetStatus()).String())
+			err := errors.New("Error closing the operation: " + safeStatus(responseClose.GetStatus()).String())
+			return err
 		}
 		return nil
 	}

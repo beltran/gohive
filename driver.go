@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -136,7 +137,9 @@ func (c *connector) Driver() driver.Driver {
 
 // connection implements driver.Conn
 type connection struct {
-	conn *Connection
+	conn   *Connection
+	cursor *Cursor // Single cursor per connection
+	mu     sync.Mutex
 }
 
 // Prepare returns a prepared statement, bound to this connection.
@@ -146,14 +149,21 @@ func (c *connection) Prepare(query string) (driver.Stmt, error) {
 
 // PrepareContext returns a prepared statement, bound to this connection.
 func (c *connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	return &stmt{conn: c.conn, query: query}, nil
+	return &stmt{conn: c, query: query}, nil
 }
 
 // Close invalidates and potentially stops any current
 // prepared statements and transactions, marking this
 // connection as no longer in use.
 func (c *connection) Close() error {
-	return c.conn.Close()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.cursor != nil {
+		c.cursor.Close()
+		c.cursor = nil
+	}
+	return nil
 }
 
 // Begin starts and returns a new transaction.
@@ -168,7 +178,7 @@ func (c *connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 
 // stmt implements driver.Stmt
 type stmt struct {
-	conn  *Connection
+	conn  *connection
 	query string
 }
 
@@ -209,7 +219,13 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Res
 		}
 	}
 
-	cursor := s.conn.Cursor()
+	s.conn.mu.Lock()
+	if s.conn.cursor == nil {
+		s.conn.cursor = s.conn.conn.Cursor()
+	}
+	cursor := s.conn.cursor
+	s.conn.mu.Unlock()
+
 	cursor.Exec(ctx, query)
 	if cursor.Error() != nil {
 		return nil, cursor.Error()
@@ -243,7 +259,13 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Ro
 		}
 	}
 
-	cursor := s.conn.Cursor()
+	s.conn.mu.Lock()
+	if s.conn.cursor == nil {
+		s.conn.cursor = s.conn.conn.Cursor()
+	}
+	cursor := s.conn.cursor
+	s.conn.mu.Unlock()
+
 	cursor.Exec(ctx, query)
 	if cursor.Error() != nil {
 		return nil, cursor.Error()
@@ -307,7 +329,6 @@ func (r *rows) Columns() []string {
 
 // Close closes the rows iterator.
 func (r *rows) Close() error {
-	r.cursor.Close()
 	return nil
 }
 
