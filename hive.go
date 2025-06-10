@@ -1234,6 +1234,7 @@ func (c *Cursor) parseResults(response *hiveserver.TFetchResultsResp) (err error
 	if !c.newData {
 		c.state = _FINISHED
 	}
+
 	return
 }
 

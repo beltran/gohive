@@ -60,16 +60,109 @@ for rows.Next() {
 }
 ```
 
-The SQL interface supports all the standard `database/sql` features including:
-- Prepared statements
-- Transactions (though Hive doesn't support them)
-- Connection pooling
-- Query cancellation
-- Context support
+### Connection to the Hive Metastore
 
-### Using the Native Interface
+The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
 
-### Connection to Hive
+```go
+    configuration := gohive.NewMetastoreConnectConfiguration()
+    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
+    if err != nil {
+        log.Fatal(err)
+    }
+    database := hive_metastore.Database{
+        Name:        "my_new_database",
+        LocationUri: "/"}
+    err = connection.Client.CreateDatabase(context.Background(), &database)
+    if err != nil {
+        log.Fatal(err)
+    }
+    databases, err := connection.Client.GetAllDatabases(context.Background())
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println("databases ", databases)
+    connection.Close()
+```
+
+## Supported connections
+### Connect with Sasl kerberos:
+``` go
+import (
+    "database/sql"
+    _ "github.com/beltran/gohive"
+)
+
+// Format: hive://username:password@host:port/database?auth=KERBEROS&service=hive
+db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+This implies setting in hive-site.xml:
+- `hive.server2.authentication = KERBEROS`
+- `hive.server2.authentication.kerberos.principal = hive/_HOST@EXAMPLE.COM`
+- `hive.server2.authentication.kerberos.keytab = path/to/keytab.keytab`
+
+### Connect using Plain Sasl:
+``` go
+import (
+    "database/sql"
+    _ "github.com/beltran/gohive"
+)
+
+// Format: hive://username:password@host:port/database?auth=NONE
+db, err := sql.Open("hive", "hive://myUsername:myPassword@hs2.example.com:10000/default?auth=NONE")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+This implies setting in hive-site.xml:
+
+- `hive.server2.authentication = NONE`
+
+### Connect using No Sasl:
+``` go
+import (
+    "database/sql"
+    _ "github.com/beltran/gohive"
+)
+
+// Format: hive://username:password@host:port/database?auth=NOSASL
+db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+This implies setting in hive-site.xml:
+
+- `hive.server2.authentication = NOSASL`
+
+### Connect using Http transport mode
+Binary transport mode is supported for auth mechanisms PLAIN, KERBEROS and NOSASL. Http transport mode is supported for PLAIN and KERBEROS:
+``` go
+import (
+    "database/sql"
+    _ "github.com/beltran/gohive"
+)
+
+// Format: hive://username:password@host:port/database?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice
+db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close()
+```
+This implies setting in hive-site.xml:
+
+- `hive.server2.authentication = KERBEROS`, or `NONE`
+- `hive.server2.transport.mode = http`
+- `hive.server2.thrift.http.port = 10001`
+
+## Using the Native Interface
 
 ```go
     connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
@@ -106,82 +199,7 @@ The SQL interface supports all the standard `database/sql` features including:
 read is discarded from memory so as long as the fetch size is not too big there's no limit to how much
 data can be queried.
 
-### Connection to the Hive Metastore
-
-The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
-
-```go
-    configuration := gohive.NewMetastoreConnectConfiguration()
-    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
-    if err != nil {
-        log.Fatal(err)
-    }
-    database := hive_metastore.Database{
-        Name:        "my_new_database",
-        LocationUri: "/"}
-    err = connection.Client.CreateDatabase(context.Background(), &database)
-    if err != nil {
-        log.Fatal(err)
-    }
-    databases, err := connection.Client.GetAllDatabases(context.Background())
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println("databases ", databases)
-    connection.Close()
-```
-
-## Supported connections
-### Connect with Sasl kerberos:
-``` go
-configuration := NewConnectConfiguration()
-configuration.Service = "hive"
-// Previously kinit should have done: kinit -kt ./secret.keytab hive/hs2.example.com@EXAMPLE.COM
-connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
-```
-This implies setting in hive-site.xml:
-- `hive.server2.authentication = KERBEROS`
-- `hive.server2.authentication.kerberos.principal = hive/_HOST@EXAMPLE.COM`
-- `hive.server2.authentication.kerberos.keytab = path/to/keytab.keytab`
-
-### Connnect using Plain Sasl:
-``` go
-configuration := NewConnectConfiguration()
-// If it's not set it will be picked up from the logged user
-configuration.Username = "myUsername"
-// This may not be necessary
-configuration.Password = "myPassword"
-connection, errConn := Connect("hs2.example.com", 10000, "NONE", configuration)
-```
-This implies setting in hive-site.xml:
-
-- `hive.server2.authentication = NONE`
-
-### Connnect using No Sasl:
-``` go
-connection, errConn := Connect("hs2.example.com", 10000, "NOSASL", NewConnectConfiguration())
-```
-This implies setting in hive-site.xml:
-
-- `hive.server2.authentication = NOSASL`
-
-### Connect using Http transport mode
-Binary transport mode is supported for auth mechanisms PLAIN, KERBEROS and NOSASL. Http transport mode is supported for PLAIN and KERBEROS:
-``` go
-configuration := NewConnectConfiguration()
-configuration.HttpPath = "cliservice" // this is the default path in Hive configuration.
-configuration.TransportMode = "http"
-configuration.Service = "hive"
-
-connection, errConn := Connect("hs2.example.com", 10000, "KERBEROS", configuration)
-```
-This implies setting in hive-site.xml:
-
-- `hive.server2.authentication = KERBEROS`, or `NONE`
-- `hive.server2.transport.mode = http`
-- `hive.server2.thrift.http.port = 10001`
-
-## Zookeeper
+### Zookeeper
 A connection can be made using zookeeper:
 
 ```go
@@ -189,7 +207,7 @@ connection, errConn := ConnectZookeeper("zk1.example.com:2181,zk2.example.com:21
 ```
 The last two parameters determine how the connection to Hive will be made once the Hive hosts are retrieved from zookeeper.
 
-## NULL values
+### NULL values
 For example if a `NULL` value is in a row, the following operations would put `0` into `i`:
 ```
 var i int32

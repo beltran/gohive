@@ -7,6 +7,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -15,23 +17,231 @@ func getTestTableName(prefix string) string {
 	return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 }
 
-func TestSQLDriverBasic(t *testing.T) {
-	fmt.Println("Running SQL driver tests...")
+func getSQLAuth() string {
+	auth := os.Getenv("AUTH")
+	if auth == "" {
+		return "NONE"
+	}
+	return auth
+}
 
-	// Open a connection using the SQL interface
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+func getSQLTransport() string {
+	transport := os.Getenv("TRANSPORT")
+	if transport == "" {
+		return "binary"
+	}
+	return transport
+}
+
+func getSQLSsl() bool {
+	ssl := os.Getenv("SSL")
+	return ssl == "1"
+}
+
+func TestSQLDriverAuthNone(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with NONE configuration
+	config := NewConnectConfiguration()
+	config.Service = "hive"
+	config.Username = "username"
+	config.Password = "password"
+	config.Database = "default"
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=NONE", config.Username, config.Password, config.Database))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
-	// Test the connection
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLDriverAuthKerberos(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "KERBEROS" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with Kerberos configuration
+	config := NewConnectConfiguration()
+	config.Service = "hive"
+	config.Username = "username"
+	config.Password = "password"
+	config.Database = "default"
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=KERBEROS", config.Username, config.Password, config.Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
 	err = db.Ping()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fmt.Println("Successfully connected to Hive!")
+	// Test with invalid credentials
+	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=KERBEROS")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err == nil {
+		t.Fatal("Expected error with invalid credentials")
+	}
+}
+
+func TestSQLDriverAuthDigestMd5(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "DIGEST-MD5" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with DIGEST-MD5 configuration
+	config := NewConnectConfiguration()
+	config.Service = "hive"
+	config.Username = "username"
+	config.Password = "password"
+	config.Database = "default"
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=DIGEST-MD5", config.Username, config.Password, config.Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test with invalid credentials
+	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=DIGEST-MD5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err == nil {
+		t.Fatal("Expected error with invalid credentials")
+	}
+}
+
+func TestSQLDriverAuthPlain(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "PLAIN" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with PLAIN configuration
+	config := NewConnectConfiguration()
+	config.Service = "hive"
+	config.Username = "username"
+	config.Password = "password"
+	config.Database = "default"
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=PLAIN", config.Username, config.Password, config.Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test with invalid credentials
+	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=PLAIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err == nil {
+		t.Fatal("Expected error with invalid credentials")
+	}
+}
+
+func TestSQLDriverAuthGssapi(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "GSSAPI" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with GSSAPI configuration
+	config := NewConnectConfiguration()
+	config.Service = "hive"
+	config.Username = "username"
+	config.Password = "password"
+	config.Database = "default"
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=GSSAPI", config.Username, config.Password, config.Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test with invalid credentials
+	db, err = sql.Open("hive", "hive://invalid:invalid@hs2.example.com:10000/default?auth=GSSAPI")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err == nil {
+		t.Fatal("Expected error with invalid credentials")
+	}
+}
+
+func TestSQLDriverInvalidHost(t *testing.T) {
+	// Test connection to a non-existent host
+	connStr := "hive://username:password@nonexistent.example.com:12345/default"
+
+	db, err := sql.Open("hive", connStr)
+	if err != nil {
+		if !strings.Contains(err.Error(), "no such host") {
+			t.Errorf("Expected 'no such host' error from sql.Open, got: %v", err)
+		}
+		return
+	}
+	defer db.Close()
+
+	// Attempt to ping should fail
+	err = db.Ping()
+	if err == nil {
+		t.Fatal("Expected error when connecting to non-existent host, got nil")
+	}
+	if !strings.Contains(err.Error(), "no such host") {
+		t.Errorf("Expected 'no such host' error from db.Ping, got: %v", err)
+	}
 }
 
 func TestSQLDriver(t *testing.T) {
@@ -246,7 +456,7 @@ func TestSQLTypes(t *testing.T) {
 }
 
 func TestSQLNullValues(t *testing.T) {
-	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,11 +464,14 @@ func TestSQLNullValues(t *testing.T) {
 
 	tableName := getTestTableName("test_nulls")
 
-	// Create a table with nullable columns
+	// Create a table with various nullable columns
 	_, err = db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			id INT,
-			name STRING
+			name STRING,
+			ts TIMESTAMP,
+			dt DATE,
+			val DOUBLE
 		)
 	`, tableName))
 	if err != nil {
@@ -267,7 +480,7 @@ func TestSQLNullValues(t *testing.T) {
 	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 
 	// Insert a row with NULL values
-	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (NULL, NULL)", tableName))
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (NULL, NULL, NULL, NULL, NULL)", tableName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,19 +496,34 @@ func TestSQLNullValues(t *testing.T) {
 		t.Fatal("expected a row")
 	}
 
-	var id sql.NullInt32
-	var name sql.NullString
+	var (
+		id   sql.NullInt32
+		name sql.NullString
+		ts   sql.NullTime
+		dt   sql.NullTime
+		val  sql.NullFloat64
+	)
 
-	err = rows.Scan(&id, &name)
+	err = rows.Scan(&id, &name, &ts, &dt, &val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Verify all values are NULL
 	if id.Valid {
 		t.Error("expected id to be NULL")
 	}
 	if name.Valid {
 		t.Error("expected name to be NULL")
+	}
+	if ts.Valid {
+		t.Error("expected ts to be NULL")
+	}
+	if dt.Valid {
+		t.Error("expected dt to be NULL")
+	}
+	if val.Valid {
+		t.Error("expected val to be NULL")
 	}
 }
 
@@ -371,5 +599,660 @@ func TestSQLPreparedStatement(t *testing.T) {
 	}
 	if id != 4 || name != "test4" {
 		t.Errorf("got id=%d, name=%s, want id=4, name=test4", id, name)
+	}
+}
+
+func TestSQLTimestampFormatting(t *testing.T) {
+	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	tableName := getTestTableName("test_timestamp")
+
+	// Create a test table with a timestamp column
+	_, err = db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (id INT, ts TIMESTAMP)", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Insert a row using a prepared statement with a timestamp
+	testTime := time.Date(2024, 3, 20, 12, 34, 56, 0, time.UTC)
+	stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(1, testTime)
+	if err != nil {
+		t.Fatalf("Failed to insert timestamp: %v", err)
+	}
+
+	// Query the data back
+	var id int
+	var ts time.Time
+	err = db.QueryRow(fmt.Sprintf("SELECT * FROM %s", tableName)).Scan(&id, &ts)
+	if err != nil {
+		t.Fatalf("Failed to query timestamp: %v", err)
+	}
+
+	// Verify the timestamp was stored correctly
+	if !ts.Equal(testTime) {
+		t.Errorf("Timestamp mismatch: got %v, want %v", ts, testTime)
+	}
+}
+
+func TestSQLDriverNoCredentials(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test without credentials in DSN
+	db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NONE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLDriverDSNParsing(t *testing.T) {
+	testCases := []struct {
+		name        string
+		dsn         string
+		expectError bool
+	}{
+		{
+			name:        "missing hive:// prefix",
+			dsn:         "username:password@hs2.example.com:10000/default?auth=NONE",
+			expectError: true,
+		},
+		{
+			name:        "missing @",
+			dsn:         "hive://username:passwordhs2.example.com:10000/default?auth=NONE", // no @
+			expectError: true,
+		},
+		{
+			name:        "missing database",
+			dsn:         "hive://username:password@hs2.example.com:10000?auth=NONE",
+			expectError: true,
+		},
+		{
+			name:        "missing port",
+			dsn:         "hive://username:password@hs2.example.com/default?auth=NONE",
+			expectError: true,
+		},
+		{
+			name:        "invalid port",
+			dsn:         "hive://username:password@hs2.example.com:invalid/default?auth=NONE",
+			expectError: true,
+		},
+		{
+			name:        "valid DSN",
+			dsn:         "hive://username:password@hs2.example.com:10000/default?auth=NONE",
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := sql.Open("hive", tc.dsn)
+			if tc.expectError && err == nil {
+				t.Errorf("Expected error for DSN: %s", tc.dsn)
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("Unexpected error for DSN: %s, error: %v", tc.dsn, err)
+			}
+		})
+	}
+}
+
+func TestSQLDriverQueryParams(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	// Test with multiple query parameters
+	dsn := "hive://username:password@hs2.example.com:10000/default?auth=NONE&transport=binary&service=hive"
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLDriverDatabaseOperations(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	tableName := fmt.Sprintf("test_table_%d", time.Now().UnixNano())
+	db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default?auth=NONE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (id INT, name STRING)", tableName))
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	t.Logf("Table created: %s", tableName)
+
+	_, err = db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2')", tableName))
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	t.Logf("Data inserted into table: %s", tableName)
+
+	// Before verifying table contents, add a query to check data
+	checkRows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to check table data: %v", err)
+	}
+	defer checkRows.Close()
+
+	var rowCount int
+	if checkRows.Next() {
+		err = checkRows.Scan(&rowCount)
+		if err != nil {
+			t.Fatalf("Failed to scan count: %v", err)
+		}
+	}
+	t.Logf("Current row count in table: %d", rowCount)
+
+	// Verify table contents directly
+	verifyRows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to verify table contents: %v", err)
+	}
+	defer verifyRows.Close()
+
+	// Before iterating, log the column names
+	cols, err := verifyRows.Columns()
+	if err != nil {
+		t.Fatalf("Failed to get columns: %v", err)
+	}
+	t.Logf("Verification columns: %v", cols)
+
+	// Log the result of verifyRows.Next() before scanning
+	var verifyCount int
+	for verifyRows.Next() {
+		t.Logf("verifyRows.Next() returned true")
+		var verifyId int
+		var verifyName string
+		err = verifyRows.Scan(&verifyId, &verifyName)
+		if err != nil {
+			t.Fatalf("Failed to scan verification row: %v", err)
+		}
+		verifyCount++
+	}
+	t.Logf("verifyRows.Next() returned false (end of rows)")
+
+	if verifyCount != 2 {
+		t.Errorf("Expected 2 rows in verification, got %d", verifyCount)
+	}
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to query data: %v", err)
+	}
+	defer rows.Close()
+
+	var id int
+	var name string
+	var count int
+	for rows.Next() {
+		err = rows.Scan(&id, &name)
+		if err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("Row iteration error: %v", err)
+	}
+	t.Logf("Actual row count: %d", count)
+	if count != 2 {
+		t.Errorf("Expected 2 rows, got %d", count)
+	}
+
+	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+
+	t.Logf("Query executed for table: %s", tableName)
+}
+
+func TestSQLDriverDataTypes(t *testing.T) {
+	// Create a unique table name for this test
+	tableName := fmt.Sprintf("test_types_table_%d", time.Now().UnixNano())
+
+	// Connect to the database
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Create a table with various data types
+	createTableSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			id INT,
+			name STRING,
+			age SMALLINT,
+			height FLOAT,
+			weight DOUBLE,
+			is_active BOOLEAN,
+			created_at TIMESTAMP,
+			birth_date DATE,
+			notes VARCHAR(100),
+			data BINARY
+		)
+	`, tableName)
+
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	t.Logf("Table created: %s", tableName)
+
+	// Insert test data
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO %s VALUES
+		(1, 'John Doe', 30, 1.75, 70.5, true, '2024-03-20 10:00:00', '1990-01-01', 'Test notes', 'binary data')
+	`, tableName)
+	if _, err := db.Exec(insertSQL); err != nil {
+		t.Fatalf("Failed to insert test data: %v", err)
+	}
+
+	// Query the data back
+	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
+	rows, err := db.Query(querySQL)
+	if err != nil {
+		t.Fatalf("Failed to query data: %v", err)
+	}
+	defer rows.Close()
+
+	// Scan the row
+	if !rows.Next() {
+		t.Fatal("Expected one row but got none")
+	}
+
+	var id int
+	var name string
+	var age int16
+	var height float32
+	var weight float64
+	var isActive bool
+	var createdAt time.Time
+	var birthDate time.Time
+	var notes string
+	var data []byte
+
+	err = rows.Scan(&id, &name, &age, &height, &weight, &isActive, &createdAt, &birthDate, &notes, &data)
+	if err != nil {
+		t.Fatalf("Failed to scan row: %v", err)
+	}
+
+	// Verify the values
+	if id != 1 {
+		t.Errorf("Expected id=1, got %d", id)
+	}
+	if name != "John Doe" {
+		t.Errorf("Expected name='John Doe', got '%s'", name)
+	}
+	if age != 30 {
+		t.Errorf("Expected age=30, got %d", age)
+	}
+	if height != 1.75 {
+		t.Errorf("Expected height=1.75, got %f", height)
+	}
+	if weight != 70.5 {
+		t.Errorf("Expected weight=70.5, got %f", weight)
+	}
+	if !isActive {
+		t.Error("Expected isActive=true")
+	}
+	expectedCreatedAt, _ := time.Parse("2006-01-02 15:04:05", "2024-03-20 10:00:00")
+	if !createdAt.Equal(expectedCreatedAt) {
+		t.Errorf("Expected createdAt='2024-03-20 10:00:00', got '%v'", createdAt)
+	}
+	expectedBirthDate, _ := time.Parse("2006-01-02", "1990-01-01")
+	if !birthDate.Equal(expectedBirthDate) {
+		t.Errorf("Expected birthDate='1990-01-01', got '%v'", birthDate)
+	}
+	if notes != "Test notes" {
+		t.Errorf("Expected notes='Test notes', got '%s'", notes)
+	}
+	if string(data) != "binary data" {
+		t.Errorf("Expected data='binary data', got '%s'", string(data))
+	}
+
+	// Clean up
+	dropTableSQL := fmt.Sprintf("DROP TABLE %s", tableName)
+	_, err = db.Exec(dropTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+func TestSQLDriverNullValues(t *testing.T) {
+	// Create a unique table name for this test
+	tableName := fmt.Sprintf("test_null_table_%d", time.Now().UnixNano())
+
+	// Connect to the database
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Create a table with nullable columns
+	createTableSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			id INT,
+			name STRING,
+			value DOUBLE,
+			created_at TIMESTAMP
+		)
+	`, tableName)
+
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	t.Logf("Table created: %s", tableName)
+
+	// Insert a row with NULL values
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO %s VALUES
+		(1, NULL, NULL, NULL)
+	`, tableName)
+
+	_, err = db.Exec(insertSQL)
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+	t.Logf("Data inserted into table: %s", tableName)
+
+	// Query the data back
+	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
+	rows, err := db.Query(querySQL)
+	if err != nil {
+		t.Fatalf("Failed to query data: %v", err)
+	}
+	defer rows.Close()
+
+	// Scan the row
+	if !rows.Next() {
+		t.Fatal("Expected one row but got none")
+	}
+
+	var id int
+	var name sql.NullString
+	var value sql.NullFloat64
+	var createdAt sql.NullTime
+
+	err = rows.Scan(&id, &name, &value, &createdAt)
+	if err != nil {
+		t.Fatalf("Failed to scan row: %v", err)
+	}
+
+	// Verify the values
+	if id != 1 {
+		t.Errorf("Expected id=1, got %d", id)
+	}
+	if name.Valid {
+		t.Error("Expected name to be NULL")
+	}
+	if value.Valid {
+		t.Error("Expected value to be NULL")
+	}
+	if createdAt.Valid {
+		t.Error("Expected createdAt to be NULL")
+	}
+
+	// Clean up
+	dropTableSQL := fmt.Sprintf("DROP TABLE %s", tableName)
+	_, err = db.Exec(dropTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// Test for large result sets
+func TestSQLDriverLargeResultSet(t *testing.T) {
+	tableName := fmt.Sprintf("test_large_table_%d", time.Now().UnixNano())
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	createTableSQL := fmt.Sprintf(`CREATE TABLE %s (id INT, value STRING)`, tableName)
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	var values []string
+	for i := 0; i < 1000; i++ {
+		values = append(values, fmt.Sprintf("(%d, 'val_%d')", i, i))
+	}
+	insertSQL := fmt.Sprintf(`INSERT INTO %s VALUES %s`, tableName, strings.Join(values, ","))
+	_, err = db.Exec(insertSQL)
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to query data: %v", err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var id int
+		var value string
+		err = rows.Scan(&id, &value)
+		if err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		count++
+	}
+	if count != 1000 {
+		t.Errorf("Expected 1000 rows, got %d", count)
+	}
+
+	_, err = db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// Test for error handling
+func TestSQLDriverErrorHandling(t *testing.T) {
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("SELECT * FROM non_existent_table")
+	if err == nil {
+		t.Error("Expected error for non-existent table, got nil")
+	}
+
+	_, err = db.Exec("INVALID SQL SYNTAX")
+	if err == nil {
+		t.Error("Expected error for invalid SQL, got nil")
+	}
+}
+
+// Test for connection reuse
+func TestSQLDriverConnectionReuse(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+		if err != nil {
+			t.Fatalf("Failed to open connection on iteration %d: %v", i, err)
+		}
+		rows, err := db.Query("SELECT 1")
+		if err != nil {
+			t.Fatalf("Failed to query on iteration %d: %v", i, err)
+		}
+		rows.Close()
+		db.Close()
+	}
+}
+
+// Test for column name case sensitivity
+func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
+	tableName := fmt.Sprintf("test_case_table_%d", time.Now().UnixNano())
+	db, err := sql.Open("hive", "hive://jaume:password@localhost:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	createTableSQL := fmt.Sprintf(`CREATE TABLE %s (Id INT, Name STRING, eMail STRING)`, tableName)
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	_, err = db.Exec(fmt.Sprintf(`INSERT INTO %s VALUES (1, 'Alice', 'alice@example.com')`, tableName))
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to query data: %v", err)
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		t.Fatalf("Failed to get columns: %v", err)
+	}
+	expected := []string{tableName + ".id", tableName + ".name", tableName + ".email"}
+	for i, col := range expected {
+		if cols[i] != col {
+			t.Errorf("Expected column %s, got %s", col, cols[i])
+		}
+	}
+	rows.Next()
+	var id int
+	var name, email string
+	err = rows.Scan(&id, &name, &email)
+	if err != nil {
+		t.Fatalf("Failed to scan row: %v", err)
+	}
+	if name != "Alice" || email != "alice@example.com" {
+		t.Errorf("Expected Alice/alice@example.com, got %s/%s", name, email)
+	}
+	_, err = db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// Test for special characters in data
+func TestSQLDriverSpecialCharacters(t *testing.T) {
+	// Create a new connection
+	db, err := sql.Open("hive", "hive://localhost@:10000/default")
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test table
+	tableName := fmt.Sprintf("test_special_table_%d", time.Now().UnixNano())
+	createSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			id INT,
+			text STRING
+		)
+	`, tableName)
+	_, err = db.Exec(createSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
+
+	// Test data with special characters
+	data := []string{"こんにちは", "emoji: 😊", "quote\"test\""}
+
+	// Insert test data
+	insertSQL := "INSERT INTO " + tableName + " VALUES "
+	values := make([]string, len(data))
+	for i, text := range data {
+		values[i] = fmt.Sprintf("(%d, '%s')", i, text)
+	}
+	insertSQL += strings.Join(values, ", ")
+	t.Logf("Insert statement: %s", insertSQL)
+	if _, err := db.Exec(insertSQL); err != nil {
+		t.Fatalf("Failed to insert test data: %v", err)
+	}
+
+	// Verify the data
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("Failed to query test data: %v", err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var id *int
+		var text *string
+		if err := rows.Scan(&id, &text); err != nil {
+			t.Fatalf("Failed to scan special row: %v", err)
+		}
+		if id == nil {
+			t.Errorf("Row %d: id is nil", count)
+			continue
+		}
+		if text == nil {
+			t.Errorf("Row %d: text is nil", *id)
+			continue
+		}
+		t.Logf("Row %d: retrieved text: %q", *id, *text)
+		if *text != data[*id] {
+			t.Errorf("Expected '%s', got '%s'", data[*id], *text)
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("Error iterating rows: %v", err)
+	}
+	if count != len(data) {
+		t.Errorf("Expected %d rows, got %d", len(data), count)
 	}
 }

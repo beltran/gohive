@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"strings"
@@ -44,14 +45,16 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	userinfo := parts[0]
 	host := parts[1]
 
-	// Parse userinfo
+	// Parse userinfo - now optional
 	var username, password string
-	if strings.Contains(userinfo, ":") {
-		userParts := strings.SplitN(userinfo, ":", 2)
-		username = userParts[0]
-		password = userParts[1]
-	} else {
-		username = userinfo
+	if userinfo != "" {
+		if strings.Contains(userinfo, ":") {
+			userParts := strings.SplitN(userinfo, ":", 2)
+			username = userParts[0]
+			password = userParts[1]
+		} else {
+			username = userinfo
+		}
 	}
 
 	// Parse host and database
@@ -61,7 +64,25 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	}
 
 	hostPort := hostParts[0]
-	database := hostParts[1]
+	databaseAndParams := hostParts[1]
+
+	// Split database and query parameters
+	dbParts := strings.SplitN(databaseAndParams, "?", 2)
+	database := dbParts[0]
+
+	// Default auth to NONE if not specified
+	auth := "NONE"
+
+	// Parse query parameters if present
+	if len(dbParts) > 1 {
+		params := strings.Split(dbParts[1], "&")
+		for _, param := range params {
+			if strings.HasPrefix(param, "auth=") {
+				auth = strings.TrimPrefix(param, "auth=")
+				break
+			}
+		}
+	}
 
 	// Parse host and port
 	hostPortParts := strings.Split(hostPort, ":")
@@ -83,7 +104,7 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	config.Database = database
 
 	// Connect to Hive
-	conn, err := Connect(hostname, port, "NONE", config)
+	conn, err := Connect(hostname, port, auth, config)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +312,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		return sql.ErrNoRows
 	}
 	if !r.cursor.HasMore(context.Background()) {
-		return sql.ErrNoRows
+		return io.EOF
 	}
 
 	row := r.cursor.RowMap(context.Background())
@@ -300,6 +321,7 @@ func (r *rows) Next(dest []driver.Value) error {
 	}
 
 	columns := r.Columns()
+	desc := r.cursor.Description()
 	for i := range dest {
 		colName := columns[i]
 		val := row[colName]
@@ -310,18 +332,26 @@ func (r *rows) Next(dest []driver.Value) error {
 			continue
 		}
 
-		// Handle type conversions
+		// Use column type from description
+		var colType string
+		if i < len(desc) {
+			colType = strings.ToUpper(desc[i][1])
+		}
+
+		// Accept both TIMESTAMP and TIMESTAMP_TYPE, DATE and DATE_TYPE
+		isTimestamp := colType == "TIMESTAMP" || colType == "TIMESTAMP_TYPE"
+		isDate := colType == "DATE" || colType == "DATE_TYPE"
+
 		switch v := val.(type) {
 		case string:
-			// Try to parse as time.Time for TIMESTAMP and DATE types
-			if strings.HasSuffix(strings.ToUpper(colName), "TIMESTAMP") {
+			if isTimestamp {
 				t, err := time.Parse("2006-01-02 15:04:05", v)
 				if err == nil {
 					dest[i] = t
 					continue
 				}
 			}
-			if strings.HasSuffix(strings.ToUpper(colName), "DATE") {
+			if isDate {
 				t, err := time.Parse("2006-01-02", v)
 				if err == nil {
 					dest[i] = t
