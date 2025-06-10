@@ -10,8 +10,8 @@ import (
 
 func main() {
 	// Open a connection to Hive using the new SQL interface
-	// Format: hive://username:password@host:port/database
-	db, err := sql.Open("hive", "hive://username:password@localhost:10000/default")
+	// Format: hive://username:password@host:port/database?auth=KERBEROS&service=hive
+	db, err := sql.Open("hive", "hive://hs2.example.com:10000/default?auth=KERBEROS&service=hive")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,8 +23,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Create a test table
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Insert some test data
+	_, err = db.Exec("INSERT INTO test_table VALUES(1, 'test1'), (2, 'test2'), (3, 'test3')")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Execute a query
-	rows, err := db.Query("SELECT * FROM my_table LIMIT 10")
+	rows, err := db.Query("SELECT * FROM test_table LIMIT 10")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,12 +72,6 @@ func main() {
 
 	// Check for errors from iterating over rows
 	if err = rows.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Execute a non-query statement
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
-	if err != nil {
 		log.Fatal(err)
 	}
 }
