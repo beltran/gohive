@@ -6,13 +6,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os/user"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +18,6 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
-	"github.com/go-zookeeper/zk"
 	"github.com/pkg/errors"
 	"golang.org/x/net/publicsuffix"
 )
@@ -110,51 +107,10 @@ type hiveError struct {
 	ErrorCode int
 }
 
-// connectZookeeper to zookeper to get hive hosts and then connect to hive.
-// hosts is in format host1:port1,host2:port2,host3:port3 (zookeeper hosts).
-func connectZookeeper(hosts string, auth string,
-	configuration *connectConfiguration) (conn *connection, err error) {
-	// consider host as zookeeper quorum
-	zkHosts := strings.Split(hosts, ",")
-	zkConn, _, err := zk.Connect(zkHosts, time.Second)
-	if err != nil {
-		return nil, err
-	}
-	defer zkConn.Close()
-
-	hsInfos, _, err := zkConn.Children("/" + configuration.ZookeeperNamespace)
-	if err != nil {
-		return nil, err
-	}
-	if len(hsInfos) > 0 {
-		nodes := parseHiveServer2Info(hsInfos)
-		rand.Shuffle(len(nodes), func(i, j int) {
-			nodes[i], nodes[j] = nodes[j], nodes[i]
-		})
-		for _, node := range nodes {
-			port, err := strconv.Atoi(node["port"])
-			if err != nil {
-				continue
-			}
-			conn, err := innerConnect(context.TODO(), node["host"], port, auth, configuration)
-			if err != nil {
-				// Let's try to connect to the next one
-				continue
-			}
-			return conn, nil
-		}
-		return nil, errors.Errorf("all Hive servers of the specified Zookeeper namespace %s are unavailable",
-			configuration.ZookeeperNamespace)
-	} else {
-		return nil, errors.Errorf("no Hive server is registered in the specified Zookeeper namespace %s",
-			configuration.ZookeeperNamespace)
-	}
-}
-
 // connect to hive server
-func connect(host string, port int, auth string,
+func connect(ctx context.Context, host string, port int, auth string,
 	configuration *connectConfiguration) (conn *connection, err error) {
-	return innerConnect(context.TODO(), host, port, auth, configuration)
+	return innerConnect(ctx, host, port, auth, configuration)
 }
 
 func parseHiveServer2Info(hsInfos []string) []map[string]string {

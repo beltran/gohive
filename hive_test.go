@@ -45,20 +45,11 @@ func TestConnectDefault(t *testing.T) {
 
 	configuration := newConnectConfiguration()
 	configuration.Service = "hive"
-	connection, err := connect("hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
 	connection.close()
-}
-
-func TestConnectZookeeper(t *testing.T) {
-	configuration := newConnectConfiguration()
-	configuration.Service = "hive"
-	_, err := connectZookeeper("host1:port1,host2:port2", getAuth(), configuration)
-	if err == nil {
-		t.Fatal("error was expected")
-	}
 }
 
 func TestDomainDoesntExist(t *testing.T) {
@@ -71,7 +62,7 @@ func TestDomainDoesntExist(t *testing.T) {
 
 	configuration := newConnectConfiguration()
 	configuration.Service = "hive"
-	_, err := connect("nonexistentdomain", 10000, getAuth(), configuration)
+	_, err := connect(context.Background(), "nonexistentdomain", 10000, getAuth(), configuration)
 	if err == nil {
 		t.Fatal("Expected error because domain doesn't exist")
 	}
@@ -89,7 +80,7 @@ func TestConnectDigestMd5(t *testing.T) {
 	configuration.Service = "null"
 	configuration.Password = "pass"
 	configuration.Username = "hive"
-	_, err := connect("hs2.example.com", 10000, "DIGEST-MD5", configuration)
+	_, err := connect(context.Background(), "hs2.example.com", 10000, "DIGEST-MD5", configuration)
 	if err == nil {
 		t.Fatal("Error was expected because the server won't accept this mechanism")
 	}
@@ -127,7 +118,7 @@ func TestConnectHttp(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	connection, err := connect("hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +141,7 @@ func TestConnectSasl(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	connection, err := connect("hs2.example.com", 10000, getAuth(), configuration)
+	connection, err := connect(context.Background(), "hs2.example.com", 10000, getAuth(), configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +151,7 @@ func TestConnectSasl(t *testing.T) {
 func TestClosedPort(t *testing.T) {
 	configuration := newConnectConfiguration()
 	configuration.Service = "hive"
-	_, err := connect("hs2.example.com", 12345, getAuth(), configuration)
+	_, err := connect(context.Background(), "hs2.example.com", 12345, getAuth(), configuration)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -698,7 +689,7 @@ func TestConnectTimeoutWithDialFn(t *testing.T) {
 		configuration.HTTPPath = "cliservice"
 	}
 	start := time.Now()
-	connection, errConn := connect("hs2.example.com", port, getAuth(), configuration)
+	connection, errConn := connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)
 	elapsed := time.Since(start)
 	if errConn == nil {
 		connection.close()
@@ -736,7 +727,7 @@ func TestConnectTimeout(t *testing.T) {
 		configuration.HTTPPath = "cliservice"
 	}
 	start := time.Now()
-	connection, errConn := connect("example.com", port, getAuth(), configuration)
+	connection, errConn := connect(context.Background(), "example.com", port, getAuth(), configuration)
 	elapsed := time.Since(start)
 	if errConn == nil {
 		connection.close()
@@ -1604,26 +1595,6 @@ func TestTypesWithNulls(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestParseZookeeperHiveServer2Info(t *testing.T) {
-	children := []string{
-		"serverUri=x1.test.io:10000;version=2.3.2;sequence=0000000792",
-		"",
-		"serverUri=x2.test.io:10001;version=2.3.2;sequence=0000000794",
-		"serverUri=x3.test.io:10006;version=2.3.2;sequence=0000000791",
-		"serverUri=invalid.test.io;version=2.3.2;sequence=0000000791",
-		"invalid=invalid",
-	}
-	expected := []map[string]string{
-		map[string]string{"host": "x1.test.io", "port": "10000", "version": "2.3.2", "sequence": "0000000792"},
-		map[string]string{"host": "x2.test.io", "port": "10001", "version": "2.3.2", "sequence": "0000000794"},
-		map[string]string{"host": "x3.test.io", "port": "10006", "version": "2.3.2", "sequence": "0000000791"},
-	}
-	result := parseHiveServer2Info(children)
-	if !reflect.DeepEqual(result, expected) {
-		t.Fatalf("Expected : %+v, got: %+v", expected, result)
-	}
-}
-
 func prepareAllTypesTable(t *testing.T, cursor *cursor) {
 	createAllTypesTable(t, cursor)
 	insertAllTypesTable(t, cursor)
@@ -1819,7 +1790,7 @@ func makeConnectionWithConfiguration(t *testing.T, fetchSize int64, hiveConfigur
 		port = 10000
 		configuration.HTTPPath = "cliservice"
 	}
-	connection, errConn := connect("hs2.example.com", port, getAuth(), configuration)
+	connection, errConn := connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}
@@ -1843,7 +1814,7 @@ func makeConnectionWithConnectConfiguration(t *testing.T, configuration *connect
 		port = 10000
 		configuration.HTTPPath = "cliservice"
 	}
-	connection, errConn := connect("hs2.example.com", port, getAuth(), configuration)
+	connection, errConn := connect(context.Background(), "hs2.example.com", port, getAuth(), configuration)
 	if errConn != nil {
 		t.Fatal(errConn)
 	}

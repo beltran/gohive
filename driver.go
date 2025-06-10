@@ -112,7 +112,7 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	}
 
 	// Connect to Hive
-	conn, err := connect(hostname, port, auth, config)
+	conn, err := connect(context.Background(), hostname, port, auth, config)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +405,9 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 	}
 	// Map Hive types to Go types
 	hiveType := desc[index][1]
-	switch strings.ToUpper(hiveType) {
+	// Remove _TYPE suffix if present
+	hiveType = strings.TrimSuffix(strings.ToUpper(hiveType), "_TYPE")
+	switch hiveType {
 	case "BOOLEAN":
 		return reflect.TypeOf(false)
 	case "TINYINT":
@@ -430,6 +432,8 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 		return reflect.TypeOf(time.Time{})
 	case "BINARY":
 		return reflect.TypeOf([]byte{})
+	case "ARRAY", "MAP", "STRUCT", "UNION":
+		return reflect.TypeOf("")
 	default:
 		return reflect.TypeOf("")
 	}
@@ -441,7 +445,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	if index >= len(desc) {
 		return ""
 	}
-	return desc[index][1]
+	return strings.TrimSuffix(desc[index][1], "_TYPE")
 }
 
 func init() {

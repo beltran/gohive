@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1137,7 +1138,145 @@ func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
 	}
 }
 
-// Test for special characters in data
+func TestSQLColumnTypeScanType(t *testing.T) {
+	conn, cursor := makeConnection(t, 1000)
+	defer closeAll(t, conn, cursor)
+
+	// Create a table with all supported types
+	tableName := getTestTableName("column_type_test")
+	createTableSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			col_boolean BOOLEAN,
+			col_tinyint TINYINT,
+			col_smallint SMALLINT,
+			col_int INT,
+			col_bigint BIGINT,
+			col_float FLOAT,
+			col_double DOUBLE,
+			col_decimal DECIMAL(10,2),
+			col_string STRING,
+			col_varchar VARCHAR(50),
+			col_char CHAR(10),
+			col_timestamp TIMESTAMP,
+			col_date DATE,
+			col_binary BINARY,
+			col_array ARRAY<STRING>,
+			col_map MAP<STRING,STRING>,
+			col_struct STRUCT<f1:STRING,f2:INT>,
+			col_union UNIONTYPE<STRING,INT>
+		)`, tableName)
+
+	cursor.exec(context.Background(), createTableSQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Insert a test row
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO %s VALUES (
+			true,
+			127,
+			32767,
+			2147483647,
+			9223372036854775807,
+			3.14,
+			3.14159265359,
+			1234.56,
+			'string value',
+			'varchar value',
+			'char value',
+			'2024-03-20 12:34:56',
+			'2024-03-20',
+			'binary data',
+			array('array', 'values'),
+			map('key1', 'value1', 'key2', 'value2'),
+			named_struct('f1', 'struct value', 'f2', 42),
+			create_union(0, 'union value', 0)
+		)`, tableName)
+
+	cursor.exec(context.Background(), insertSQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Query the table
+	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
+	cursor.exec(context.Background(), querySQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Get the rows interface
+	rows := &rows{cursor: cursor}
+
+	// Test each column's scan type
+	expectedTypes := map[string]reflect.Type{
+		"col_boolean":   reflect.TypeOf(false),
+		"col_tinyint":   reflect.TypeOf(int8(0)),
+		"col_smallint":  reflect.TypeOf(int16(0)),
+		"col_int":       reflect.TypeOf(int32(0)),
+		"col_bigint":    reflect.TypeOf(int64(0)),
+		"col_float":     reflect.TypeOf(float32(0)),
+		"col_double":    reflect.TypeOf(float64(0)),
+		"col_decimal":   reflect.TypeOf(""),
+		"col_string":    reflect.TypeOf(""),
+		"col_varchar":   reflect.TypeOf(""),
+		"col_char":      reflect.TypeOf(""),
+		"col_timestamp": reflect.TypeOf(time.Time{}),
+		"col_date":      reflect.TypeOf(time.Time{}),
+		"col_binary":    reflect.TypeOf([]byte{}),
+		"col_array":     reflect.TypeOf(""),
+		"col_map":       reflect.TypeOf(""),
+		"col_struct":    reflect.TypeOf(""),
+		"col_union":     reflect.TypeOf(""),
+	}
+
+	// Get column names
+	columns := rows.Columns()
+	if len(columns) == 0 {
+		t.Fatal("No columns returned")
+	}
+
+	// Create a map of fully qualified column names to their base names
+	columnMap := make(map[string]string)
+	for _, col := range columns {
+		parts := strings.Split(col, ".")
+		if len(parts) == 2 {
+			columnMap[col] = parts[1]
+		} else {
+			columnMap[col] = col
+		}
+	}
+
+	for i, colName := range columns {
+		scanType := rows.ColumnTypeScanType(i)
+		baseName := columnMap[colName]
+		expectedType, exists := expectedTypes[baseName]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", colName)
+			continue
+		}
+
+		if scanType != expectedType {
+			t.Errorf("Column %s: expected scan type %v, got %v", colName, expectedType, scanType)
+		}
+	}
+
+	// Verify we tested all expected types
+	for expectedCol := range expectedTypes {
+		found := false
+		for _, col := range columns {
+			if columnMap[col] == expectedCol {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in result set", expectedCol)
+		}
+	}
+}
+
 func TestSQLDriverSpecialCharacters(t *testing.T) {
 	// Create a new connection
 	auth := getSQLAuth()
@@ -1215,5 +1354,236 @@ func TestSQLDriverSpecialCharacters(t *testing.T) {
 	}
 	if count != len(data) {
 		t.Errorf("Expected %d rows, got %d", len(data), count)
+	}
+}
+
+func TestSQLStmtClose(t *testing.T) {
+	// Create a new connection
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer db.Close()
+
+	// Create a prepared statement
+	stmt, err := db.Prepare("SELECT 1")
+	if err != nil {
+		t.Fatalf("Failed to prepare statement: %v", err)
+	}
+
+	// Close the statement
+	err = stmt.Close()
+	if err != nil {
+		t.Fatalf("Failed to close statement: %v", err)
+	}
+
+	// Try to use the closed statement
+	_, err = stmt.Query()
+	if err == nil {
+		t.Fatal("Expected error when using closed statement")
+	}
+}
+
+func TestSQLColumnTypeDatabaseTypeName(t *testing.T) {
+	conn, cursor := makeConnection(t, 1000)
+	defer closeAll(t, conn, cursor)
+
+	// Create a table with all supported types
+	tableName := getTestTableName("column_type_test")
+	createTableSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			col_boolean BOOLEAN,
+			col_tinyint TINYINT,
+			col_smallint SMALLINT,
+			col_int INT,
+			col_bigint BIGINT,
+			col_float FLOAT,
+			col_double DOUBLE,
+			col_decimal DECIMAL(10,2),
+			col_string STRING,
+			col_varchar VARCHAR(50),
+			col_char CHAR(10),
+			col_timestamp TIMESTAMP,
+			col_date DATE,
+			col_binary BINARY,
+			col_array ARRAY<STRING>,
+			col_map MAP<STRING,STRING>,
+			col_struct STRUCT<f1:STRING,f2:INT>,
+			col_union UNIONTYPE<STRING,INT>
+		)`, tableName)
+
+	cursor.exec(context.Background(), createTableSQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Insert a test row
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO %s VALUES (
+			true,
+			127,
+			32767,
+			2147483647,
+			9223372036854775807,
+			3.14,
+			3.14159265359,
+			1234.56,
+			'string value',
+			'varchar value',
+			'char value',
+			'2024-03-20 12:34:56',
+			'2024-03-20',
+			'binary data',
+			array('array', 'values'),
+			map('key1', 'value1', 'key2', 'value2'),
+			named_struct('f1', 'struct value', 'f2', 42),
+			create_union(0, 'union value', 0)
+		)`, tableName)
+
+	cursor.exec(context.Background(), insertSQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Query the table
+	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
+	cursor.exec(context.Background(), querySQL)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Get the rows interface
+	rows := &rows{cursor: cursor}
+
+	// Test each column's database type name
+	expectedTypes := map[string]string{
+		"col_boolean":   "BOOLEAN",
+		"col_tinyint":   "TINYINT",
+		"col_smallint":  "SMALLINT",
+		"col_int":       "INT",
+		"col_bigint":    "BIGINT",
+		"col_float":     "FLOAT",
+		"col_double":    "DOUBLE",
+		"col_decimal":   "DECIMAL",
+		"col_string":    "STRING",
+		"col_varchar":   "VARCHAR",
+		"col_char":      "CHAR",
+		"col_timestamp": "TIMESTAMP",
+		"col_date":      "DATE",
+		"col_binary":    "BINARY",
+		"col_array":     "ARRAY",
+		"col_map":       "MAP",
+		"col_struct":    "STRUCT",
+		"col_union":     "UNION",
+	}
+
+	// Get column names
+	columns := rows.Columns()
+	if len(columns) == 0 {
+		t.Fatal("No columns returned")
+	}
+
+	// Create a map of fully qualified column names to their base names
+	columnMap := make(map[string]string)
+	for _, col := range columns {
+		parts := strings.Split(col, ".")
+		if len(parts) == 2 {
+			columnMap[col] = parts[1]
+		} else {
+			columnMap[col] = col
+		}
+	}
+
+	for i, colName := range columns {
+		dbType := rows.ColumnTypeDatabaseTypeName(i)
+		baseName := columnMap[colName]
+		expectedType, exists := expectedTypes[baseName]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", colName)
+			continue
+		}
+
+		if dbType != expectedType {
+			t.Errorf("Column %s: expected database type %s, got %s", colName, expectedType, dbType)
+		}
+	}
+
+	// Verify we tested all expected types
+	for expectedCol := range expectedTypes {
+		found := false
+		for _, col := range columns {
+			if columnMap[col] == expectedCol {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected column %s not found in result set", expectedCol)
+		}
+	}
+}
+
+func TestSQLResultMethods(t *testing.T) {
+	// Create a new connection
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	if auth != "NONE" || transport != "binary" || ssl {
+		t.Skip("not testing this combination")
+	}
+
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test table with an ID column
+	tableName := fmt.Sprintf("test_result_table_%d", time.Now().UnixNano())
+	createSQL := fmt.Sprintf(`
+		CREATE TABLE %s (
+			id INT,
+			value STRING
+		)
+	`, tableName)
+	_, err = db.Exec(createSQL)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
+
+	// Test LastInsertId
+	insertSQL := fmt.Sprintf("INSERT INTO %s VALUES (1, 'test')", tableName)
+	result, err := db.Exec(insertSQL)
+	if err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	lastID, err := result.LastInsertId()
+	if err == nil {
+		t.Logf("LastInsertId returned: %d", lastID)
+	} else {
+		t.Logf("LastInsertId error (expected): %v", err)
+	}
+
+	// Test RowsAffected
+	updateSQL := fmt.Sprintf("UPDATE %s SET value = 'updated' WHERE id = 1", tableName)
+	result, err = db.Exec(updateSQL)
+	if err != nil {
+		t.Fatalf("Failed to update: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		t.Logf("RowsAffected returned: %d", rowsAffected)
+	} else {
+		t.Logf("RowsAffected error (expected): %v", err)
 	}
 }
