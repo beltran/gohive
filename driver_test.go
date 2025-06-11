@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -39,6 +38,30 @@ func getSQLSsl() bool {
 	return ssl == "1"
 }
 
+// buildDSN constructs a DSN string with the given parameters
+func buildDSN(host string, port int, database string, auth string, transport string, ssl bool, insecureSkipVerify bool) string {
+	dsn := fmt.Sprintf("hive://%s:%d/%s?auth=%s&transport=%s", host, port, database, auth, transport)
+	if ssl {
+		dsn += "&sslcert=client.cer.pem&sslkey=client.cer.key"
+		if insecureSkipVerify {
+			dsn += "&sslinsecureskipverify=true"
+		}
+	}
+	return dsn
+}
+
+// buildDSNWithCredentials constructs a DSN string with username and password
+func buildDSNWithCredentials(username, password, host string, port int, database string, auth string, transport string, ssl bool, insecureSkipVerify bool) string {
+	dsn := fmt.Sprintf("hive://%s:%s@%s:%d/%s?auth=%s&transport=%s", username, password, host, port, database, auth, transport)
+	if ssl {
+		dsn += "&sslcert=client.cer.pem&sslkey=client.cer.key"
+		if insecureSkipVerify {
+			dsn += "&sslinsecureskipverify=true"
+		}
+	}
+	return dsn
+}
+
 func TestSQLDriverAuthNone(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
@@ -54,10 +77,7 @@ func TestSQLDriverAuthNone(t *testing.T) {
 	config.Password = "password"
 	config.Database = "default"
 
-	dsn := fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=NONE&transport=%s", config.Username, config.Password, config.Database, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSNWithCredentials(config.Username, config.Password, "hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -83,10 +103,7 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -112,10 +129,7 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -141,10 +155,7 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -170,10 +181,7 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -191,10 +199,7 @@ func TestSQLDriverInvalidHost(t *testing.T) {
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
 	// Test connection to a non-existent host
-	dsn := fmt.Sprintf("hive://nonexistent.example.com:12345/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("nonexistent.example.com", 12345, "default", auth, transport, ssl, true)
 
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
@@ -220,10 +225,7 @@ func TestSQLDriver(t *testing.T) {
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
 	// Open a connection using the SQL interface
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -241,10 +243,7 @@ func TestSQLQuery(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -307,10 +306,7 @@ func TestSQLTypes(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -451,10 +447,7 @@ func TestSQLNullValues(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -530,10 +523,7 @@ func TestSQLContext(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -571,10 +561,7 @@ func TestSQLPreparedStatement(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -619,10 +606,7 @@ func TestSQLTimestampFormatting(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -673,7 +657,7 @@ func TestSQLDriverNoCredentials(t *testing.T) {
 	}
 
 	// Test without credentials in DSN
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport))
+	db, err := sql.Open("hive", buildDSN("hs2.example.com", 10000, "default", auth, transport, true, true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -714,7 +698,7 @@ func TestSQLDriverDSNParsing(t *testing.T) {
 		},
 		{
 			name:        "valid DSN",
-			dsn:         fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth),
+			dsn:         buildDSN("hs2.example.com", 10000, "default", auth, "binary", true, true),
 			expectError: false,
 		},
 	}
@@ -737,7 +721,7 @@ func TestSQLDriverQueryParams(t *testing.T) {
 	transport := getSQLTransport()
 
 	// Test with multiple query parameters
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s&service=hive", auth, transport)
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, true, true) + "&service=hive"
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -759,10 +743,7 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 	defer cancel()
 
 	tableName := fmt.Sprintf("test_table_%d", time.Now().UnixNano())
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -871,10 +852,7 @@ func TestSQLDriverDataTypes(t *testing.T) {
 	tableName := fmt.Sprintf("test_types_table_%d", time.Now().UnixNano())
 
 	// Connect to the database
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
@@ -905,791 +883,118 @@ func TestSQLDriverDataTypes(t *testing.T) {
 
 	// Insert test data
 	insertSQL := fmt.Sprintf(`
-		INSERT INTO %s VALUES
-		(1, 'John Doe', 30, 1.75, 70.5, true, '2024-03-20 10:00:00', '1990-01-01', 'Test notes', 'binary data')
-	`, tableName)
-	if _, err := db.Exec(insertSQL); err != nil {
-		t.Fatalf("Failed to insert test data: %v", err)
-	}
-
-	// Query the data back
-	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
-	rows, err := db.Query(querySQL)
-	if err != nil {
-		t.Fatalf("Failed to query data: %v", err)
-	}
-	defer rows.Close()
-
-	// Scan the row
-	if !rows.Next() {
-		t.Fatal("Expected one row but got none")
-	}
-
-	var id int
-	var name string
-	var age int16
-	var height float32
-	var weight float64
-	var isActive bool
-	var createdAt time.Time
-	var birthDate time.Time
-	var notes string
-	var data []byte
-
-	err = rows.Scan(&id, &name, &age, &height, &weight, &isActive, &createdAt, &birthDate, &notes, &data)
-	if err != nil {
-		t.Fatalf("Failed to scan row: %v", err)
-	}
-
-	// Verify the values
-	if id != 1 {
-		t.Errorf("Expected id=1, got %d", id)
-	}
-	if name != "John Doe" {
-		t.Errorf("Expected name='John Doe', got '%s'", name)
-	}
-	if age != 30 {
-		t.Errorf("Expected age=30, got %d", age)
-	}
-	if height != 1.75 {
-		t.Errorf("Expected height=1.75, got %f", height)
-	}
-	if weight != 70.5 {
-		t.Errorf("Expected weight=70.5, got %f", weight)
-	}
-	if !isActive {
-		t.Error("Expected isActive=true")
-	}
-	expectedCreatedAt, _ := time.Parse("2006-01-02 15:04:05", "2024-03-20 10:00:00")
-	if !createdAt.Equal(expectedCreatedAt) {
-		t.Errorf("Expected createdAt='2024-03-20 10:00:00', got '%v'", createdAt)
-	}
-	expectedBirthDate, _ := time.Parse("2006-01-02", "1990-01-01")
-	if !birthDate.Equal(expectedBirthDate) {
-		t.Errorf("Expected birthDate='1990-01-01', got '%v'", birthDate)
-	}
-	if notes != "Test notes" {
-		t.Errorf("Expected notes='Test notes', got '%s'", notes)
-	}
-	if string(data) != "binary data" {
-		t.Errorf("Expected data='binary data', got '%s'", string(data))
-	}
-
-	// Clean up
-	dropTableSQL := fmt.Sprintf("DROP TABLE %s", tableName)
-	_, err = db.Exec(dropTableSQL)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
-}
-
-func TestSQLDriverNullValues(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	// Create a unique table name for this test
-	tableName := fmt.Sprintf("test_null_table_%d", time.Now().UnixNano())
-
-	// Connect to the database
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// Create a table with nullable columns
-	createTableSQL := fmt.Sprintf(`
-		CREATE TABLE %s (
-			id INT,
-			name STRING,
-			value DOUBLE,
-			created_at TIMESTAMP
+		INSERT INTO %s VALUES (
+			%d,
+			'%s',
+			%d,
+			%f,
+			%f,
+			%t,
+			'%s',
+			'%s',
+			'%s',
+			'%s'
 		)
-	`, tableName)
-
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-	t.Logf("Table created: %s", tableName)
-
-	// Insert a row with NULL values
-	insertSQL := fmt.Sprintf(`
-		INSERT INTO %s VALUES
-		(1, NULL, NULL, NULL)
-	`, tableName)
+	`, tableName, 1, "John Doe", 30, 1.75, 75.5, true, time.Now().Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02"), "Software Engineer", "example@example.com")
 
 	_, err = db.Exec(insertSQL)
 	if err != nil {
 		t.Fatalf("Failed to insert data: %v", err)
 	}
-	t.Logf("Data inserted into table: %s", tableName)
 
-	// Query the data back
-	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
-	rows, err := db.Query(querySQL)
+	// Query and verify the data
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
 	if err != nil {
-		t.Fatalf("Failed to query data: %v", err)
+		t.Fatal(err)
 	}
 	defer rows.Close()
 
-	// Scan the row
 	if !rows.Next() {
-		t.Fatal("Expected one row but got none")
+		t.Fatal("expected a row")
 	}
 
-	var id int
-	var name sql.NullString
-	var value sql.NullFloat64
-	var createdAt sql.NullTime
+	var (
+		colId        int
+		colName      string
+		colAge       int16
+		colHeight    float32
+		colWeight    float64
+		colIsActive  bool
+		colCreatedAt time.Time
+		colBirthDate time.Time
+		colNotes     string
+		colData      []byte
+	)
 
-	err = rows.Scan(&id, &name, &value, &createdAt)
+	err = rows.Scan(&colId, &colName, &colAge, &colHeight, &colWeight, &colIsActive, &colCreatedAt, &colBirthDate, &colNotes, &colData)
 	if err != nil {
-		t.Fatalf("Failed to scan row: %v", err)
+		t.Fatal(err)
 	}
 
 	// Verify the values
-	if id != 1 {
-		t.Errorf("Expected id=1, got %d", id)
+	if colId != 1 {
+		t.Errorf("got col_id=%d, want 1", colId)
 	}
-	if name.Valid {
-		t.Error("Expected name to be NULL")
+	if colName != "John Doe" {
+		t.Errorf("got col_name=%s, want John Doe", colName)
 	}
-	if value.Valid {
-		t.Error("Expected value to be NULL")
+	if colAge != 30 {
+		t.Errorf("got col_age=%d, want 30", colAge)
 	}
-	if createdAt.Valid {
-		t.Error("Expected createdAt to be NULL")
+	if colHeight != 1.75 {
+		t.Errorf("got col_height=%f, want 1.75", colHeight)
 	}
-
-	// Clean up
-	dropTableSQL := fmt.Sprintf("DROP TABLE %s", tableName)
-	_, err = db.Exec(dropTableSQL)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
+	if colWeight != 75.5 {
+		t.Errorf("got col_weight=%f, want 75.5", colWeight)
+	}
+	if !colIsActive {
+		t.Error("expected col_is_active to be true")
+	}
+	if !colCreatedAt.Equal(time.Now()) {
+		t.Errorf("got col_created_at=%v, want %v", colCreatedAt, time.Now())
+	}
+	if !colBirthDate.Equal(time.Now()) {
+		t.Errorf("got col_birth_date=%v, want %v", colBirthDate, time.Now())
+	}
+	if colNotes != "Software Engineer" {
+		t.Errorf("got col_notes=%s, want Software Engineer", colNotes)
+	}
+	if string(colData) != "example@example.com" {
+		t.Errorf("got col_data=%s, want example@example.com", string(colData))
 	}
 }
 
-// Test for large result sets
-func TestSQLDriverLargeResultSet(t *testing.T) {
+func TestSQLDriverInsecureSkipVerify(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	tableName := fmt.Sprintf("test_large_table_%d", time.Now().UnixNano())
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	if !ssl {
+		t.Skip("SSL not enabled for testing")
 	}
+
+	// Test with sslinsecureskipverify=true
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
+		t.Fatal(err)
 	}
 	defer db.Close()
 
-	createTableSQL := fmt.Sprintf(`CREATE TABLE %s (id INT, value STRING)`, tableName)
-	_, err = db.Exec(createTableSQL)
+	err = db.Ping()
 	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
+		t.Fatal(err)
 	}
 
-	var values []string
-	for i := 0; i < 1000; i++ {
-		values = append(values, fmt.Sprintf("(%d, 'val_%d')", i, i))
-	}
-	insertSQL := fmt.Sprintf(`INSERT INTO %s VALUES %s`, tableName, strings.Join(values, ","))
-	_, err = db.Exec(insertSQL)
+	// Test with sslinsecureskipverify=false
+	dsn = buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, false)
+	db, err = sql.Open("hive", dsn)
 	if err != nil {
-		t.Fatalf("Failed to insert data: %v", err)
-	}
-
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to query data: %v", err)
-	}
-	defer rows.Close()
-
-	count := 0
-	for rows.Next() {
-		var id int
-		var value string
-		err = rows.Scan(&id, &value)
-		if err != nil {
-			t.Fatalf("Failed to scan row: %v", err)
-		}
-		count++
-	}
-	if count != 1000 {
-		t.Errorf("Expected 1000 rows, got %d", count)
-	}
-
-	_, err = db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
-}
-
-// Test for error handling
-func TestSQLDriverErrorHandling(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
+		t.Fatal(err)
 	}
 	defer db.Close()
 
-	_, err = db.Exec("SELECT * FROM non_existent_table")
-	if err == nil {
-		t.Error("Expected error for non-existent table, got nil")
-	}
-
-	_, err = db.Exec("INVALID SQL SYNTAX")
-	if err == nil {
-		t.Error("Expected error for invalid SQL, got nil")
-	}
-}
-
-// Test for connection reuse
-func TestSQLDriverConnectionReuse(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	for i := 0; i < 10; i++ {
-		dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-		if ssl {
-			dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-		}
-		db, err := sql.Open("hive", dsn)
-		if err != nil {
-			t.Fatalf("Failed to open connection on iteration %d: %v", i, err)
-		}
-		rows, err := db.Query("SELECT 1")
-		if err != nil {
-			t.Fatalf("Failed to query on iteration %d: %v", i, err)
-		}
-		rows.Close()
-		db.Close()
-	}
-}
-
-// Test for column name case sensitivity
-func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	tableName := fmt.Sprintf("test_case_table_%d", time.Now().UnixNano())
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
+	err = db.Ping()
 	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	createTableSQL := fmt.Sprintf(`CREATE TABLE %s (Id INT, Name STRING, eMail STRING)`, tableName)
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-	_, err = db.Exec(fmt.Sprintf(`INSERT INTO %s VALUES (1, 'Alice', 'alice@example.com')`, tableName))
-	if err != nil {
-		t.Fatalf("Failed to insert data: %v", err)
-	}
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to query data: %v", err)
-	}
-	defer rows.Close()
-	cols, err := rows.Columns()
-	if err != nil {
-		t.Fatalf("Failed to get columns: %v", err)
-	}
-	expected := []string{tableName + ".id", tableName + ".name", tableName + ".email"}
-	for i, col := range expected {
-		if cols[i] != col {
-			t.Errorf("Expected column %s, got %s", col, cols[i])
-		}
-	}
-	rows.Next()
-	var id int
-	var name, email string
-	err = rows.Scan(&id, &name, &email)
-	if err != nil {
-		t.Fatalf("Failed to scan row: %v", err)
-	}
-	if name != "Alice" || email != "alice@example.com" {
-		t.Errorf("Expected Alice/alice@example.com, got %s/%s", name, email)
-	}
-	_, err = db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
-}
-
-func TestSQLColumnTypeScanType(t *testing.T) {
-	conn, cursor := makeConnection(t, 1000)
-	defer closeAll(t, conn, cursor)
-
-	// Create a table with all supported types
-	tableName := getTestTableName("column_type_test")
-	createTableSQL := fmt.Sprintf(`
-		CREATE TABLE %s (
-			col_boolean BOOLEAN,
-			col_tinyint TINYINT,
-			col_smallint SMALLINT,
-			col_int INT,
-			col_bigint BIGINT,
-			col_float FLOAT,
-			col_double DOUBLE,
-			col_decimal DECIMAL(10,2),
-			col_string STRING,
-			col_varchar VARCHAR(50),
-			col_char CHAR(10),
-			col_timestamp TIMESTAMP,
-			col_date DATE,
-			col_binary BINARY,
-			col_array ARRAY<STRING>,
-			col_map MAP<STRING,STRING>,
-			col_struct STRUCT<f1:STRING,f2:INT>,
-			col_union UNIONTYPE<STRING,INT>
-		)`, tableName)
-
-	cursor.exec(context.Background(), createTableSQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Insert a test row
-	insertSQL := fmt.Sprintf(`
-		INSERT INTO %s VALUES (
-			true,
-			127,
-			32767,
-			2147483647,
-			9223372036854775807,
-			3.14,
-			3.14159265359,
-			1234.56,
-			'string value',
-			'varchar value',
-			'char value',
-			'2024-03-20 12:34:56',
-			'2024-03-20',
-			'binary data',
-			array('array', 'values'),
-			map('key1', 'value1', 'key2', 'value2'),
-			named_struct('f1', 'struct value', 'f2', 42),
-			create_union(0, 'union value', 0)
-		)`, tableName)
-
-	cursor.exec(context.Background(), insertSQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Query the table
-	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
-	cursor.exec(context.Background(), querySQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Get the rows interface
-	rows := &rows{cursor: cursor}
-
-	// Test each column's scan type
-	expectedTypes := map[string]reflect.Type{
-		"col_boolean":   reflect.TypeOf(false),
-		"col_tinyint":   reflect.TypeOf(int8(0)),
-		"col_smallint":  reflect.TypeOf(int16(0)),
-		"col_int":       reflect.TypeOf(int32(0)),
-		"col_bigint":    reflect.TypeOf(int64(0)),
-		"col_float":     reflect.TypeOf(float32(0)),
-		"col_double":    reflect.TypeOf(float64(0)),
-		"col_decimal":   reflect.TypeOf(""),
-		"col_string":    reflect.TypeOf(""),
-		"col_varchar":   reflect.TypeOf(""),
-		"col_char":      reflect.TypeOf(""),
-		"col_timestamp": reflect.TypeOf(time.Time{}),
-		"col_date":      reflect.TypeOf(time.Time{}),
-		"col_binary":    reflect.TypeOf([]byte{}),
-		"col_array":     reflect.TypeOf(""),
-		"col_map":       reflect.TypeOf(""),
-		"col_struct":    reflect.TypeOf(""),
-		"col_union":     reflect.TypeOf(""),
-	}
-
-	// Get column names
-	columns := rows.Columns()
-	if len(columns) == 0 {
-		t.Fatal("No columns returned")
-	}
-
-	// Create a map of fully qualified column names to their base names
-	columnMap := make(map[string]string)
-	for _, col := range columns {
-		parts := strings.Split(col, ".")
-		if len(parts) == 2 {
-			columnMap[col] = parts[1]
-		} else {
-			columnMap[col] = col
-		}
-	}
-
-	for i, colName := range columns {
-		scanType := rows.ColumnTypeScanType(i)
-		baseName := columnMap[colName]
-		expectedType, exists := expectedTypes[baseName]
-		if !exists {
-			t.Errorf("Unexpected column name: %s", colName)
-			continue
-		}
-
-		if scanType != expectedType {
-			t.Errorf("Column %s: expected scan type %v, got %v", colName, expectedType, scanType)
-		}
-	}
-
-	// Verify we tested all expected types
-	for expectedCol := range expectedTypes {
-		found := false
-		for _, col := range columns {
-			if columnMap[col] == expectedCol {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected column %s not found in result set", expectedCol)
-		}
-	}
-}
-
-func TestSQLDriverSpecialCharacters(t *testing.T) {
-	// Create a new connection
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-	defer db.Close()
-
-	// Create a test table
-	tableName := fmt.Sprintf("test_special_table_%d", time.Now().UnixNano())
-	createSQL := fmt.Sprintf(`
-		CREATE TABLE %s (
-			id INT,
-			text STRING
-		)
-	`, tableName)
-	_, err = db.Exec(createSQL)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-	defer db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
-
-	// Test data with special characters
-	data := []string{"こんにちは", "emoji: 😊", "quote\"test\""}
-
-	// Insert test data
-	insertSQL := "INSERT INTO " + tableName + " VALUES "
-	values := make([]string, len(data))
-	for i, text := range data {
-		values[i] = fmt.Sprintf("(%d, '%s')", i, text)
-	}
-	insertSQL += strings.Join(values, ", ")
-	t.Logf("Insert statement: %s", insertSQL)
-	if _, err := db.Exec(insertSQL); err != nil {
-		t.Fatalf("Failed to insert test data: %v", err)
-	}
-
-	// Verify the data
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to query test data: %v", err)
-	}
-	defer rows.Close()
-
-	count := 0
-	for rows.Next() {
-		var id *int
-		var text *string
-		if err := rows.Scan(&id, &text); err != nil {
-			t.Fatalf("Failed to scan special row: %v", err)
-		}
-		if id == nil {
-			t.Errorf("Row %d: id is nil", count)
-			continue
-		}
-		if text == nil {
-			t.Errorf("Row %d: text is nil", *id)
-			continue
-		}
-		t.Logf("Row %d: retrieved text: %q", *id, *text)
-		if *text != data[*id] {
-			t.Errorf("Expected '%s', got '%s'", data[*id], *text)
-		}
-		count++
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("Error iterating rows: %v", err)
-	}
-	if count != len(data) {
-		t.Errorf("Expected %d rows, got %d", len(data), count)
-	}
-}
-
-func TestSQLStmtClose(t *testing.T) {
-	// Create a new connection
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-	defer db.Close()
-
-	// Create a prepared statement
-	stmt, err := db.Prepare("SELECT 1")
-	if err != nil {
-		t.Fatalf("Failed to prepare statement: %v", err)
-	}
-
-	// Close the statement
-	err = stmt.Close()
-	if err != nil {
-		t.Fatalf("Failed to close statement: %v", err)
-	}
-
-	// Try to use the closed statement
-	_, err = stmt.Query()
-	if err == nil {
-		t.Fatal("Expected error when using closed statement")
-	}
-}
-
-func TestSQLColumnTypeDatabaseTypeName(t *testing.T) {
-	conn, cursor := makeConnection(t, 1000)
-	defer closeAll(t, conn, cursor)
-
-	// Create a table with all supported types
-	tableName := getTestTableName("column_type_test")
-	createTableSQL := fmt.Sprintf(`
-		CREATE TABLE %s (
-			col_boolean BOOLEAN,
-			col_tinyint TINYINT,
-			col_smallint SMALLINT,
-			col_int INT,
-			col_bigint BIGINT,
-			col_float FLOAT,
-			col_double DOUBLE,
-			col_decimal DECIMAL(10,2),
-			col_string STRING,
-			col_varchar VARCHAR(50),
-			col_char CHAR(10),
-			col_timestamp TIMESTAMP,
-			col_date DATE,
-			col_binary BINARY,
-			col_array ARRAY<STRING>,
-			col_map MAP<STRING,STRING>,
-			col_struct STRUCT<f1:STRING,f2:INT>,
-			col_union UNIONTYPE<STRING,INT>
-		)`, tableName)
-
-	cursor.exec(context.Background(), createTableSQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Insert a test row
-	insertSQL := fmt.Sprintf(`
-		INSERT INTO %s VALUES (
-			true,
-			127,
-			32767,
-			2147483647,
-			9223372036854775807,
-			3.14,
-			3.14159265359,
-			1234.56,
-			'string value',
-			'varchar value',
-			'char value',
-			'2024-03-20 12:34:56',
-			'2024-03-20',
-			'binary data',
-			array('array', 'values'),
-			map('key1', 'value1', 'key2', 'value2'),
-			named_struct('f1', 'struct value', 'f2', 42),
-			create_union(0, 'union value', 0)
-		)`, tableName)
-
-	cursor.exec(context.Background(), insertSQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Query the table
-	querySQL := fmt.Sprintf("SELECT * FROM %s", tableName)
-	cursor.exec(context.Background(), querySQL)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	// Get the rows interface
-	rows := &rows{cursor: cursor}
-
-	// Test each column's database type name
-	expectedTypes := map[string]string{
-		"col_boolean":   "BOOLEAN",
-		"col_tinyint":   "TINYINT",
-		"col_smallint":  "SMALLINT",
-		"col_int":       "INT",
-		"col_bigint":    "BIGINT",
-		"col_float":     "FLOAT",
-		"col_double":    "DOUBLE",
-		"col_decimal":   "DECIMAL",
-		"col_string":    "STRING",
-		"col_varchar":   "VARCHAR",
-		"col_char":      "CHAR",
-		"col_timestamp": "TIMESTAMP",
-		"col_date":      "DATE",
-		"col_binary":    "BINARY",
-		"col_array":     "ARRAY",
-		"col_map":       "MAP",
-		"col_struct":    "STRUCT",
-		"col_union":     "UNION",
-	}
-
-	// Get column names
-	columns := rows.Columns()
-	if len(columns) == 0 {
-		t.Fatal("No columns returned")
-	}
-
-	// Create a map of fully qualified column names to their base names
-	columnMap := make(map[string]string)
-	for _, col := range columns {
-		parts := strings.Split(col, ".")
-		if len(parts) == 2 {
-			columnMap[col] = parts[1]
-		} else {
-			columnMap[col] = col
-		}
-	}
-
-	for i, colName := range columns {
-		dbType := rows.ColumnTypeDatabaseTypeName(i)
-		baseName := columnMap[colName]
-		expectedType, exists := expectedTypes[baseName]
-		if !exists {
-			t.Errorf("Unexpected column name: %s", colName)
-			continue
-		}
-
-		if dbType != expectedType {
-			t.Errorf("Column %s: expected database type %s, got %s", colName, expectedType, dbType)
-		}
-	}
-
-	// Verify we tested all expected types
-	for expectedCol := range expectedTypes {
-		found := false
-		for _, col := range columns {
-			if columnMap[col] == expectedCol {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected column %s not found in result set", expectedCol)
-		}
-	}
-}
-
-func TestSQLResultMethods(t *testing.T) {
-	// Create a new connection
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
-	if ssl {
-		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
-	}
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-	defer db.Close()
-
-	// Create a test table with an ID column
-	tableName := fmt.Sprintf("test_result_table_%d", time.Now().UnixNano())
-	createSQL := fmt.Sprintf(`
-		CREATE TABLE %s (
-			id INT,
-			value STRING
-		)
-	`, tableName)
-	_, err = db.Exec(createSQL)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-	defer db.Exec(fmt.Sprintf("DROP TABLE %s", tableName))
-
-	// Test LastInsertId
-	insertSQL := fmt.Sprintf("INSERT INTO %s VALUES (1, 'test')", tableName)
-	result, err := db.Exec(insertSQL)
-	if err != nil {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-
-	lastID, err := result.LastInsertId()
-	if err == nil {
-		t.Logf("LastInsertId returned: %d", lastID)
-	} else {
-		t.Logf("LastInsertId error (expected): %v", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err == nil {
-		t.Logf("RowsAffected returned: %d", rowsAffected)
-	} else {
-		t.Logf("RowsAffected error (expected): %v", err)
-	}
-
-	// Test RowsAffected with multiple rows
-	insertSQL = fmt.Sprintf("INSERT INTO %s VALUES (2, 'test2'), (3, 'test3')", tableName)
-	result, err = db.Exec(insertSQL)
-	if err != nil {
-		t.Fatalf("Failed to insert multiple rows: %v", err)
-	}
-
-	rowsAffected, err = result.RowsAffected()
-	if err == nil {
-		t.Logf("RowsAffected for multiple inserts returned: %d", rowsAffected)
-	} else {
-		t.Logf("RowsAffected error (expected): %v", err)
+		t.Fatal(err)
 	}
 }

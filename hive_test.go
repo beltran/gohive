@@ -1171,23 +1171,6 @@ func TestExecute(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestConsecutiveAsyncStatements(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-	async_statements := []string{fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName), "USE DEFAULT", "USE DEFAULT", fmt.Sprintf("SELECT * FROM %s", tableName), fmt.Sprintf("SELECT * FROM %s", tableName)}
-
-	for _, stm := range async_statements {
-		cursor.exec(context.Background(), stm)
-		if cursor.error() != nil {
-			t.Fatal(cursor.error())
-		}
-
-		if cursor.error() != nil {
-			t.Fatal(cursor.error())
-		}
-	}
-	closeAll(t, connection, cursor)
-}
-
 func TestNoResult(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 

@@ -74,7 +74,8 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 
 	// Default auth to NONE if not specified
 	auth := "NONE"
-	var tlsCertFile, tlsKeyFile string
+	var sslCertFile, sslKeyFile string
+	var insecureSkipVerify bool
 
 	// Create configuration
 	config := newConnectConfiguration()
@@ -88,10 +89,12 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 		for _, param := range params {
 			if strings.HasPrefix(param, "auth=") {
 				auth = strings.TrimPrefix(param, "auth=")
-			} else if strings.HasPrefix(param, "tls_cert_file=") {
-				tlsCertFile = strings.TrimPrefix(param, "tls_cert_file=")
-			} else if strings.HasPrefix(param, "tls_key_file=") {
-				tlsKeyFile = strings.TrimPrefix(param, "tls_key_file=")
+			} else if strings.HasPrefix(param, "sslcert=") {
+				sslCertFile = strings.TrimPrefix(param, "sslcert=")
+			} else if strings.HasPrefix(param, "sslkey=") {
+				sslKeyFile = strings.TrimPrefix(param, "sslkey=")
+			} else if strings.HasPrefix(param, "insecure_skip_verify=") {
+				insecureSkipVerify = strings.TrimPrefix(param, "insecure_skip_verify=") == "true"
 			} else if strings.HasPrefix(param, "transport=") {
 				config.TransportMode = strings.TrimPrefix(param, "transport=")
 			}
@@ -122,11 +125,12 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	}
 
 	// Configure SSL if paths are provided
-	if tlsCertFile != "" && tlsKeyFile != "" {
-		tlsConfig, err := getTlsConfiguration(tlsCertFile, tlsKeyFile)
+	if sslCertFile != "" && sslKeyFile != "" {
+		tlsConfig, err := getTlsConfiguration(sslCertFile, sslKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure SSL: %v", err)
 		}
+		tlsConfig.InsecureSkipVerify = insecureSkipVerify
 		config.TLSConfig = tlsConfig
 	}
 
