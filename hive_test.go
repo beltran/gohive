@@ -1046,7 +1046,7 @@ func TestWithContextSync(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(value)*time.Millisecond)
 		defer cancel()
 		cursor.exec(ctx, fmt.Sprintf("SELECT reflect('java.lang.Thread', 'sleep', 1000L * 1000L) FROM %s a JOIN %s b", tableName, tableName))
-		if cursor.error() != nil {
+		if cursor.error() == nil {
 			t.Fatal("Error should be context has been done")
 		}
 	}
