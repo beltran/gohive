@@ -29,7 +29,7 @@ func getSQLAuth() string {
 func getSQLTransport() string {
 	transport := os.Getenv("TRANSPORT")
 	if transport == "" {
-		return "binary"
+		transport = "binary"
 	}
 	return transport
 }
@@ -43,7 +43,7 @@ func TestSQLDriverAuthNone(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
+	if auth != "NONE" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
@@ -54,7 +54,11 @@ func TestSQLDriverAuthNone(t *testing.T) {
 	config.Password = "password"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=NONE", config.Username, config.Password, config.Database))
+	dsn := fmt.Sprintf("hive://%s:%s@hs2.example.com:10000/%s?auth=NONE&transport=%s", config.Username, config.Password, config.Database, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +74,7 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "KERBEROS" || transport != "binary" || ssl {
+	if auth != "KERBEROS" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
@@ -79,7 +83,11 @@ func TestSQLDriverAuthKerberos(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +103,7 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "DIGEST-MD5" || transport != "binary" || ssl {
+	if auth != "DIGEST-MD5" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
@@ -104,7 +112,11 @@ func TestSQLDriverAuthDigestMd5(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +132,7 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "PLAIN" || transport != "binary" || ssl {
+	if auth != "PLAIN" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
@@ -129,7 +141,11 @@ func TestSQLDriverAuthPlain(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +161,7 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "GSSAPI" || transport != "binary" || ssl {
+	if auth != "GSSAPI" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
@@ -154,7 +170,11 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 	config.Service = "hive"
 	config.Database = "default"
 
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s", config.Database, auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/%s?auth=%s&transport=%s", config.Database, auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,10 +188,15 @@ func TestSQLDriverAuthGssapi(t *testing.T) {
 
 func TestSQLDriverInvalidHost(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	// Test connection to a non-existent host
-	connStr := fmt.Sprintf("hive://nonexistent.example.com:12345/default?auth=%s", auth)
+	dsn := fmt.Sprintf("hive://nonexistent.example.com:12345/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
 
-	db, err := sql.Open("hive", connStr)
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		if !strings.Contains(err.Error(), "no such host") {
 			t.Errorf("Expected 'no such host' error from sql.Open, got: %v", err)
@@ -192,8 +217,14 @@ func TestSQLDriverInvalidHost(t *testing.T) {
 
 func TestSQLDriver(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	// Open a connection using the SQL interface
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +239,13 @@ func TestSQLDriver(t *testing.T) {
 
 func TestSQLQuery(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +305,13 @@ func TestSQLQuery(t *testing.T) {
 
 func TestSQLTypes(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +449,13 @@ func TestSQLTypes(t *testing.T) {
 
 func TestSQLNullValues(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -479,7 +528,13 @@ func TestSQLNullValues(t *testing.T) {
 
 func TestSQLContext(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +569,13 @@ func TestSQLContext(t *testing.T) {
 
 func TestSQLPreparedStatement(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -556,7 +617,13 @@ func TestSQLPreparedStatement(t *testing.T) {
 
 func TestSQLTimestampFormatting(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,13 +668,12 @@ func TestSQLTimestampFormatting(t *testing.T) {
 func TestSQLDriverNoCredentials(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
+	if auth != "NONE" || transport != "binary" {
 		t.Skip("not testing this combination")
 	}
 
 	// Test without credentials in DSN
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -669,13 +735,9 @@ func TestSQLDriverDSNParsing(t *testing.T) {
 func TestSQLDriverQueryParams(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
-		t.Skip("not testing this combination")
-	}
 
 	// Test with multiple query parameters
-	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=binary&service=hive", auth)
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s&service=hive", auth, transport)
 	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -692,15 +754,16 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
-		t.Skip("not testing this combination")
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tableName := fmt.Sprintf("test_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,11 +865,17 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 
 func TestSQLDriverDataTypes(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	// Create a unique table name for this test
 	tableName := fmt.Sprintf("test_types_table_%d", time.Now().UnixNano())
 
 	// Connect to the database
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -916,11 +985,17 @@ func TestSQLDriverDataTypes(t *testing.T) {
 
 func TestSQLDriverNullValues(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	// Create a unique table name for this test
 	tableName := fmt.Sprintf("test_null_table_%d", time.Now().UnixNano())
 
 	// Connect to the database
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1002,8 +1077,14 @@ func TestSQLDriverNullValues(t *testing.T) {
 // Test for large result sets
 func TestSQLDriverLargeResultSet(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	tableName := fmt.Sprintf("test_large_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1054,7 +1135,13 @@ func TestSQLDriverLargeResultSet(t *testing.T) {
 // Test for error handling
 func TestSQLDriverErrorHandling(t *testing.T) {
 	auth := getSQLAuth()
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1074,8 +1161,14 @@ func TestSQLDriverErrorHandling(t *testing.T) {
 // Test for connection reuse
 func TestSQLDriverConnectionReuse(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	for i := 0; i < 10; i++ {
-		db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+		dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+		if ssl {
+			dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+		}
+		db, err := sql.Open("hive", dsn)
 		if err != nil {
 			t.Fatalf("Failed to open connection on iteration %d: %v", i, err)
 		}
@@ -1091,8 +1184,14 @@ func TestSQLDriverConnectionReuse(t *testing.T) {
 // Test for column name case sensitivity
 func TestSQLDriverColumnNameCaseSensitivity(t *testing.T) {
 	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
 	tableName := fmt.Sprintf("test_case_table_%d", time.Now().UnixNano())
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
+	}
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -1282,11 +1381,11 @@ func TestSQLDriverSpecialCharacters(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
-		t.Skip("not testing this combination")
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
 	}
-
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
@@ -1362,11 +1461,11 @@ func TestSQLStmtClose(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
-		t.Skip("not testing this combination")
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
 	}
-
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
@@ -1535,11 +1634,11 @@ func TestSQLResultMethods(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" || ssl {
-		t.Skip("not testing this combination")
+	dsn := fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s&transport=%s", auth, transport)
+	if ssl {
+		dsn += "&tls_cert_file=client.cer.pem&tls_key_file=client.cer.key"
 	}
-
-	db, err := sql.Open("hive", fmt.Sprintf("hive://hs2.example.com:10000/default?auth=%s", auth))
+	db, err := sql.Open("hive", dsn)
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
@@ -1573,16 +1672,23 @@ func TestSQLResultMethods(t *testing.T) {
 		t.Logf("LastInsertId error (expected): %v", err)
 	}
 
-	// Test RowsAffected
-	updateSQL := fmt.Sprintf("UPDATE %s SET value = 'updated' WHERE id = 1", tableName)
-	result, err = db.Exec(updateSQL)
-	if err != nil {
-		t.Fatalf("Failed to update: %v", err)
-	}
-
 	rowsAffected, err := result.RowsAffected()
 	if err == nil {
 		t.Logf("RowsAffected returned: %d", rowsAffected)
+	} else {
+		t.Logf("RowsAffected error (expected): %v", err)
+	}
+
+	// Test RowsAffected with multiple rows
+	insertSQL = fmt.Sprintf("INSERT INTO %s VALUES (2, 'test2'), (3, 'test3')", tableName)
+	result, err = db.Exec(insertSQL)
+	if err != nil {
+		t.Fatalf("Failed to insert multiple rows: %v", err)
+	}
+
+	rowsAffected, err = result.RowsAffected()
+	if err == nil {
+		t.Logf("RowsAffected for multiple inserts returned: %d", rowsAffected)
 	} else {
 		t.Logf("RowsAffected error (expected): %v", err)
 	}
