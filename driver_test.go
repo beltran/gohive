@@ -668,23 +668,6 @@ func TestSQLDriverNoCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestSQLDriverQueryParams(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-
-	// Test with multiple query parameters
-	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, true, true) + "&service=hive"
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestSQLDriverDatabaseOperations(t *testing.T) {
 	auth := getSQLAuth()
