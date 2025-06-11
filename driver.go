@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -27,115 +26,32 @@ func (d *Driver) Open(name string) (driver.Conn, error) {
 
 // OpenConnector implements driver.DriverContext
 func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
-	// Parse the DSN (Data Source Name)
-	// Format: "hive://username:password@host:port/database?param1=value1&param2=value2"
-	if !strings.HasPrefix(name, "hive://") {
-		return nil, fmt.Errorf("invalid DSN format: must start with hive://")
+	// Parse the DSN
+	dsn, err := ParseDSN(name)
+	if err != nil {
+		return nil, err
 	}
-
-	// Remove the hive:// prefix
-	name = strings.TrimPrefix(name, "hive://")
-
-	// Split into userinfo and host
-	var userinfo, host string
-	if strings.Contains(name, "@") {
-		parts := strings.SplitN(name, "@", 2)
-		userinfo = parts[0]
-		host = parts[1]
-	} else {
-		userinfo = ""
-		host = name
-	}
-
-	// Parse userinfo - now optional
-	var username, password string
-	if userinfo != "" {
-		if strings.Contains(userinfo, ":") {
-			userParts := strings.SplitN(userinfo, ":", 2)
-			username = userParts[0]
-			password = userParts[1]
-		} else {
-			username = userinfo
-		}
-	}
-
-	// Parse host and database
-	hostParts := strings.SplitN(host, "/", 2)
-	if len(hostParts) != 2 {
-		return nil, fmt.Errorf("invalid DSN format: missing database")
-	}
-
-	hostPort := hostParts[0]
-	databaseAndParams := hostParts[1]
-
-	// Split database and query parameters
-	dbParts := strings.SplitN(databaseAndParams, "?", 2)
-	database := dbParts[0]
-
-	// Default auth to NONE if not specified
-	auth := "NONE"
-	var sslCertFile, sslKeyFile string
-	var insecureSkipVerify bool
 
 	// Create configuration
 	config := newConnectConfiguration()
-	config.Username = username
-	config.Password = password
-	config.Database = database
-
-	// Parse query parameters if present
-	if len(dbParts) > 1 {
-		params := strings.Split(dbParts[1], "&")
-		for _, param := range params {
-			if strings.HasPrefix(param, "auth=") {
-				auth = strings.TrimPrefix(param, "auth=")
-			} else if strings.HasPrefix(param, "sslcert=") {
-				sslCertFile = strings.TrimPrefix(param, "sslcert=")
-			} else if strings.HasPrefix(param, "sslkey=") {
-				sslKeyFile = strings.TrimPrefix(param, "sslkey=")
-			} else if strings.HasPrefix(param, "insecure_skip_verify=") {
-				insecureSkipVerify = strings.TrimPrefix(param, "insecure_skip_verify=") == "true"
-			} else if strings.HasPrefix(param, "transport=") {
-				config.TransportMode = strings.TrimPrefix(param, "transport=")
-			}
-		}
-	}
-
-	// Default transport to binary if not provided
-	if config.TransportMode == "" {
-		config.TransportMode = "binary"
-	}
-
-	// Parse host and port
-	hostPortParts := strings.Split(hostPort, ":")
-	if len(hostPortParts) != 2 {
-		return nil, fmt.Errorf("invalid DSN format: missing port")
-	}
-
-	hostname := hostPortParts[0]
-	portStr := hostPortParts[1]
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid port number: %v", err)
-	}
-
-	// Set service name for Kerberos authentication
-	if auth == "KERBEROS" {
-		config.Service = "hive"
-	}
+	config.Username = dsn.Username
+	config.Password = dsn.Password
+	config.Database = dsn.Database
+	config.TransportMode = dsn.TransportMode
+	config.Service = dsn.Service
 
 	// Configure SSL if paths are provided
-	if sslCertFile != "" && sslKeyFile != "" {
-		tlsConfig, err := getTlsConfiguration(sslCertFile, sslKeyFile)
+	if dsn.SSLCertFile != "" && dsn.SSLKeyFile != "" {
+		tlsConfig, err := getTlsConfiguration(dsn.SSLCertFile, dsn.SSLKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure SSL: %v", err)
 		}
-		tlsConfig.InsecureSkipVerify = insecureSkipVerify
+		tlsConfig.InsecureSkipVerify = dsn.SSLInsecureSkip
 		config.TLSConfig = tlsConfig
 	}
 
 	// Connect to Hive
-	conn, err := connect(context.Background(), hostname, port, auth, config)
+	conn, err := connect(context.Background(), dsn.Host, dsn.Port, dsn.Auth, config)
 	if err != nil {
 		return nil, err
 	}
