@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -75,6 +74,13 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 
 	// Default auth to NONE if not specified
 	auth := "NONE"
+	var tlsCertFile, tlsKeyFile string
+
+	// Create configuration
+	config := newConnectConfiguration()
+	config.Username = username
+	config.Password = password
+	config.Database = database
 
 	// Parse query parameters if present
 	if len(dbParts) > 1 {
@@ -82,9 +88,19 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 		for _, param := range params {
 			if strings.HasPrefix(param, "auth=") {
 				auth = strings.TrimPrefix(param, "auth=")
-				break
+			} else if strings.HasPrefix(param, "tls_cert_file=") {
+				tlsCertFile = strings.TrimPrefix(param, "tls_cert_file=")
+			} else if strings.HasPrefix(param, "tls_key_file=") {
+				tlsKeyFile = strings.TrimPrefix(param, "tls_key_file=")
+			} else if strings.HasPrefix(param, "transport=") {
+				config.TransportMode = strings.TrimPrefix(param, "transport=")
 			}
 		}
+	}
+
+	// Default transport to binary if not provided
+	if config.TransportMode == "" {
+		config.TransportMode = "binary"
 	}
 
 	// Parse host and port
@@ -100,15 +116,18 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 		return nil, fmt.Errorf("invalid port number: %v", err)
 	}
 
-	// Create configuration
-	config := newConnectConfiguration()
-	config.Username = username
-	config.Password = password
-	config.Database = database
-
 	// Set service name for Kerberos authentication
 	if auth == "KERBEROS" {
 		config.Service = "hive"
+	}
+
+	// Configure SSL if paths are provided
+	if tlsCertFile != "" && tlsKeyFile != "" {
+		tlsConfig, err := getTlsConfiguration(tlsCertFile, tlsKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure SSL: %v", err)
+		}
+		config.TLSConfig = tlsConfig
 	}
 
 	// Connect to Hive
@@ -138,7 +157,6 @@ func (c *connector) Driver() driver.Driver {
 // sqlConnection implements driver.Conn
 type sqlConnection struct {
 	conn *connection
-	mu   sync.Mutex
 }
 
 // Prepare returns a prepared statement, bound to this connection.
@@ -155,8 +173,6 @@ func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (drive
 // prepared statements and transactions, marking this
 // connection as no longer in use.
 func (c *sqlConnection) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	return c.conn.close()
 }
 
@@ -213,9 +229,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Res
 		}
 	}
 
-	s.conn.mu.Lock()
 	cursor := s.conn.conn.cursor()
-	s.conn.mu.Unlock()
 
 	cursor.exec(ctx, query)
 	if cursor.error() != nil {
@@ -250,9 +264,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Ro
 		}
 	}
 
-	s.conn.mu.Lock()
 	cursor := s.conn.conn.cursor()
-	s.conn.mu.Unlock()
 
 	cursor.exec(ctx, query)
 	if cursor.error() != nil {
@@ -270,34 +282,15 @@ type result struct {
 // LastInsertId returns the database's auto-generated ID
 // after, for example, an INSERT into a table with primary key.
 func (r *result) LastInsertId() (int64, error) {
-	// Hive doesn't support auto-generated IDs, but we can try to get the last inserted ID
-	// if the query was an INSERT with an explicit ID
-	if strings.HasPrefix(strings.ToUpper(r.query), "INSERT") {
-		// Try to extract the ID from the last row
-		if r.cursor.hasMore(context.Background()) {
-			row := r.cursor.rowMap(context.Background())
-			if id, ok := row["id"].(int64); ok {
-				return id, nil
-			}
-		}
-	}
-	return 0, fmt.Errorf("LastInsertId is not supported for this operation")
+	return -1, nil
 }
 
 // RowsAffected returns the number of rows affected by the query.
 func (r *result) RowsAffected() (int64, error) {
-	// For INSERT, UPDATE, DELETE operations, try to get the number of affected rows
-	query := strings.ToUpper(r.query)
-	if strings.HasPrefix(query, "INSERT") || strings.HasPrefix(query, "UPDATE") || strings.HasPrefix(query, "DELETE") {
-		// Try to get the number of affected rows from the cursor
-		if r.cursor.hasMore(context.Background()) {
-			row := r.cursor.rowMap(context.Background())
-			if count, ok := row["count"].(int64); ok {
-				return count, nil
-			}
-		}
+	if r.cursor.operationHandle != nil && r.cursor.operationHandle.ModifiedRowCount != nil {
+		return int64(*r.cursor.operationHandle.ModifiedRowCount), nil
 	}
-	return 0, fmt.Errorf("RowsAffected is not supported for this operation")
+	return -1, nil
 }
 
 // rows implements driver.Rows

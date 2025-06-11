@@ -2,7 +2,7 @@
 [![Build Status](https://api.travis-ci.com/beltran/gohive.svg?branch=master)](https://app.travis-ci.com/beltran/gohive) [![Coverage Status](https://coveralls.io/repos/github/beltran/gohive/badge.svg?branch=master)](https://coveralls.io/github/beltran/gohive?branch=master)
 
 
-GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) in go that supports connection mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and HTTP transport, with and without SSL. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
+GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) in go that supports connection mechanisms KERBEROS(Gssapi Sasl), NONE(Plain Sasl), LDAP, CUSTOM and NOSASL, both for binary and HTTP transport, with and without SSL, compliant with the `database/sql` interface. The kerberos mechanism will pick a different authentication level depending on `hive.server2.thrift.sasl.qop`.
 
 GoHive also offers support to query the Hive metastore with various authentication mechanisms, including KERBEROS.
 
@@ -93,7 +93,7 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://username:password@host:port/database?auth=KERBEROS&service=hive
+// Format: hive://host:port/database?auth=KERBEROS&service=hive
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive")
 if err != nil {
     log.Fatal(err)
@@ -130,7 +130,7 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://username:password@host:port/database?auth=NOSASL
+// Format: hive://host:port/database?auth=NOSASL
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL")
 if err != nil {
     log.Fatal(err)
@@ -141,15 +141,15 @@ This implies setting in hive-site.xml:
 
 - `hive.server2.authentication = NOSASL`
 
-### Connect using Http transport mode
-Binary transport mode is supported for auth mechanisms PLAIN, KERBEROS and NOSASL. Http transport mode is supported for PLAIN and KERBEROS:
+### Connect using HTTP transport mode
+Binary transport mode is supported for auth mechanisms PLAIN, KERBEROS and NOSASL. HTTP transport mode is supported for PLAIN and KERBEROS:
 ``` go
 import (
     "database/sql"
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://username:password@host:port/database?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice
+// Format: hive://host:port/database?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice")
 if err != nil {
     log.Fatal(err)
@@ -161,71 +161,6 @@ This implies setting in hive-site.xml:
 - `hive.server2.authentication = KERBEROS`, or `NONE`
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
-
-## Using the Native Interface
-
-```go
-    connection, errConn := gohive.Connect("hs2.example.com", 10000, "KERBEROS", configuration)
-    if errConn != nil {
-        log.Fatal(errConn)
-    }
-    cursor := connection.Cursor()
-
-    cursor.Exec(ctx, "INSERT INTO myTable VALUES(1, '1'), (2, '2'), (3, '3'), (4, '4')")
-    if cursor.Err != nil {
-        log.Fatal(cursor.Err)
-    }
-
-    cursor.Exec(ctx, "SELECT * FROM myTable")
-    if cursor.Err != nil {
-        log.Fatal(cursor.Err)
-    }
-
-    var i int32
-    var s string
-    for cursor.HasMore(ctx) {
-        cursor.FetchOne(ctx, &i, &s)
-        if cursor.Err != nil {
-            log.Fatal(cursor.Err)
-        }
-        log.Println(i, s)
-    }
-
-    cursor.Close()
-    connection.Close()
-```
-
-`cursor.HasMore` may query Hive for more rows if not all of them have been received. Once the row is
-read is discarded from memory so as long as the fetch size is not too big there's no limit to how much
-data can be queried.
-
-### Zookeeper
-A connection can be made using zookeeper:
-
-```go
-connection, errConn := ConnectZookeeper("zk1.example.com:2181,zk2.example.com:2181", "NONE", configuration)
-```
-The last two parameters determine how the connection to Hive will be made once the Hive hosts are retrieved from zookeeper.
-
-### NULL values
-For example if a `NULL` value is in a row, the following operations would put `0` into `i`:
-```
-var i int32
-cursor.FetchOne(context.Background(), &i)
-```
-To differentiate between these two values (`NULL` and `0`) the following will set `i` to `nil` or `*i` to `0`:
-```
-var i *int32 = new(int32)
-cursor.FetchOne(context.Background(), &i)
-```
-which will produce the same result as:
-```
-var i *int32
-cursor.FetchOne(context.Background(), &i)
-```
-Alternatively, using the rowmap API, `m := cursor.RowMap(context.Background())`,
- `m` would be `map[string]interface{}{"table_name.column_name": nil}` for a `NULL` value. It will return a map
-where the keys are `table_name.column_name`. This works fine with Hive but using [Spark Thirft SQL server](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) `table_name` is not present and the keys are `column_name` and it can [lead to problems](https://github.com/beltran/gohive/issues/120) if two tables have the same column name so the `FetchOne` API should be used in this case.
 
 ## Running tests
 Tests can be run with:

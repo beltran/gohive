@@ -409,8 +409,6 @@ type cursor struct {
 	newData         bool
 	Err             error
 	descriptionData [][]string
-	mu              sync.Mutex // Mutex to protect cursor operations
-	id              string     // Unique identifier for logging
 
 	// Caller is responsible for managing this channel
 	Logs chan<- []string
@@ -418,9 +416,6 @@ type cursor struct {
 
 // exec issues a synchronous query.
 func (c *cursor) exec(ctx context.Context, query string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.execute(ctx, query)
 }
 
@@ -1074,9 +1069,6 @@ func (c *cursor) cancel() {
 
 // close closes the cursor
 func (c *cursor) close() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.Err = c.resetState()
 }
 
@@ -1178,4 +1170,17 @@ func (c *connection) close() error {
 		return c.transport.Close()
 	}
 	return nil
+}
+
+// getTlsConfiguration returns a tls.Config with the provided certificate and key
+func getTlsConfiguration(sslPemPath, sslKeyPath string) (tlsConfig *tls.Config, err error) {
+	cert, err := tls.LoadX509KeyPair(sslPemPath, sslKeyPath)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig = &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+	}
+	return tlsConfig, nil
 }
