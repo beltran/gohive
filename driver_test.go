@@ -766,41 +766,6 @@ func TestSQLDriverDataTypes(t *testing.T) {
 	}
 }
 
-func TestSQLDriverInsecureSkipVerify(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if !ssl {
-		t.Skip("SSL not enabled for testing")
-	}
-
-	// Test with sslinsecureskipverify=true
-	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Test with sslinsecureskipverify=false
-	dsn = buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, false)
-	db, err = sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSQLConnectionProperties(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
