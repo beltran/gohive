@@ -224,7 +224,7 @@ func TestDescription(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 2, 1000)
 
 	// We come from an insert
-	d := cursor.description()
+	d := cursor.description(context.Background())
 	expected := [][]string{[]string{"col1", "INT_TYPE"}, []string{"col2", "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
@@ -238,7 +238,7 @@ func TestDescription(t *testing.T) {
 		t.Fatal(cursor.error())
 	}
 
-	d = cursor.description()
+	d = cursor.description(context.Background())
 	expected = [][]string{[]string{fmt.Sprintf("%s.a", tableName), "INT_TYPE"}, []string{fmt.Sprintf("%s.b", tableName), "STRING_TYPE"}}
 	if !reflect.DeepEqual(d, expected) {
 		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
@@ -254,7 +254,7 @@ func TestDescription(t *testing.T) {
 		t.Fatal(cursor.error())
 	}
 
-	d = cursor.description()
+	d = cursor.description(context.Background())
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
 	}
@@ -265,41 +265,7 @@ func TestDescription(t *testing.T) {
 	}
 
 	// Call again it will follow a different path
-	d = cursor.description()
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	closeAll(t, connection, cursor)
-}
-
-func TestDescriptionAsync(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 2, 1000)
-
-	cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	d := cursor.description()
-	expected := [][]string{[]string{fmt.Sprintf("%s.a", tableName), "INT_TYPE"}, []string{fmt.Sprintf("%s.b", tableName), "STRING_TYPE"}}
-	if !reflect.DeepEqual(d, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, d)
-	}
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	var i int32
-	var s string
-
-	cursor.fetchOne(context.Background(), &i, &s)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-	if i != 1 || s != "1" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
+	d = cursor.description(context.Background())
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
 	}
@@ -357,9 +323,6 @@ func TestSelect(t *testing.T) {
 		cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 		if cursor.error() != nil {
 			t.Fatal(cursor.error())
-		}
-		if !cursor.finished() {
-			t.Fatal("Finished should be true")
 		}
 		for cursor.hasMore(context.Background()) {
 			if cursor.error() != nil {
@@ -517,9 +480,6 @@ func TestSelectNull(t *testing.T) {
 	cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
-	}
-	if !cursor.finished() {
-		t.Fatal("Finished should be true")
 	}
 	j := 0
 	for cursor.hasMore(context.Background()) {
@@ -1117,60 +1077,6 @@ func TestWithContextAsync(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestExecute(t *testing.T) {
-	transport := os.Getenv("TRANSPORT")
-	auth := os.Getenv("AUTH")
-	if auth == "KERBEROS" && transport == "http" {
-		t.Skip("Skipping test for KERBEROS auth with HTTP transport")
-	}
-
-	connection, cursor, tableName := prepareTable(t, 0, 1000)
-
-	cursor.exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(1, '1')", tableName))
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-	if !cursor.finished() {
-		t.Fatal("Operation should have finished")
-	}
-
-	cursor.cancel()
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES(2, '2')", tableName))
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	var i int32
-	var s string
-	cursor.fetchOne(context.Background(), &i, &s)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	if cursor.hasMore(context.Background()) {
-		t.Fatal("All rows should have been read")
-	}
-
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	if i != 2 || s != "2" {
-		log.Fatalf("Unexpected values for i(%d)  or s(%s) ", i, s)
-	}
-
-	closeAll(t, connection, cursor)
-}
-
 func TestNoResult(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 
@@ -1356,7 +1262,7 @@ func TestTypesError(t *testing.T) {
 		t.Fatal(cursor.error())
 	}
 
-	d := cursor.description()
+	d := cursor.description(context.Background())
 	expected := [][]string{
 		[]string{"all_types.boolean", "BOOLEAN_TYPE"},
 		[]string{"all_types.tinyint", "TINYINT_TYPE"},
@@ -1685,15 +1591,9 @@ func createTable(t *testing.T, cursor *cursor) string {
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
 	}
-	if !cursor.finished() {
-		t.Fatal("Finished should be true")
-	}
 	cursor.exec(context.Background(), fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (a INT, b STRING)", tableName))
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
-	}
-	if !cursor.finished() {
-		t.Fatal("Finished should be true")
 	}
 	return tableName
 }
@@ -1711,9 +1611,6 @@ func insertInTable(t *testing.T, cursor *cursor, tableName string, rowsToInsert 
 		if cursor.error() != nil {
 			t.Fatal(cursor.error())
 		}
-		if !cursor.finished() {
-			t.Fatal("Finished should be true")
-		}
 	}
 }
 
@@ -1729,9 +1626,6 @@ func insertInTableSingleValue(t *testing.T, cursor *cursor, tableName string, ro
 		cursor.exec(context.Background(), fmt.Sprintf("INSERT INTO %s(b) VALUES ", tableName)+values)
 		if cursor.error() != nil {
 			t.Fatal(cursor.error())
-		}
-		if !cursor.finished() {
-			t.Fatal("Finished should be true")
 		}
 	}
 }

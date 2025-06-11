@@ -190,7 +190,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Ro
 	if cursor.error() != nil {
 		return nil, cursor.error()
 	}
-	return &rows{cursor: cursor}, nil
+	return &rows{cursor: cursor, ctx: ctx}, nil
 }
 
 // result implements driver.Result
@@ -216,11 +216,12 @@ func (r *result) RowsAffected() (int64, error) {
 // rows implements driver.Rows
 type rows struct {
 	cursor *cursor
+	ctx    context.Context
 }
 
 // Columns returns the names of the columns.
 func (r *rows) Columns() []string {
-	desc := r.cursor.description()
+	desc := r.cursor.description(r.ctx)
 	columns := make([]string, len(desc))
 	for i, col := range desc {
 		columns[i] = col[0]
@@ -243,17 +244,17 @@ func (r *rows) Next(dest []driver.Value) error {
 	if r.cursor == nil {
 		return sql.ErrNoRows
 	}
-	if !r.cursor.hasMore(context.Background()) {
+	if !r.cursor.hasMore(r.ctx) {
 		return io.EOF
 	}
 
-	row := r.cursor.rowMap(context.Background())
+	row := r.cursor.rowMap(r.ctx)
 	if r.cursor.error() != nil {
 		return r.cursor.error()
 	}
 
 	columns := r.Columns()
-	desc := r.cursor.description()
+	desc := r.cursor.description(r.ctx)
 	for i := range dest {
 		colName := columns[i]
 		val := row[colName]
@@ -312,7 +313,7 @@ func (r *rows) Next(dest []driver.Value) error {
 
 // ColumnTypeScanType returns the Go type that should be used to scan values into.
 func (r *rows) ColumnTypeScanType(index int) reflect.Type {
-	desc := r.cursor.description()
+	desc := r.cursor.description(r.ctx)
 	if index >= len(desc) {
 		return reflect.TypeOf(nil)
 	}
@@ -354,7 +355,7 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 
 // ColumnTypeDatabaseTypeName returns the database system type name.
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
-	desc := r.cursor.description()
+	desc := r.cursor.description(r.ctx)
 	if index >= len(desc) {
 		return ""
 	}

@@ -816,6 +816,11 @@ func TestSQLDriverDataTypes(t *testing.T) {
 	}
 	t.Logf("Table created: %s", tableName)
 
+	// Create timestamps in UTC
+	now := time.Now().UTC()
+	createdAt := now.Format("2006-01-02 15:04:05")
+	birthDate := now.Format("2006-01-02")
+
 	// Insert test data
 	insertSQL := fmt.Sprintf(`
 		INSERT INTO %s VALUES (
@@ -830,7 +835,7 @@ func TestSQLDriverDataTypes(t *testing.T) {
 			'%s',
 			'%s'
 		)
-	`, tableName, 1, "John Doe", 30, 1.75, 75.5, true, time.Now().Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02"), "Software Engineer", "example@example.com")
+	`, tableName, 1, "John Doe", 30, 1.75, 75.5, true, createdAt, birthDate, "Software Engineer", "example@example.com")
 
 	_, err = db.Exec(insertSQL)
 	if err != nil {
@@ -885,12 +890,18 @@ func TestSQLDriverDataTypes(t *testing.T) {
 	if !colIsActive {
 		t.Error("expected col_is_active to be true")
 	}
-	if !colCreatedAt.Equal(time.Now()) {
-		t.Errorf("got col_created_at=%v, want %v", colCreatedAt, time.Now())
+
+	// Compare timestamps in UTC
+	expectedCreatedAt, _ := time.Parse("2006-01-02 15:04:05", createdAt)
+	if !colCreatedAt.Equal(expectedCreatedAt) {
+		t.Errorf("got col_created_at=%v, want %v", colCreatedAt, expectedCreatedAt)
 	}
-	if !colBirthDate.Equal(time.Now()) {
-		t.Errorf("got col_birth_date=%v, want %v", colBirthDate, time.Now())
+
+	expectedBirthDate, _ := time.Parse("2006-01-02", birthDate)
+	if !colBirthDate.Equal(expectedBirthDate) {
+		t.Errorf("got col_birth_date=%v, want %v", colBirthDate, expectedBirthDate)
 	}
+
 	if colNotes != "Software Engineer" {
 		t.Errorf("got col_notes=%s, want Software Engineer", colNotes)
 	}

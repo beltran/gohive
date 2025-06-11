@@ -314,7 +314,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
 	// Context is ignored
-	response, err := client.OpenSession(context.Background(), openSession)
+	response, err := client.OpenSession(ctx, openSession)
 	if err != nil {
 		return
 	}
@@ -338,7 +338,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	if configuration.Database != "" {
 		cursor := conn.cursor()
 		defer cursor.close()
-		cursor.exec(context.Background(), "USE "+configuration.Database)
+		cursor.exec(ctx, "USE "+configuration.Database)
 		if cursor.Err != nil {
 			return nil, cursor.Err
 		}
@@ -509,28 +509,6 @@ func (c *cursor) executeSync(ctx context.Context, query string) {
 	}
 }
 
-// poll returns the current status of the last operation
-func (c *cursor) poll(getProgress bool) (status *hiveserver.TGetOperationStatusResp) {
-	c.Err = nil
-	progressGet := getProgress
-	pollRequest := hiveserver.NewTGetOperationStatusReq()
-	pollRequest.OperationHandle = c.operationHandle
-	pollRequest.GetProgressUpdate = &progressGet
-	var responsePoll *hiveserver.TGetOperationStatusResp
-	// Context ignored
-	c.conn.clientMu.Lock()
-	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
-	c.conn.clientMu.Unlock()
-	if c.Err != nil {
-		return nil
-	}
-	if !success(safeStatus(responsePoll.GetStatus())) {
-		c.Err = errors.New("Error closing the operation: " + safeStatus(responsePoll.GetStatus()).String())
-		return nil
-	}
-	return responsePoll
-}
-
 // fetchLogs returns all the Hive execution logs for the latest query up to the current point
 func (c *cursor) fetchLogs() []string {
 	logRequest := hiveserver.NewTFetchResultsReq()
@@ -557,17 +535,6 @@ func (c *cursor) fetchLogs() []string {
 	}
 
 	return logs
-}
-
-// finished returns true if the last async operation has finished
-func (c *cursor) finished() bool {
-	operationStatus := c.poll(true)
-
-	if c.Err != nil {
-		return true
-	}
-	status := operationStatus.OperationState
-	return !(*status == hiveserver.TOperationState_INITIALIZED_STATE || *status == hiveserver.TOperationState_RUNNING_STATE)
 }
 
 func success(status *hiveserver.TStatus) bool {
@@ -597,7 +564,7 @@ func (c *cursor) rowMap(ctx context.Context) map[string]interface{} {
 		return nil
 	}
 
-	d := c.description()
+	d := c.description(ctx)
 	if c.Err != nil || len(d) != len(c.queue) {
 		return nil
 	}
@@ -929,7 +896,7 @@ func isNull(nulls []byte, position int) bool {
 // description return a map with the names of the columns and their types
 // must be called after a FetchResult request
 // a context should be added here but seems to be ignored by thrift
-func (c *cursor) description() [][]string {
+func (c *cursor) description(ctx context.Context) [][]string {
 	if c.descriptionData != nil {
 		return c.descriptionData
 	}
@@ -940,7 +907,7 @@ func (c *cursor) description() [][]string {
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
 	metaRequest.OperationHandle = c.operationHandle
 	c.conn.clientMu.Lock()
-	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
+	metaResponse, err := c.conn.client.GetResultSetMetadata(ctx, metaRequest)
 	c.conn.clientMu.Unlock()
 	if err != nil {
 		c.Err = err
@@ -1000,7 +967,7 @@ func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 			c.conn.clientMu.Lock()
-			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
+			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
 			c.conn.clientMu.Unlock()
 			if err != nil {
 				rowsAvailable <- err
