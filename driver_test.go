@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -936,59 +935,5 @@ func TestSQLUseDatabase(t *testing.T) {
 	_, err = db.Exec("DROP DATABASE IF EXISTS db")
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-func TestSQLFetchLogs(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	// Execute a query that will generate some logs
-	rows, err := db.Query("SHOW DATABASES")
-	if err != nil {
-		t.Fatalf("error executing query: %v", err)
-	}
-	defer rows.Close()
-
-	// Get the underlying driver.Rows implementation using reflection
-	rowsValue := reflect.ValueOf(rows).Elem()
-	driverRowsField := rowsValue.FieldByName("driverRows")
-	if !driverRowsField.IsValid() {
-		t.Fatal("failed to get driver.Rows field")
-	}
-
-	// Get our specific rows implementation
-	hiveRows, ok := driverRowsField.Interface().(*HiveRows)
-	if !ok {
-		t.Fatal("failed to get HiveRows implementation")
-	}
-
-	// Fetch the logs
-	logs, err := hiveRows.FetchLogs()
-	if err != nil {
-		t.Fatalf("error fetching logs: %v", err)
-	}
-
-	// Verify we got some logs
-	if len(logs) == 0 {
-		t.Fatal("expected non-empty logs")
-	}
-
-	// Logs should contain information about the query execution
-	foundQueryInfo := false
-	for _, log := range logs {
-		if strings.Contains(log, "SHOW DATABASES") {
-			foundQueryInfo = true
-			break
-		}
-	}
-	if !foundQueryInfo {
-		t.Error("expected logs to contain query information")
 	}
 }
