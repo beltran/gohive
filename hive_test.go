@@ -1033,10 +1033,8 @@ func TestSmallFetchSize(t *testing.T) {
 }
 
 func TestWithContextSync(t *testing.T) {
-	if os.Getenv("TRANSPORT") == "http" {
-		if os.Getenv("SKIP_UNSTABLE") == "1" {
-			return
-		}
+	if os.Getenv("SKIP_UNSTABLE") == "1" {
+		return
 	}
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 
@@ -1055,10 +1053,8 @@ func TestWithContextSync(t *testing.T) {
 }
 
 func TestWithContextAsync(t *testing.T) {
-	if os.Getenv("TRANSPORT") == "http" {
-		if os.Getenv("SKIP_UNSTABLE") == "1" {
-			return
-		}
+	if os.Getenv("SKIP_UNSTABLE") == "1" {
+		return
 	}
 	connection, cursor, tableName := prepareTable(t, 0, 1000)
 

@@ -577,15 +577,8 @@ func TestSQLPreparedStatement(t *testing.T) {
 	}
 	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 
-	// Create a prepared statement
-	stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stmt.Close()
-
-	// Execute the prepared statement
-	_, err = stmt.Exec(4, "test4")
+	// Insert data directly
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (4, 'test4')", tableName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,15 +615,9 @@ func TestSQLTimestampFormatting(t *testing.T) {
 	}
 	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 
-	// Insert a row using a prepared statement with a timestamp
+	// Insert a row with a timestamp directly
 	testTime := time.Date(2024, 3, 20, 12, 34, 56, 0, time.UTC)
-	stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(1, testTime)
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (1, '%s')", tableName, testTime.Format("2006-01-02 15:04:05")))
 	if err != nil {
 		t.Fatalf("Failed to insert timestamp: %v", err)
 	}

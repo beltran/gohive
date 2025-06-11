@@ -79,16 +79,6 @@ type sqlConnection struct {
 	conn *connection
 }
 
-// Prepare returns a prepared statement, bound to this connection.
-func (c *sqlConnection) Prepare(query string) (driver.Stmt, error) {
-	return c.PrepareContext(context.Background(), query)
-}
-
-// PrepareContext returns a prepared statement, bound to this connection.
-func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	return &stmt{conn: c, query: query}, nil
-}
-
 // Close invalidates and potentially stops any current
 // prepared statements and transactions, marking this
 // connection as no longer in use.
@@ -106,51 +96,29 @@ func (c *sqlConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 	return nil, fmt.Errorf("transactions are not supported")
 }
 
-// stmt implements driver.Stmt
-type stmt struct {
-	conn  *sqlConnection
-	query string
+// Prepare returns a prepared statement, bound to this connection.
+func (c *sqlConnection) Prepare(query string) (driver.Stmt, error) {
+	return nil, fmt.Errorf("prepared statements are not supported by Hive")
 }
 
-// Close closes the statement.
-func (s *stmt) Close() error {
-	return nil
-}
-
-// NumInput returns the number of placeholder parameters.
-func (s *stmt) NumInput() int {
-	// Count the number of ? placeholders in the query
-	return strings.Count(s.query, "?")
+// PrepareContext returns a prepared statement, bound to this connection.
+func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	return nil, fmt.Errorf("prepared statements are not supported by Hive")
 }
 
 // Exec executes a query that doesn't return rows.
-func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
-	return s.ExecContext(context.Background(), args)
+// Implements driver.Execer
+func (c *sqlConnection) Exec(query string, args []driver.Value) (driver.Result, error) {
+	return c.ExecContext(context.Background(), query, args)
 }
 
 // ExecContext executes a query that doesn't return rows.
-func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Result, error) {
-	query := s.query
+func (c *sqlConnection) ExecContext(ctx context.Context, query string, args []driver.Value) (driver.Result, error) {
 	if len(args) > 0 {
-		// Replace ? placeholders with actual values
-		for _, arg := range args {
-			var value string
-			switch v := arg.(type) {
-			case string:
-				value = "'" + strings.ReplaceAll(v, "'", "''") + "'"
-			case time.Time:
-				value = "'" + v.Format("2006-01-02 15:04:05") + "'"
-			case nil:
-				value = "NULL"
-			default:
-				value = fmt.Sprintf("%v", v)
-			}
-			query = strings.Replace(query, "?", value, 1)
-		}
+		return nil, fmt.Errorf("query parameters are not supported by Hive")
 	}
 
-	cursor := s.conn.conn.cursor()
-
+	cursor := c.conn.cursor()
 	cursor.exec(ctx, query)
 	if cursor.error() != nil {
 		return nil, cursor.error()
@@ -159,33 +127,18 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.Value) (driver.Res
 }
 
 // Query executes a query that may return rows.
-func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
-	return s.QueryContext(context.Background(), args)
+// Implements driver.Queryer
+func (c *sqlConnection) Query(query string, args []driver.Value) (driver.Rows, error) {
+	return c.QueryContext(context.Background(), query, args)
 }
 
 // QueryContext executes a query that may return rows.
-func (s *stmt) QueryContext(ctx context.Context, args []driver.Value) (driver.Rows, error) {
-	query := s.query
+func (c *sqlConnection) QueryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
 	if len(args) > 0 {
-		// Replace ? placeholders with actual values
-		for _, arg := range args {
-			var value string
-			switch v := arg.(type) {
-			case string:
-				value = "'" + strings.ReplaceAll(v, "'", "''") + "'"
-			case time.Time:
-				value = "'" + v.Format("2006-01-02 15:04:05") + "'"
-			case nil:
-				value = "NULL"
-			default:
-				value = fmt.Sprintf("%v", v)
-			}
-			query = strings.Replace(query, "?", value, 1)
-		}
+		return nil, fmt.Errorf("query parameters are not supported by Hive")
 	}
 
-	cursor := s.conn.conn.cursor()
-
+	cursor := c.conn.cursor()
 	cursor.exec(ctx, query)
 	if cursor.error() != nil {
 		return nil, cursor.error()

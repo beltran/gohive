@@ -26,7 +26,7 @@ go get -tags kerberos github.com/beltran/gohive
 
 ### Using the SQL Interface
 
-GoHive now supports the standard `database/sql` interface, making it easier to use with existing Go code:
+GoHive supports the standard `database/sql` interface, making it easier to use with existing Go code:
 
 ```go
 import (
