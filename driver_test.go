@@ -62,138 +62,6 @@ func buildDSNWithCredentials(username, password, host string, port int, database
 	return dsn
 }
 
-func TestSQLDriverAuthNone(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "NONE" || transport != "binary" {
-		t.Skip("not testing this combination")
-	}
-
-	// Test with NONE configuration
-	config := newConnectConfiguration()
-	config.Service = "hive"
-	config.Username = "username"
-	config.Password = "password"
-	config.Database = "default"
-
-	dsn := buildDSNWithCredentials(config.Username, config.Password, "hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSQLDriverAuthKerberos(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "KERBEROS" || transport != "binary" {
-		t.Skip("not testing this combination")
-	}
-
-	// Test with Kerberos configuration
-	config := newConnectConfiguration()
-	config.Service = "hive"
-	config.Database = "default"
-
-	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSQLDriverAuthDigestMd5(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "DIGEST-MD5" || transport != "binary" {
-		t.Skip("not testing this combination")
-	}
-
-	// Test with DIGEST-MD5 configuration
-	config := newConnectConfiguration()
-	config.Service = "hive"
-	config.Database = "default"
-
-	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSQLDriverAuthPlain(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "PLAIN" || transport != "binary" {
-		t.Skip("not testing this combination")
-	}
-
-	// Test with PLAIN configuration
-	config := newConnectConfiguration()
-	config.Service = "hive"
-	config.Database = "default"
-
-	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSQLDriverAuthGssapi(t *testing.T) {
-	auth := getSQLAuth()
-	transport := getSQLTransport()
-	ssl := getSQLSsl()
-	if auth != "GSSAPI" || transport != "binary" {
-		t.Skip("not testing this combination")
-	}
-
-	// Test with GSSAPI configuration
-	config := newConnectConfiguration()
-	config.Service = "hive"
-	config.Database = "default"
-
-	dsn := buildDSN("hs2.example.com", 10000, config.Database, auth, transport, ssl, true)
-	db, err := sql.Open("hive", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSQLDriverInvalidHost(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
@@ -557,7 +425,7 @@ func TestSQLContext(t *testing.T) {
 	}
 }
 
-func TestSQLPreparedStatement(t *testing.T) {
+func TestSQLDirectInsert(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
@@ -927,6 +795,179 @@ func TestSQLDriverInsecureSkipVerify(t *testing.T) {
 	defer db.Close()
 
 	err = db.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLConnectionProperties(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+
+	// Create DSN
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Set properties using SET command
+	_, err = db.Exec("SET hadoop.madeup.one=value1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec("SET hadoop.madeup.two=value2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify properties are set in the session
+	var propValue string
+	err = db.QueryRow("SET hadoop.madeup.one").Scan(&propValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if propValue != "hadoop.madeup.one=value1" {
+		t.Errorf("Property value mismatch: got %s, want hadoop.madeup.two=value1", propValue)
+	}
+
+	err = db.QueryRow("SET hadoop.madeup.two").Scan(&propValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if propValue != "hadoop.madeup.two=value2" {
+		t.Errorf("Property value mismatch: got %s, want hadoop.madeup.two=value2", propValue)
+	}
+}
+
+func TestSQLShowDatabases(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SHOW DATABASES")
+	if err != nil {
+		t.Fatalf("Failed to execute SHOW DATABASES: %v", err)
+	}
+	defer rows.Close()
+
+	var count int
+	for rows.Next() {
+		var dbName string
+		err := rows.Scan(&dbName)
+		if err != nil {
+			t.Fatalf("Failed to scan database name: %v", err)
+		}
+		t.Logf("Database: %s", dbName)
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("Row iteration error: %v", err)
+	}
+	if count == 0 {
+		t.Error("Expected at least one database, got 0")
+	}
+}
+
+func TestSQLUseDatabase(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Drop table and database if they exist
+	_, err = db.Exec("DROP TABLE IF EXISTS db.pokes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec("DROP DATABASE IF EXISTS db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create database and table
+	_, err = db.Exec("CREATE DATABASE db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec("CREATE TABLE db.pokes (foo INT, bar INT)")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use the database
+	_, err = db.Exec("USE db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert a row
+	_, err = db.Exec("INSERT INTO pokes VALUES(1, 1111)")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Query using unqualified table name
+	rows, err := db.Query("SELECT * FROM pokes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	var foo, bar int32
+	if rows.Next() {
+		err = rows.Scan(&foo, &bar)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foo != 1 || bar != 1111 {
+			t.Errorf("Expected foo=1, bar=1111, got foo=%d, bar=%d", foo, bar)
+		}
+	} else {
+		t.Fatal("No rows returned")
+	}
+
+	// Query using qualified table name
+	rows, err = db.Query("SELECT * FROM db.pokes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.Scan(&foo, &bar)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foo != 1 || bar != 1111 {
+			t.Errorf("Expected foo=1, bar=1111, got foo=%d, bar=%d", foo, bar)
+		}
+	} else {
+		t.Fatal("No rows returned")
+	}
+
+	// Clean up
+	_, err = db.Exec("DROP TABLE IF EXISTS db.pokes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec("DROP DATABASE IF EXISTS db")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,9 +24,9 @@ go get -tags kerberos github.com/beltran/gohive
 
 ## Quickstart
 
-### Using the SQL Interface
+### Connection to Hive
 
-GoHive supports the standard `database/sql` interface, making it easier to use with existing Go code:
+GoHive supports the standard `database/sql` interface:
 
 ```go
 import (
@@ -34,7 +34,7 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Open a connection using the SQL interface
+// Open a connection
 // Format: hive://username:password@host:port/database
 db, err := sql.Open("hive", "hive://username:password@localhost:10000/default")
 if err != nil {
@@ -93,8 +93,7 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://host:port/database?auth=KERBEROS&service=hive
-db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive")
+db, err := sql.Open("hive", "hive://hs2.example.com:10000/default?auth=KERBEROS&service=hive")
 if err != nil {
     log.Fatal(err)
 }
@@ -112,7 +111,6 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://username:password@host:port/database?auth=NONE
 db, err := sql.Open("hive", "hive://myUsername:myPassword@hs2.example.com:10000/default?auth=NONE")
 if err != nil {
     log.Fatal(err)
@@ -130,7 +128,6 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://host:port/database?auth=NOSASL
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL")
 if err != nil {
     log.Fatal(err)
@@ -149,8 +146,7 @@ import (
     _ "github.com/beltran/gohive"
 )
 
-// Format: hive://host:port/database?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice
-db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=KERBEROS&service=hive&transport=http&httpPath=cliservice")
+db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL&service=hive&transport=http&httpPath=cliservice")
 if err != nil {
     log.Fatal(err)
 }

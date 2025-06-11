@@ -315,6 +315,19 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	return strings.TrimSuffix(desc[index][1], "_TYPE")
 }
 
+// FetchLogs returns all the Hive execution logs for the latest query up to the current point.
+// This method should be called after executing a query to get its execution logs.
+func (r *rows) FetchLogs() ([]string, error) {
+	if r.cursor == nil {
+		return nil, fmt.Errorf("no active cursor")
+	}
+	logs := r.cursor.fetchLogs()
+	if r.cursor.error() != nil {
+		return nil, r.cursor.error()
+	}
+	return logs, nil
+}
+
 func init() {
 	sql.Register("hive", &Driver{})
 }

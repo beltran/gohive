@@ -9,17 +9,18 @@ import (
 
 // DSN represents a parsed Data Source Name
 type DSN struct {
-	Username        string
-	Password        string
-	Host            string
-	Port            int
-	Database        string
-	Auth            string
-	TransportMode   string
-	Service         string
-	SSLCertFile     string
-	SSLKeyFile      string
-	SSLInsecureSkip bool
+	Username          string
+	Password          string
+	Host              string
+	Port              int
+	Database          string
+	Auth              string
+	TransportMode     string
+	Service           string
+	SSLCertFile       string
+	SSLKeyFile        string
+	SSLInsecureSkip   bool
+	HiveConfiguration map[string]string
 }
 
 // ParseDSN parses a DSN string into a DSN struct
@@ -37,9 +38,10 @@ func ParseDSN(dsn string) (*DSN, error) {
 
 	// Create a new DSN struct
 	parsedDSN := &DSN{
-		Database:      strings.TrimPrefix(u.Path, "/"),
-		TransportMode: "binary", // Default transport mode
-		Service:       "hive",   // Default service
+		Database:          strings.TrimPrefix(u.Path, "/"),
+		TransportMode:     "binary", // Default transport mode
+		Service:           "hive",   // Default service
+		HiveConfiguration: make(map[string]string),
 	}
 
 	// Parse username and password if present
@@ -81,6 +83,18 @@ func ParseDSN(dsn string) (*DSN, error) {
 	}
 	if sslInsecureSkip := query.Get("sslinsecureskipverify"); sslInsecureSkip != "" {
 		parsedDSN.SSLInsecureSkip = sslInsecureSkip == "true"
+	}
+
+	// Collect all other query parameters as Hive configuration properties
+	for key, values := range query {
+		// Skip standard parameters
+		if key == "auth" || key == "transport" || key == "service" ||
+			key == "sslcert" || key == "sslkey" || key == "sslinsecureskipverify" {
+			continue
+		}
+		if len(values) > 0 {
+			parsedDSN.HiveConfiguration[key] = values[0]
+		}
 	}
 
 	// Validate required fields

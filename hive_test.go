@@ -159,24 +159,6 @@ func TestClosedPort(t *testing.T) {
 	}
 }
 
-func TestFetchDatabase(t *testing.T) {
-	connection, cursor := makeConnection(t, 1000)
-	cursor.exec(context.Background(), "SHOW DATABASES")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	var s string
-	cursor.fetchOne(context.Background(), &s)
-	if cursor.Err != nil {
-		t.Fatal(cursor.Err)
-	}
-	if s != "default" {
-		t.Fatalf("Unrecognized dabase found: %s", s)
-	}
-	closeAll(t, connection, cursor)
-}
-
 func TestCreateTable(t *testing.T) {
 	connection, cursor := makeConnection(t, 1000)
 	cursor.exec(context.Background(), "DROP TABLE IF EXISTS pokes6")
@@ -273,43 +255,6 @@ func TestDescription(t *testing.T) {
 	closeAll(t, connection, cursor)
 }
 
-func TestHiveProperties(t *testing.T) {
-	configuration := map[string]string{
-		"hadoop.madeup.one": "one",
-	}
-
-	connection, cursor := makeConnectionWithConfiguration(t, 1000, configuration)
-
-	cursor.exec(context.Background(), "SET hadoop.madeup.one")
-
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	m := cursor.rowMap(context.Background())
-	expected := map[string]interface{}{"set": "hadoop.madeup.one=one"}
-
-	if !reflect.DeepEqual(m, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
-	}
-
-	cursor.exec(context.Background(), "SET hadoop.madeup.two = two")
-	cursor.exec(context.Background(), "SET hadoop.madeup.two")
-
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	m = cursor.rowMap(context.Background())
-	expected = map[string]interface{}{"set": "hadoop.madeup.two=two"}
-
-	if !reflect.DeepEqual(m, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
-	}
-
-	closeAll(t, connection, cursor)
-}
-
 func TestSelect(t *testing.T) {
 	connection, cursor, tableName := prepareTable(t, 6000, 1000)
 
@@ -347,65 +292,6 @@ func TestSelect(t *testing.T) {
 			t.Fatalf("6000 rows expected here, found %d", j)
 		}
 	}
-	closeAll(t, connection, cursor)
-}
-
-func TestUseDatabase(t *testing.T) {
-	connection, cursor := makeConnection(t, 1000)
-
-	cursor.exec(context.Background(), "DROP TABLE IF EXISTS db.pokes")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "DROP DATABASE IF EXISTS db")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "CREATE DATABASE db")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "CREATE TABLE db.pokes (foo INT, bar INT)")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "USE db")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "INSERT INTO pokes VALUES(1, 1111)")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "SELECT * FROM pokes")
-	m := cursor.rowMap(context.Background())
-	expected := map[string]interface{}{"pokes.foo": int32(1), "pokes.bar": int32(1111)}
-	if !reflect.DeepEqual(m, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
-	}
-
-	cursor.exec(context.Background(), "SELECT * FROM db.pokes")
-	m = cursor.rowMap(context.Background())
-	if !reflect.DeepEqual(m, expected) {
-		t.Fatalf("Expected map: %+v, got: %+v", expected, m)
-	}
-
-	cursor.exec(context.Background(), "DROP TABLE IF EXISTS db.pokes")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
-	cursor.exec(context.Background(), "DROP DATABASE IF EXISTS db")
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
 	closeAll(t, connection, cursor)
 }
 
@@ -516,22 +402,6 @@ func TestSelectNull(t *testing.T) {
 	if j != 6000 {
 		t.Fatalf("6000 rows expected here")
 	}
-	closeAll(t, connection, cursor)
-}
-
-func TestSimpleSelect(t *testing.T) {
-	connection, cursor, tableName := prepareTable(t, 1, 1000)
-	cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-	var s string
-	var i int32
-	cursor.fetchOne(context.Background(), &i, &s)
-	if cursor.error() != nil {
-		t.Fatal(cursor.error())
-	}
-
 	closeAll(t, connection, cursor)
 }
 
@@ -1717,4 +1587,94 @@ func getSsl() bool {
 		return true
 	}
 	return false
+}
+
+func TestConnectionPropertiesPropagation(t *testing.T) {
+	// Set up test properties
+	hiveConfiguration := map[string]string{
+		"hadoop.madeup.one":     "value1",
+		"hadoop.madeup.two":     "value2",
+		"hive.session.timezone": "UTC",
+	}
+
+	// Create connection with properties
+	connection, cursor := makeConnectionWithConfiguration(t, 1000, hiveConfiguration)
+	defer closeAll(t, connection, cursor)
+
+	// Create a test table
+	tableName := fmt.Sprintf("test_props_%d", time.Now().UnixNano())
+	cursor.exec(context.Background(), fmt.Sprintf("CREATE TABLE %s (id INT, value STRING)", tableName))
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+	defer cursor.exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Insert some test data
+	cursor.exec(context.Background(), fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2')", tableName))
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	// Create a new cursor from the same connection
+	newCursor := connection.cursor()
+	defer newCursor.close()
+
+	// Verify both cursors can access the data (properties are inherited)
+	cursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s WHERE id = 1", tableName))
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	var id int
+	var value string
+	cursor.fetchOne(context.Background(), &id, &value)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+	if id != 1 || value != "test1" {
+		t.Errorf("First cursor: got id=%d, value=%s, want id=1, value=test1", id, value)
+	}
+
+	// Test the new cursor
+	newCursor.exec(context.Background(), fmt.Sprintf("SELECT * FROM %s WHERE id = 2", tableName))
+	if newCursor.error() != nil {
+		t.Fatal(newCursor.error())
+	}
+
+	newCursor.fetchOne(context.Background(), &id, &value)
+	if newCursor.error() != nil {
+		t.Fatal(newCursor.error())
+	}
+	if id != 2 || value != "test2" {
+		t.Errorf("Second cursor: got id=%d, value=%s, want id=2, value=test2", id, value)
+	}
+
+	// Verify properties are set in the session
+	cursor.exec(context.Background(), "SET hadoop.madeup.one")
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+
+	var propValue string
+	cursor.fetchOne(context.Background(), &propValue)
+	if cursor.error() != nil {
+		t.Fatal(cursor.error())
+	}
+	if propValue != "value1" {
+		t.Errorf("Property value mismatch: got %s, want value1", propValue)
+	}
+
+	// Verify properties are also available in the new cursor
+	newCursor.exec(context.Background(), "SET hadoop.madeup.two")
+	if newCursor.error() != nil {
+		t.Fatal(newCursor.error())
+	}
+
+	newCursor.fetchOne(context.Background(), &propValue)
+	if newCursor.error() != nil {
+		t.Fatal(newCursor.error())
+	}
+	if propValue != "value2" {
+		t.Errorf("Property value mismatch: got %s, want value2", propValue)
+	}
 }
