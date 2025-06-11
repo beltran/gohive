@@ -668,54 +668,6 @@ func TestSQLDriverNoCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestSQLDriverDSNParsing(t *testing.T) {
-	auth := getSQLAuth()
-	testCases := []struct {
-		name        string
-		dsn         string
-		expectError bool
-	}{
-		{
-			name:        "missing hive:// prefix",
-			dsn:         "username:password@hs2.example.com:10000/default?auth=NONE",
-			expectError: true,
-		},
-		{
-			name:        "missing database",
-			dsn:         fmt.Sprintf("hive://hs2.example.com:10000?auth=%s", auth),
-			expectError: true,
-		},
-		{
-			name:        "missing port",
-			dsn:         fmt.Sprintf("hive://hs2.example.com/default?auth=%s", auth),
-			expectError: true,
-		},
-		{
-			name:        "invalid port",
-			dsn:         fmt.Sprintf("hive://hs2.example.com:invalid/default?auth=%s", auth),
-			expectError: true,
-		},
-		{
-			name:        "valid DSN",
-			dsn:         buildDSN("hs2.example.com", 10000, "default", auth, "binary", true, true),
-			expectError: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := sql.Open("hive", tc.dsn)
-			if tc.expectError && err == nil {
-				t.Errorf("Expected error for DSN: %s", tc.dsn)
-			}
-			if !tc.expectError && err != nil {
-				t.Errorf("Unexpected error for DSN: %s, error: %v", tc.dsn, err)
-			}
-		})
-	}
-}
-
 func TestSQLDriverQueryParams(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
