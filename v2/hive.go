@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os/user"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -472,12 +473,12 @@ func (c *cursor) executeSync(ctx context.Context, query string) {
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
+	c.conn.clientMu.Lock()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
 	executeReq.RunAsync = false
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
-	c.conn.clientMu.Lock()
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 	c.conn.clientMu.Unlock()
 
@@ -514,11 +515,11 @@ func (c *cursor) fetchLogs() []string {
 	logRequest := hiveserver.NewTFetchResultsReq()
 	logRequest.OperationHandle = c.operationHandle
 	logRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
+	c.conn.clientMu.Lock()
 	logRequest.MaxRows = c.conn.configuration.FetchSize
 	// FetchType 1 is "logs"
 	logRequest.FetchType = 1
 
-	c.conn.clientMu.Lock()
 	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
 	c.conn.clientMu.Unlock()
 	if err != nil || resp == nil || resp.Results == nil {
@@ -547,6 +548,8 @@ func (c *cursor) fetchIfEmpty(ctx context.Context) {
 	if c.totalRows == c.columnIndex {
 		c.queue = nil
 		if !c.hasMore(ctx) {
+			// print stack trace
+			log.Printf("[DEBUG] Stack trace: %+v", string(debug.Stack()))
 			c.Err = errors.New("No more rows are left")
 			return
 		}
@@ -965,8 +968,8 @@ func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest := hiveserver.NewTFetchResultsReq()
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
-			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 			c.conn.clientMu.Lock()
+			fetchRequest.MaxRows = c.conn.configuration.FetchSize
 			responseFetch, err := c.conn.client.FetchResults(ctx, fetchRequest)
 			c.conn.clientMu.Unlock()
 			if err != nil {

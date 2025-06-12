@@ -1377,7 +1377,7 @@ func TestSQLConnectionPooling(t *testing.T) {
 	}
 }
 
-func TestSQLConnectionPoolingTx(t *testing.T) {
+func TestSQLConnectionPoolinAgTx(t *testing.T) {
 	auth := getSQLAuth()
 	transport := getSQLTransport()
 	ssl := getSQLSsl()
