@@ -1248,3 +1248,131 @@ func TestSQLMultipleCursors(t *testing.T) {
 		t.Errorf("third cursor got count=%d, want 3", totalCount)
 	}
 }
+
+func TestSQLConnectionPooling(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+
+	// Create a DB with specific pool settings
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Configure pool settings
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(time.Minute * 5)
+	db.SetConnMaxIdleTime(time.Minute)
+
+	// Verify initial connection
+	if err := db.Ping(); err != nil {
+		t.Fatalf("Failed to ping database: %v", err)
+	}
+
+	// Check current database
+	var currentDB string
+	err = db.QueryRow("SELECT current_database()").Scan(&currentDB)
+	if err != nil {
+		t.Fatalf("Failed to get current database: %v", err)
+	}
+
+	// List all tables in current database
+	rows, err := db.Query("SHOW TABLES")
+	if err != nil {
+		t.Fatalf("Failed to list tables: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			t.Fatalf("Failed to scan table name: %v", err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("Error iterating tables: %v", err)
+	}
+
+	// Create a test table with fully qualified name
+	tableName := fmt.Sprintf("%s.pool_test", currentDB)
+	_, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(fmt.Sprintf("CREATE TABLE %s (id INT, value STRING)", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Insert some test data
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2'), (3, 'test3')", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a channel to coordinate goroutines
+	done := make(chan bool)
+	errors := make(chan error, 10)
+
+	// Launch multiple concurrent queries
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			// Each goroutine will perform multiple operations
+			for j := 0; j < 3; j++ {
+				// Verify connection is still alive before each operation
+				if err := db.Ping(); err != nil {
+					errors <- fmt.Errorf("goroutine %d ping %d failed: %v", id, j, err)
+					return
+				}
+
+				// Query operation
+				rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d query %d failed: %v", id, j, err)
+					return
+				}
+				rows.Close()
+
+				// Exec operation
+				_, err = db.Exec(fmt.Sprintf("SELECT * FROM %s", tableName))
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d exec %d failed: %v", id, j, err)
+					return
+				}
+
+				// QueryRow operation
+				var value string
+				err = db.QueryRow(fmt.Sprintf("SELECT value FROM %s WHERE id = 1", tableName)).Scan(&value)
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d queryrow %d failed: %v", id, j, err)
+					return
+				}
+
+				// Small delay between operations to prevent overwhelming the connection
+				time.Sleep(50 * time.Millisecond)
+			}
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines to complete or timeout
+	timeout := time.After(30 * time.Second)
+	completed := 0
+	for {
+		select {
+		case err := <-errors:
+			t.Fatal(err)
+		case <-done:
+			completed++
+			if completed == 10 {
+				return // All goroutines completed successfully
+			}
+		case <-timeout:
+			t.Fatalf("Test timed out after 30 seconds. Completed %d/10 goroutines", completed)
+		}
+	}
+}

@@ -1133,6 +1133,7 @@ func (c *connection) cursor() *cursor {
 func (c *connection) close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.transport != nil {
 		return c.transport.Close()
 	}

@@ -50,23 +50,25 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 		config.TLSConfig = tlsConfig
 	}
 
-	// Connect to Hive
-	conn, err := connect(context.Background(), dsn.Host, dsn.Port, dsn.Auth, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &connector{conn: conn}, nil
+	return &connector{host: dsn.Host, port: dsn.Port, auth: dsn.Auth, config: config}, nil
 }
 
 // connector implements driver.Connector
 type connector struct {
-	conn *connection
+	host   string
+	port   int
+	auth   string
+	config *connectConfiguration
 }
 
 // Connect returns a connection to the database.
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
-	return &sqlConnection{conn: c.conn}, nil
+	// Connect to Hive
+	conn, err := connect(context.Background(), c.host, c.port, c.auth, c.config)
+	if err != nil {
+		return nil, err
+	}
+	return &sqlConnection{conn: conn}, nil
 }
 
 // Driver returns the underlying Driver of the Connector.
