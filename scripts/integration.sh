@@ -104,10 +104,14 @@ function  binaryKerberos() {
   export AUTH="KERBEROS"
   export SSL="0"
   export METASTORE_SKIP="0"
-  go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go test -tags "integration kerberos" -covermode=count -coverprofile=a.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go run -tags "kerberos" example/main.go
   go run -tags "kerberos" example/main_meta.go
+  pushd v2
+  go test -tags "integration kerberos" -covermode=count -coverprofile=aa.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go run -tags "kerberos" example/main.go
+  go run -tags "kerberos" example/main_meta.go
+  popd
 }
 
 function httpKerberos() {
@@ -122,7 +126,10 @@ function httpKerberos() {
   export SSL="1"
   export METASTORE_SKIP="1"
   # go test -tags "integration kerberos" -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags "integration kerberos" -covermode=count -coverprofile=b.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags "integration kerberos" -covermode=count -coverprofile=b.part -v -run TestFetchDatabase || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  pushd v2
+  go test -tags "integration kerberos" -covermode=count -coverprofile=bb.part -v -run TestSQLShowDatabases || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  popd
 }
 
 function binaryNone() {
@@ -135,10 +142,14 @@ function binaryNone() {
   export SSL="0"
   export METASTORE_SKIP="1"
   # go test -tags integration -race -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
-  go test -tags integration -covermode=count -coverprofile=c.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  go test -tags integration -covermode=count -coverprofile=c.part -v -run TestFetchDatabase || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  pushd v2
+  go test -tags integration -covermode=count -coverprofile=cc.part -v -run TestSQLShowDatabases || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
+  popd
 
   echo "mode: count" >coverage.out
   grep -h -v "mode: count" *.part >>coverage.out
+  grep -h -v "mode: count" v2/*.part >>coverage.out
 }
 
 function run_tests() {
