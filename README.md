@@ -36,7 +36,7 @@ import (
 
 // Open a connection
 // Format: hive://username:password@host:port/database
-db, err := sql.Open("hive", "hive://username:password@localhost:10000/default")
+db, err := sql.Open("hive", "hive://username:password@hs2.example.com:10000/default")
 if err != nil {
     log.Fatal(err)
 }
@@ -60,33 +60,8 @@ for rows.Next() {
 }
 ```
 
-### Connection to the Hive Metastore
-
-The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
-
-```go
-    configuration := gohive.NewMetastoreConnectConfiguration()
-    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
-    if err != nil {
-        log.Fatal(err)
-    }
-    database := hive_metastore.Database{
-        Name:        "my_new_database",
-        LocationUri: "/"}
-    err = connection.Client.CreateDatabase(context.Background(), &database)
-    if err != nil {
-        log.Fatal(err)
-    }
-    databases, err := connection.Client.GetAllDatabases(context.Background())
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println("databases ", databases)
-    connection.Close()
-```
-
 ## Supported connections
-### Connect with Sasl kerberos:
+### Connect with SASL KERBEROS:
 ``` go
 import (
     "database/sql"
@@ -104,7 +79,7 @@ This implies setting in hive-site.xml:
 - `hive.server2.authentication.kerberos.principal = hive/_HOST@EXAMPLE.COM`
 - `hive.server2.authentication.kerberos.keytab = path/to/keytab.keytab`
 
-### Connect using Plain Sasl:
+### Connect using Plain SASL:
 ``` go
 import (
     "database/sql"
@@ -121,7 +96,7 @@ This implies setting in hive-site.xml:
 
 - `hive.server2.authentication = NONE`
 
-### Connect using No Sasl:
+### Connect using NOSASL:
 ``` go
 import (
     "database/sql"
@@ -157,6 +132,31 @@ This implies setting in hive-site.xml:
 - `hive.server2.authentication = KERBEROS`, or `NONE`
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
+
+## Connection to the Hive Metastore
+
+The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
+
+```go
+    configuration := gohive.NewMetastoreConnectConfiguration()
+    connection, err := gohive.ConnectToMetastore("hm.example.com", 9083, "KERBEROS", configuration)
+    if err != nil {
+        log.Fatal(err)
+    }
+    database := hive_metastore.Database{
+        Name:        "my_new_database",
+        LocationUri: "/"}
+    err = connection.Client.CreateDatabase(context.Background(), &database)
+    if err != nil {
+        log.Fatal(err)
+    }
+    databases, err := connection.Client.GetAllDatabases(context.Background())
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println("databases ", databases)
+    connection.Close()
+```
 
 ## Running tests
 Tests can be run with:

@@ -91,7 +91,7 @@ func TestResuseConnection(t *testing.T) {
 	if cursor.error() != nil {
 		t.Fatal(cursor.error())
 	}
-	cursor.close()
+	cursor.close(context.Background())
 
 	newCursor := connection.cursor()
 	cursor.exec(context.Background(), "SHOW DATABASES")
@@ -1557,7 +1557,7 @@ func makeConnectionWithConnectConfiguration(t *testing.T, configuration *connect
 
 func closeAll(t *testing.T, connection *connection, cursor *cursor) {
 	if cursor != nil {
-		cursor.close()
+		cursor.close(context.Background())
 	}
 	if connection != nil {
 		connection.close()

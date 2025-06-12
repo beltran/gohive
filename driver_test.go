@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -547,28 +548,11 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 
 	t.Logf("Table created: %s", tableName)
 
+	// Insert data and check rows affected
 	_, err = db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2')", tableName))
 	if err != nil {
 		t.Fatalf("Failed to insert data: %v", err)
 	}
-
-	t.Logf("Data inserted into table: %s", tableName)
-
-	// Before verifying table contents, add a query to check data
-	checkRows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName))
-	if err != nil {
-		t.Fatalf("Failed to check table data: %v", err)
-	}
-	defer checkRows.Close()
-
-	var rowCount int
-	if checkRows.Next() {
-		err = checkRows.Scan(&rowCount)
-		if err != nil {
-			t.Fatalf("Failed to scan count: %v", err)
-		}
-	}
-	t.Logf("Current row count in table: %d", rowCount)
 
 	// Verify table contents directly
 	verifyRows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s", tableName))
@@ -577,12 +561,58 @@ func TestSQLDriverDatabaseOperations(t *testing.T) {
 	}
 	defer verifyRows.Close()
 
-	// Before iterating, log the column names
+	// Get column information
 	cols, err := verifyRows.Columns()
 	if err != nil {
 		t.Fatalf("Failed to get columns: %v", err)
 	}
 	t.Logf("Verification columns: %v", cols)
+
+	// Verify column names (they come with table prefix)
+	expectedCols := []string{
+		fmt.Sprintf("%s.id", tableName),
+		fmt.Sprintf("%s.name", tableName),
+	}
+	if !reflect.DeepEqual(cols, expectedCols) {
+		t.Errorf("Expected columns %v, got %v", expectedCols, cols)
+	}
+
+	// Get column types
+	columnTypes, err := verifyRows.ColumnTypes()
+	if err != nil {
+		t.Fatalf("Failed to get column types: %v", err)
+	}
+
+	// Verify column types
+	expectedTypes := []struct {
+		name     string
+		dbType   string
+		scanType reflect.Type
+	}{
+		{"id", "INT", reflect.TypeOf(int32(0))},
+		{"name", "STRING", reflect.TypeOf("")},
+	}
+
+	if len(columnTypes) != len(expectedTypes) {
+		t.Errorf("Expected %d column types, got %d", len(expectedTypes), len(columnTypes))
+	}
+
+	for i, colType := range columnTypes {
+		if i >= len(expectedTypes) {
+			continue
+		}
+		expected := expectedTypes[i]
+
+		// Check database type name
+		if dbType := colType.DatabaseTypeName(); dbType != expected.dbType {
+			t.Errorf("Column %s: got database type %q, want %q", expected.name, dbType, expected.dbType)
+		}
+
+		// Check scan type
+		if scanType := colType.ScanType(); scanType != expected.scanType {
+			t.Errorf("Column %s: got scan type %v, want %v", expected.name, scanType, expected.scanType)
+		}
+	}
 
 	// Log the result of verifyRows.Next() before scanning
 	var verifyCount int
@@ -935,5 +965,183 @@ func TestSQLUseDatabase(t *testing.T) {
 	_, err = db.Exec("DROP DATABASE IF EXISTS db")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestColumnTypeDatabaseTypeName(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	tableName := getTestTableName("test_column_types")
+
+	// Create a table with various types
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			col_boolean BOOLEAN,
+			col_tinyint TINYINT,
+			col_smallint SMALLINT,
+			col_int INT,
+			col_bigint BIGINT,
+			col_float FLOAT,
+			col_double DOUBLE,
+			col_decimal DECIMAL(10,2),
+			col_string STRING,
+			col_varchar VARCHAR(100),
+			col_char CHAR(10),
+			col_timestamp TIMESTAMP,
+			col_date DATE,
+			col_binary BINARY,
+			col_array ARRAY<INT>,
+			col_map MAP<INT,STRING>,
+			col_struct STRUCT<a:INT,b:STRING>,
+			col_union UNIONTYPE<INT,STRING>
+		)
+	`, tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Query the table to get column types
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	// Get column types
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expected type names (without _TYPE suffix)
+	expectedTypes := []string{
+		"BOOLEAN",
+		"TINYINT",
+		"SMALLINT",
+		"INT",
+		"BIGINT",
+		"FLOAT",
+		"DOUBLE",
+		"DECIMAL",
+		"STRING",
+		"VARCHAR",
+		"CHAR",
+		"TIMESTAMP",
+		"DATE",
+		"BINARY",
+		"ARRAY",
+		"MAP",
+		"STRUCT",
+		"UNION",
+	}
+
+	// Verify each column's database type name
+	for i, colType := range columnTypes {
+		if i >= len(expectedTypes) {
+			t.Errorf("Unexpected column at index %d", i)
+			continue
+		}
+
+		dbTypeName := colType.DatabaseTypeName()
+		expectedType := expectedTypes[i]
+		if dbTypeName != expectedType {
+			t.Errorf("Column %d: got type %q, want %q", i, dbTypeName, expectedType)
+		}
+	}
+
+	if len(columnTypes) != len(expectedTypes) {
+		t.Errorf("Got %d columns, want %d", len(columnTypes), len(expectedTypes))
+	}
+}
+
+func TestColumnTypeScanType(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	tableName := getTestTableName("test_scan_types")
+
+	// Create a table with various types
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			col_boolean BOOLEAN,
+			col_tinyint TINYINT,
+			col_smallint SMALLINT,
+			col_int INT,
+			col_bigint BIGINT,
+			col_float FLOAT,
+			col_double DOUBLE,
+			col_decimal DECIMAL(10,2),
+			col_string STRING,
+			col_timestamp TIMESTAMP,
+			col_date DATE,
+			col_binary BINARY
+		)
+	`, tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Query the table to get column types
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	// Get column types
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expected Go types for scanning
+	expectedTypes := []reflect.Type{
+		reflect.TypeOf(false),       // BOOLEAN
+		reflect.TypeOf(int8(0)),     // TINYINT
+		reflect.TypeOf(int16(0)),    // SMALLINT
+		reflect.TypeOf(int32(0)),    // INT
+		reflect.TypeOf(int64(0)),    // BIGINT
+		reflect.TypeOf(float32(0)),  // FLOAT
+		reflect.TypeOf(float64(0)),  // DOUBLE
+		reflect.TypeOf(""),          // DECIMAL
+		reflect.TypeOf(""),          // STRING
+		reflect.TypeOf(time.Time{}), // TIMESTAMP
+		reflect.TypeOf(time.Time{}), // DATE
+		reflect.TypeOf([]byte{}),    // BINARY
+	}
+
+	// Verify each column's scan type
+	for i, colType := range columnTypes {
+		if i >= len(expectedTypes) {
+			t.Errorf("Unexpected column at index %d", i)
+			continue
+		}
+
+		scanType := colType.ScanType()
+		expectedType := expectedTypes[i]
+		if scanType != expectedType {
+			t.Errorf("Column %d: got scan type %v, want %v", i, scanType, expectedType)
+		}
+	}
+
+	if len(columnTypes) != len(expectedTypes) {
+		t.Errorf("Got %d columns, want %d", len(columnTypes), len(expectedTypes))
 	}
 }

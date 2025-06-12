@@ -337,7 +337,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 
 	if configuration.Database != "" {
 		cursor := conn.cursor()
-		defer cursor.close()
+		defer cursor.close(ctx)
 		cursor.exec(ctx, "USE "+configuration.Database)
 		if cursor.Err != nil {
 			return nil, cursor.Err
@@ -426,14 +426,14 @@ func (c *cursor) execute(ctx context.Context, query string) {
 	// because if the context ends the operation can't be cancelled cleanly
 	if c.Err != nil {
 		if c.state == _CONTEXT_DONE {
-			c.handleDoneContext()
+			c.handleDoneContext(ctx)
 		}
 		return
 	}
 
 	if c.Err != nil {
 		if c.state == _CONTEXT_DONE {
-			c.handleDoneContext()
+			c.handleDoneContext(ctx)
 		} else if c.state == _ERROR {
 			c.Err = errors.New("Probably the context was over when passed to execute. This probably resulted in the message being sent but we didn't get an operation handle so it's most likely a bug in thrift")
 		}
@@ -453,7 +453,7 @@ func (c *cursor) execute(ctx context.Context, query string) {
 	c.state = _ASYNC_ENDED
 }
 
-func (c *cursor) handleDoneContext() {
+func (c *cursor) handleDoneContext(ctx context.Context) {
 	originalError := c.Err
 	if c.operationHandle != nil {
 		c.cancel()
@@ -461,14 +461,14 @@ func (c *cursor) handleDoneContext() {
 			return
 		}
 	}
-	c.resetState()
+	c.resetState(ctx)
 	c.Err = originalError
 	c.state = _FINISHED
 }
 
 // executeSync sends a query to hive for execution with a context
 func (c *cursor) executeSync(ctx context.Context, query string) {
-	c.resetState()
+	c.resetState(ctx)
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
@@ -1035,11 +1035,11 @@ func (c *cursor) cancel() {
 }
 
 // close closes the cursor
-func (c *cursor) close() {
-	c.Err = c.resetState()
+func (c *cursor) close(ctx context.Context) {
+	c.Err = c.resetState(ctx)
 }
 
-func (c *cursor) resetState() error {
+func (c *cursor) resetState(ctx context.Context) error {
 	c.response = nil
 	c.Err = nil
 	c.queue = nil
@@ -1053,7 +1053,7 @@ func (c *cursor) resetState() error {
 		closeRequest.OperationHandle = c.operationHandle
 
 		c.conn.clientMu.Lock()
-		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
+		responseClose, err := c.conn.client.CloseOperation(ctx, closeRequest)
 		c.conn.clientMu.Unlock()
 		c.operationHandle = nil
 		if err != nil {
