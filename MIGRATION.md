@@ -99,7 +99,7 @@ func main() {
 
 The following features from version 1.x are no longer supported in version 2.0:
 
-- Connection via Zookeeper**
+- Connection via Zookeeper
 - Log Fetching
 
 ## Migration Steps

@@ -1145,3 +1145,106 @@ func TestColumnTypeScanType(t *testing.T) {
 		t.Errorf("Got %d columns, want %d", len(columnTypes), len(expectedTypes))
 	}
 }
+
+func TestMultipleCursors(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	tableName := getTestTableName("test_multiple_cursors")
+
+	// Create a test table
+	_, err = db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (id INT, name STRING)", tableName))
+	if err != nil {
+		t.Fatalf("error creating table: %v", err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Insert test data
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2'), (3, 'test3')", tableName))
+	if err != nil {
+		t.Fatalf("error inserting data: %v", err)
+	}
+
+	// Create first cursor
+	rows1, err := db.Query(fmt.Sprintf("SELECT * FROM %s WHERE id <= 2", tableName))
+	if err != nil {
+		t.Fatalf("error querying with first cursor: %v", err)
+	}
+	defer rows1.Close()
+
+	// Create second cursor while first is still open
+	rows2, err := db.Query(fmt.Sprintf("SELECT * FROM %s WHERE id > 2", tableName))
+	if err != nil {
+		t.Fatalf("error querying with second cursor: %v", err)
+	}
+	defer rows2.Close()
+
+	// Read from first cursor
+	var id1 int
+	var name1 string
+	var count1 int
+	for rows1.Next() {
+		err = rows1.Scan(&id1, &name1)
+		if err != nil {
+			t.Fatalf("error scanning first cursor: %v", err)
+		}
+		count1++
+		if id1 > 2 {
+			t.Errorf("first cursor got id=%d, want id <= 2", id1)
+		}
+	}
+	if err := rows1.Err(); err != nil {
+		t.Fatalf("error iterating first cursor: %v", err)
+	}
+	if count1 != 2 {
+		t.Errorf("first cursor got %d rows, want 2", count1)
+	}
+
+	// Read from second cursor
+	var id2 int
+	var name2 string
+	var count2 int
+	for rows2.Next() {
+		err = rows2.Scan(&id2, &name2)
+		if err != nil {
+			t.Fatalf("error scanning second cursor: %v", err)
+		}
+		count2++
+		if id2 <= 2 {
+			t.Errorf("second cursor got id=%d, want id > 2", id2)
+		}
+	}
+	if err := rows2.Err(); err != nil {
+		t.Fatalf("error iterating second cursor: %v", err)
+	}
+	if count2 != 1 {
+		t.Errorf("second cursor got %d rows, want 1", count2)
+	}
+
+	// Create a third cursor after closing the first two
+	rows3, err := db.Query(fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName))
+	if err != nil {
+		t.Fatalf("error querying with third cursor: %v", err)
+	}
+	defer rows3.Close()
+
+	// Read from third cursor
+	var totalCount int
+	if !rows3.Next() {
+		t.Fatal("expected a row from third cursor")
+	}
+	err = rows3.Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("error scanning third cursor: %v", err)
+	}
+	if totalCount != 3 {
+		t.Errorf("third cursor got count=%d, want 3", totalCount)
+	}
+}
