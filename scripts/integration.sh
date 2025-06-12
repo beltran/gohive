@@ -92,6 +92,8 @@ function bringCredentials() {
 
     openssl pkcs12 -in /tmp/hostname-keystore.p12 -out client.cer.pem -clcerts -nokeys -passin pass:changeme
     openssl pkcs12 -in /tmp/hostname-keystore.p12 -out client.cer.key -nocerts -nodes -passin pass:changeme
+    cp client.cer.pem v2/client.cer.pem
+    cp client.cer.key v2/client.cer.key
 }
 
 function  binaryKerberos() {
