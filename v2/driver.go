@@ -88,6 +88,19 @@ func (c *sqlConnection) Close() error {
 	return c.conn.close()
 }
 
+type tx struct {
+}
+
+// Commit implements driver.Tx.
+func (t tx) Commit() error {
+	return nil
+}
+
+// Rollback implements driver.Tx.
+func (t tx) Rollback() error {
+	return nil
+}
+
 // Begin starts and returns a new transaction.
 func (c *sqlConnection) Begin() (driver.Tx, error) {
 	return c.BeginTx(context.Background(), driver.TxOptions{})
@@ -95,7 +108,7 @@ func (c *sqlConnection) Begin() (driver.Tx, error) {
 
 // BeginTx starts and returns a new transaction.
 func (c *sqlConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return nil, fmt.Errorf("transactions are not supported")
+	return tx{}, nil
 }
 
 // Prepare returns a prepared statement, bound to this connection.

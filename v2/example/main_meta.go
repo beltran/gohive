@@ -15,7 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 	database := hive_metastore.Database{
-		Name:        "my_new_database",
+		Name:        "my_new_databasev2",
 		LocationUri: "/"}
 	err = connection.Client.CreateDatabase(context.Background(), &database)
 	if err != nil {
