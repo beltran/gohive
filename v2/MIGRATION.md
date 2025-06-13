@@ -101,6 +101,7 @@ The following features from version 1.x are no longer supported in version 2.0:
 
 - Connection via Zookeeper
 - Log Fetching
+- Custom dial function
 
 ## Migration Steps
 
@@ -118,7 +119,7 @@ The following features from version 1.x are no longer supported in version 2.0:
 
 If you encounter any issues during migration:
 1. Check the [GitHub Issues](https://github.com/beltran/gohive/issues)
-2. Review the [documentation](https://github.com/beltran/gohive#readme)
+2. Review the [documentation](https://github.com/beltran/gohive/v2/readme.md)
 3. Open a new issue if you find a bug
 
 ## Why These Changes?
