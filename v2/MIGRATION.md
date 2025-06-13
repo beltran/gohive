@@ -41,7 +41,7 @@ func main() {
     defer cursor.Close()
     defer connection.Close()
 
-    cursor.Exec(context.Background(), "SELECT * FROM one_row")
+    cursor.Exec(context.Background(), "SELECT * FROM mytable")
     if cursor.Err != nil {
         log.Fatal(cursor.Err)
     }
@@ -78,7 +78,7 @@ func main() {
     }
     defer db.Close()
 
-    rows, err := db.Query("SELECT * FROM one_row")
+    rows, err := db.Query("SELECT * FROM mytable")
     if err != nil {
         log.Fatal(err)
     }
@@ -97,7 +97,7 @@ func main() {
 
 ### 2. Unsupported Features
 
-The following features from version 1.x are no longer supported in version 2.0:
+The following features from version 1.x are not supported at the moment in version 2.0:
 
 - Connection via Zookeeper
 - Log Fetching
