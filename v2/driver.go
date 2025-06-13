@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -195,72 +196,25 @@ func (r *rows) Close() error {
 // Next is called to populate the next row of data into
 // the provided slice.
 func (r *rows) Next(dest []driver.Value) error {
-	// Defensive: always use a valid context
 	if r.cursor == nil {
-		return sql.ErrNoRows
+		return io.EOF
 	}
+
 	if !r.cursor.hasMore(r.ctx) {
 		return io.EOF
 	}
 
-	row := r.cursor.rowMap(r.ctx)
-	if r.cursor.error() != nil {
-		return r.cursor.error()
+	// Create a slice of pointers to hold the values
+	ptrs := make([]interface{}, len(dest))
+	for i := range dest {
+		ptrs[i] = &dest[i]
 	}
 
-	columns := r.Columns()
-	desc := r.cursor.description(r.ctx)
-	for i := range dest {
-		colName := columns[i]
-		val := row[colName]
-
-		// Handle NULL values
-		if val == nil {
-			dest[i] = nil
-			continue
-		}
-
-		// Use column type from description
-		var colType string
-		if i < len(desc) {
-			colType = strings.ToUpper(desc[i][1])
-		}
-
-		// Accept both TIMESTAMP and TIMESTAMP_TYPE, DATE and DATE_TYPE
-		isTimestamp := colType == "TIMESTAMP" || colType == "TIMESTAMP_TYPE"
-		isDate := colType == "DATE" || colType == "DATE_TYPE"
-
-		switch v := val.(type) {
-		case string:
-			if isTimestamp {
-				t, err := time.Parse("2006-01-02 15:04:05", v)
-				if err == nil {
-					dest[i] = t
-					continue
-				}
-			}
-			if isDate {
-				t, err := time.Parse("2006-01-02", v)
-				if err == nil {
-					dest[i] = t
-					continue
-				}
-			}
-			dest[i] = v
-		case int64:
-			dest[i] = v
-		case float64:
-			dest[i] = v
-		case bool:
-			dest[i] = v
-		case []byte:
-			dest[i] = v
-		case time.Time:
-			dest[i] = v
-		default:
-			// For any other type, convert to string
-			dest[i] = fmt.Sprintf("%v", v)
-		}
+	// Fetch the row directly into the destination slice
+	r.cursor.fetchOne(r.ctx, ptrs...)
+	if r.cursor.Err != nil {
+		log.Printf("Error in fetchOne: %v", r.cursor.Err)
+		return r.cursor.Err
 	}
 
 	return nil

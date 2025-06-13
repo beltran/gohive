@@ -1273,35 +1273,9 @@ func TestSQLConnectionPooling(t *testing.T) {
 		t.Fatalf("Failed to ping database: %v", err)
 	}
 
-	// Check current database
-	var currentDB string
-	err = db.QueryRow("SELECT current_database()").Scan(&currentDB)
-	if err != nil {
-		t.Fatalf("Failed to get current database: %v", err)
-	}
-
-	// List all tables in current database
-	rows, err := db.Query("SHOW TABLES")
-	if err != nil {
-		t.Fatalf("Failed to list tables: %v", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var tableName string
-		if err := rows.Scan(&tableName); err != nil {
-			t.Fatalf("Failed to scan table name: %v", err)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("Error iterating tables: %v", err)
-	}
-
 	// Create a test table with fully qualified name
-	tableName := fmt.Sprintf("%s.pool_test", currentDB)
-	_, err = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
-	if err != nil {
-		t.Fatal(err)
-	}
+	tableName := getTestTableName("pool_test")
+
 	_, err = db.Exec(fmt.Sprintf("CREATE TABLE %s (id INT, value STRING)", tableName))
 	if err != nil {
 		t.Fatal(err)
@@ -1312,6 +1286,27 @@ func TestSQLConnectionPooling(t *testing.T) {
 	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (1, 'test1'), (2, 'test2'), (3, 'test3')", tableName))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var id int
+		var value string
+		err = rows.Scan(&id, &value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+
+	if count != 3 {
+		t.Fatalf("goroutine original count %d", count)
 	}
 
 	// Create a channel to coordinate goroutines
@@ -1335,7 +1330,22 @@ func TestSQLConnectionPooling(t *testing.T) {
 					errors <- fmt.Errorf("goroutine %d query %d failed: %v", id, j, err)
 					return
 				}
-				rows.Close()
+				defer rows.Close()
+
+				count := 0
+				for rows.Next() {
+					var id int
+					var value string
+					err = rows.Scan(&id, &value)
+					if err != nil {
+						errors <- fmt.Errorf("goroutine %d scan %d failed: %v", id, j, err)
+					}
+					count++
+				}
+
+				if count != 3 {
+					errors <- fmt.Errorf("goroutine %d count %d failed: %v", id, j, count)
+				}
 
 				// Exec operation
 				_, err = db.Exec(fmt.Sprintf("SELECT * FROM %s", tableName))
