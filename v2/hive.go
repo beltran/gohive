@@ -680,8 +680,7 @@ func (c *cursor) rowMap(ctx context.Context) map[string]interface{} {
 	return m
 }
 
-// fetchOne returns one row and advances the cursor one
-func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
+func (c *cursor) fetchOneDriver(ctx context.Context, dests []driver.Value) {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
 	if c.Err != nil {
@@ -705,18 +704,100 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 		isDate := colType == "DATE"
 
 		if c.queue[i].IsSetBinaryVal() {
+			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = c.queue[i].BinaryVal.Values[c.columnIndex]
+			}
+		} else if c.queue[i].IsSetByteVal() {
+			if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = int64(c.queue[i].ByteVal.Values[c.columnIndex])
+			}
+		} else if c.queue[i].IsSetI16Val() {
+			if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = int64(c.queue[i].I16Val.Values[c.columnIndex])
+			}
+		} else if c.queue[i].IsSetI32Val() {
+			if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = int64(c.queue[i].I32Val.Values[c.columnIndex])
+			}
+		} else if c.queue[i].IsSetI64Val() {
+			if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = c.queue[i].I64Val.Values[c.columnIndex]
+			}
+		} else if c.queue[i].IsSetStringVal() {
+			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				val := c.queue[i].StringVal.Values[c.columnIndex]
+				if isTimestamp {
+					t, err := time.Parse("2006-01-02 15:04:05", val)
+					if err != nil {
+						c.Err = fmt.Errorf("failed to parse TIMESTAMP value %q: %w", val, err)
+						return
+					}
+					dests[i] = t
+				} else if isDate {
+					t, err := time.Parse("2006-01-02", val)
+					if err != nil {
+						c.Err = fmt.Errorf("failed to parse DATE value %q: %w", val, err)
+						return
+					}
+					dests[i] = t
+				} else {
+					dests[i] = val
+				}
+			}
+		} else if c.queue[i].IsSetDoubleVal() {
+			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = c.queue[i].DoubleVal.Values[c.columnIndex]
+			}
+		} else if c.queue[i].IsSetBoolVal() {
+			if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+				dests[i] = nil
+			} else {
+				dests[i] = c.queue[i].BoolVal.Values[c.columnIndex]
+			}
+		} else {
+			c.Err = errors.Errorf("Empty column %v", c.queue[i])
+			return
+		}
+	}
+	c.columnIndex++
+}
+
+// fetchOne returns one row and advances the cursor one
+func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
+	c.Err = nil
+	c.fetchIfEmpty(ctx)
+	if c.Err != nil {
+		return
+	}
+
+	if len(c.queue) != len(dests) {
+		c.Err = errors.Errorf("%d arguments where passed for filling but the number of columns is %d", len(dests), len(c.queue))
+		return
+	}
+	for i := 0; i < len(c.queue); i++ {
+		if c.queue[i].IsSetBinaryVal() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].BinaryVal.Values[c.columnIndex]
 				continue
 			}
 			d, ok := dests[i].(*[]byte)
 			if !ok {
-				if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = c.queue[i].BinaryVal.Values[c.columnIndex]
-				}
-				continue
+				c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BinaryVal.Values[c.columnIndex], c.queue[i].BinaryVal.Values[c.columnIndex], i)
+				return
 			}
 			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
 				*d = nil
@@ -730,14 +811,24 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*int8)
 			if !ok {
-				if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = int64(c.queue[i].ByteVal.Values[c.columnIndex])
+				d, ok := dests[i].(**int8)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].ByteVal.Values[c.columnIndex], c.queue[i].ByteVal.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].ByteVal.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(int8)
+					}
+					**d = c.queue[i].ByteVal.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].ByteVal.Values[c.columnIndex]
 			}
-			*d = c.queue[i].ByteVal.Values[c.columnIndex]
+
 		} else if c.queue[i].IsSetI16Val() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].I16Val.Values[c.columnIndex]
@@ -745,14 +836,23 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*int16)
 			if !ok {
-				if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = int64(c.queue[i].I16Val.Values[c.columnIndex])
+				d, ok := dests[i].(**int16)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I16Val.Values[c.columnIndex], c.queue[i].I16Val.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].I16Val.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(int16)
+					}
+					**d = c.queue[i].I16Val.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].I16Val.Values[c.columnIndex]
 			}
-			*d = c.queue[i].I16Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI32Val() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].I32Val.Values[c.columnIndex]
@@ -760,14 +860,23 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*int32)
 			if !ok {
-				if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = int64(c.queue[i].I32Val.Values[c.columnIndex])
+				d, ok := dests[i].(**int32)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I32Val.Values[c.columnIndex], c.queue[i].I32Val.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].I32Val.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(int32)
+					}
+					**d = c.queue[i].I32Val.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].I32Val.Values[c.columnIndex]
 			}
-			*d = c.queue[i].I32Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetI64Val() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].I64Val.Values[c.columnIndex]
@@ -775,14 +884,23 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*int64)
 			if !ok {
-				if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = c.queue[i].I64Val.Values[c.columnIndex]
+				d, ok := dests[i].(**int64)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].I64Val.Values[c.columnIndex], c.queue[i].I64Val.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].I64Val.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(int64)
+					}
+					**d = c.queue[i].I64Val.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].I64Val.Values[c.columnIndex]
 			}
-			*d = c.queue[i].I64Val.Values[c.columnIndex]
 		} else if c.queue[i].IsSetStringVal() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].StringVal.Values[c.columnIndex]
@@ -790,31 +908,23 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*string)
 			if !ok {
-				if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					val := c.queue[i].StringVal.Values[c.columnIndex]
-					if isTimestamp {
-						t, err := time.Parse("2006-01-02 15:04:05", val)
-						if err != nil {
-							c.Err = fmt.Errorf("failed to parse TIMESTAMP value %q: %w", val, err)
-							return
-						}
-						*(dests[i].(*driver.Value)) = t
-					} else if isDate {
-						t, err := time.Parse("2006-01-02", val)
-						if err != nil {
-							c.Err = fmt.Errorf("failed to parse DATE value %q: %w", val, err)
-							return
-						}
-						*(dests[i].(*driver.Value)) = t
-					} else {
-						*(dests[i].(*driver.Value)) = val
-					}
+				d, ok := dests[i].(**string)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].StringVal.Values[c.columnIndex], c.queue[i].StringVal.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(string)
+					}
+					**d = c.queue[i].StringVal.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].StringVal.Values[c.columnIndex]
 			}
-			*d = c.queue[i].StringVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetDoubleVal() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].DoubleVal.Values[c.columnIndex]
@@ -822,14 +932,23 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*float64)
 			if !ok {
-				if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = c.queue[i].DoubleVal.Values[c.columnIndex]
+				d, ok := dests[i].(**float64)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].DoubleVal.Values[c.columnIndex], c.queue[i].DoubleVal.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(float64)
+					}
+					**d = c.queue[i].DoubleVal.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].DoubleVal.Values[c.columnIndex]
 			}
-			*d = c.queue[i].DoubleVal.Values[c.columnIndex]
 		} else if c.queue[i].IsSetBoolVal() {
 			if dests[i] == nil {
 				dests[i] = c.queue[i].BoolVal.Values[c.columnIndex]
@@ -837,20 +956,31 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 			}
 			d, ok := dests[i].(*bool)
 			if !ok {
-				if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
-					*(dests[i].(*driver.Value)) = nil
-				} else {
-					*(dests[i].(*driver.Value)) = c.queue[i].BoolVal.Values[c.columnIndex]
+				d, ok := dests[i].(**bool)
+				if !ok {
+					c.Err = errors.Errorf("Unexpected data type %T for value %v (should be %T) index is %v", dests[i], c.queue[i].BoolVal.Values[c.columnIndex], c.queue[i].BoolVal.Values[c.columnIndex], i)
+					return
 				}
-				continue
+
+				if isNull(c.queue[i].BoolVal.Nulls, c.columnIndex) {
+					*d = nil
+				} else {
+					if *d == nil {
+						*d = new(bool)
+					}
+					**d = c.queue[i].BoolVal.Values[c.columnIndex]
+				}
+			} else {
+				*d = c.queue[i].BoolVal.Values[c.columnIndex]
 			}
-			*d = c.queue[i].BoolVal.Values[c.columnIndex]
 		} else {
 			c.Err = errors.Errorf("Empty column %v", c.queue[i])
 			return
 		}
 	}
 	c.columnIndex++
+
+	return
 }
 
 func isNull(nulls []byte, position int) bool {

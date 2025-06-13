@@ -204,14 +204,8 @@ func (r *rows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 
-	// Create a slice of pointers to hold the values
-	ptrs := make([]interface{}, len(dest))
-	for i := range dest {
-		ptrs[i] = &dest[i]
-	}
-
 	// Fetch the row directly into the destination slice
-	r.cursor.fetchOne(r.ctx, ptrs...)
+	r.cursor.fetchOneDriver(r.ctx, dest)
 	if r.cursor.Err != nil {
 		log.Printf("Error in fetchOne: %v", r.cursor.Err)
 		return r.cursor.Err

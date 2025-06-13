@@ -1386,3 +1386,72 @@ func TestSQLConnectionPooling(t *testing.T) {
 		}
 	}
 }
+
+func TestSQLSelectNull(t *testing.T) {
+	auth := getSQLAuth()
+	transport := getSQLTransport()
+	ssl := getSQLSsl()
+	dsn := buildDSN("hs2.example.com", 10000, "default", auth, transport, ssl, true)
+	db, err := sql.Open("hive", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	tableName := getTestTableName("test_select_null")
+
+	// Create a table with a single value column
+	_, err = db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			a INT,
+			b STRING
+		)
+	`, tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	// Insert a row with NULL value
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s(a) VALUES(1)", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Query and verify NULL handling
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		t.Fatal("expected a row")
+	}
+
+	var (
+		a sql.NullInt32
+		b sql.NullString
+	)
+
+	err = rows.Scan(&a, &b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify a is 1 and b is NULL
+	if !a.Valid {
+		t.Error("expected a to be valid")
+	}
+	if a.Int32 != 1 {
+		t.Errorf("expected a to be 1, got %d", a.Int32)
+	}
+	if b.Valid {
+		t.Errorf("expected b to be NULL, got %v", b.String)
+	}
+
+	// Verify no more rows
+	if rows.Next() {
+		t.Error("expected no more rows")
+	}
+}
