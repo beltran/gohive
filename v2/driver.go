@@ -207,7 +207,6 @@ func (r *rows) Next(dest []driver.Value) error {
 	// Fetch the row directly into the destination slice
 	r.cursor.fetchOneDriver(r.ctx, dest)
 	if r.cursor.Err != nil {
-		log.Printf("Error in fetchOne: %v", r.cursor.Err)
 		return r.cursor.Err
 	}
 
