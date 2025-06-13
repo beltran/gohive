@@ -195,110 +195,71 @@ func (r *rows) Close() error {
 // Next is called to populate the next row of data into
 // the provided slice.
 func (r *rows) Next(dest []driver.Value) error {
+	// Defensive: always use a valid context
 	if r.cursor == nil {
-		return io.EOF
+		return sql.ErrNoRows
 	}
-
 	if !r.cursor.hasMore(r.ctx) {
 		return io.EOF
 	}
 
-	// Get column descriptions to understand the types
+	row := r.cursor.rowMap(r.ctx)
+	if r.cursor.error() != nil {
+		return r.cursor.error()
+	}
+
+	columns := r.Columns()
 	desc := r.cursor.description(r.ctx)
-	if r.cursor.Err != nil {
-		return r.cursor.Err
-	}
+	for i := range dest {
+		colName := columns[i]
+		val := row[colName]
 
-	// Create temporary variables of the correct types
-	tempVars := make([]interface{}, len(desc))
-	for i, col := range desc {
-		// Remove _TYPE suffix if present
-		colType := strings.TrimSuffix(strings.ToUpper(col[1]), "_TYPE")
-		switch colType {
-		case "BOOLEAN":
-			tempVars[i] = new(bool)
-		case "TINYINT":
-			tempVars[i] = new(int8)
-		case "SMALLINT":
-			tempVars[i] = new(int16)
-		case "INT":
-			tempVars[i] = new(int32)
-		case "BIGINT":
-			tempVars[i] = new(int64)
-		case "FLOAT":
-			tempVars[i] = new(float64)
-		case "DOUBLE":
-			tempVars[i] = new(float64)
-		case "STRING", "VARCHAR", "CHAR":
-			tempVars[i] = new(string)
-		case "TIMESTAMP":
-			tempVars[i] = new(string)
-		case "DATE":
-			tempVars[i] = new(string)
-		case "BINARY":
-			tempVars[i] = new([]byte)
-		default:
-			tempVars[i] = new(string)
+		// Handle NULL values
+		if val == nil {
+			dest[i] = nil
+			continue
 		}
-	}
 
-	// Fetch the row into temporary variables
-	r.cursor.fetchOne(r.ctx, tempVars...)
-	if r.cursor.Err != nil {
-		if r.cursor.Err.Error() == "No more rows are left" {
-			return io.EOF
+		// Use column type from description
+		var colType string
+		if i < len(desc) {
+			colType = strings.ToUpper(desc[i][1])
 		}
-		return r.cursor.Err
-	}
 
-	// Convert the values to driver.Value
-	for i, tempVar := range tempVars {
-		if i >= len(dest) {
-			break
-		}
-		switch v := tempVar.(type) {
-		case *bool:
-			dest[i] = *v
-		case *int8:
-			dest[i] = int64(*v)
-		case *int16:
-			dest[i] = int64(*v)
-		case *int32:
-			dest[i] = int64(*v)
-		case *int64:
-			dest[i] = *v
-		case *float32:
-			dest[i] = *v
-		case *float64:
-			// If the original type was FLOAT, convert to float32
-			colType := strings.TrimSuffix(strings.ToUpper(desc[i][1]), "_TYPE")
-			if colType == "FLOAT" {
-				dest[i] = float32(*v)
-			} else {
-				dest[i] = *v
-			}
-		case *string:
-			// Handle timestamp and date types
-			colType := strings.TrimSuffix(strings.ToUpper(desc[i][1]), "_TYPE")
-			if colType == "TIMESTAMP" {
-				t, err := time.Parse("2006-01-02 15:04:05", *v)
-				if err != nil {
-					return fmt.Errorf("failed to parse TIMESTAMP value %q: %w", *v, err)
+		// Accept both TIMESTAMP and TIMESTAMP_TYPE, DATE and DATE_TYPE
+		isTimestamp := colType == "TIMESTAMP" || colType == "TIMESTAMP_TYPE"
+		isDate := colType == "DATE" || colType == "DATE_TYPE"
+
+		switch v := val.(type) {
+		case string:
+			if isTimestamp {
+				t, err := time.Parse("2006-01-02 15:04:05", v)
+				if err == nil {
+					dest[i] = t
+					continue
 				}
-				dest[i] = t
-			} else if colType == "DATE" {
-				t, err := time.Parse("2006-01-02", *v)
-				if err != nil {
-					return fmt.Errorf("failed to parse DATE value %q: %w", *v, err)
-				}
-				dest[i] = t
-			} else {
-				dest[i] = *v
 			}
-		case *[]byte:
-			dest[i] = *v
+			if isDate {
+				t, err := time.Parse("2006-01-02", v)
+				if err == nil {
+					dest[i] = t
+					continue
+				}
+			}
+			dest[i] = v
+		case int64:
+			dest[i] = v
+		case float64:
+			dest[i] = v
+		case bool:
+			dest[i] = v
+		case []byte:
+			dest[i] = v
+		case time.Time:
+			dest[i] = v
 		default:
-			return fmt.Errorf("unsupported type: %T", v)
+			// For any other type, convert to string
+			dest[i] = fmt.Sprintf("%v", v)
 		}
 	}
 
