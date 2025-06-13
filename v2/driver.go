@@ -6,10 +6,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"strings"
-	"time"
 )
 
 // Driver is the interface that must be implemented by a database driver.
@@ -146,7 +144,7 @@ func (c *sqlConnection) QueryContext(ctx context.Context, query string, args []d
 	if cursor.error() != nil {
 		return nil, cursor.error()
 	}
-	return &rows{cursor: cursor, ctx: ctx}, nil
+	return &rows{cursor: cursor, ctx: ctx, descriptionValid: false}, nil
 }
 
 // result implements driver.Result
@@ -171,15 +169,20 @@ func (r *result) RowsAffected() (int64, error) {
 
 // rows implements driver.Rows
 type rows struct {
-	cursor *cursor
-	ctx    context.Context
+	cursor           *cursor
+	ctx              context.Context
+	description      [][]string
+	descriptionValid bool
 }
 
 // Columns returns the names of the columns.
 func (r *rows) Columns() []string {
-	desc := r.cursor.description(r.ctx)
-	columns := make([]string, len(desc))
-	for i, col := range desc {
+	if !r.descriptionValid {
+		r.description = r.cursor.description(r.ctx)
+		r.descriptionValid = true
+	}
+	columns := make([]string, len(r.description))
+	for i, col := range r.description {
 		columns[i] = col[0]
 	}
 	return columns
@@ -210,6 +213,11 @@ func (r *rows) Next(dest []driver.Value) error {
 		return r.cursor.Err
 	}
 
+	if !r.descriptionValid {
+		r.description = r.cursor.description(r.ctx)
+		r.descriptionValid = true
+	}
+
 	return nil
 }
 
@@ -218,11 +226,14 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 	if r.cursor == nil {
 		return nil
 	}
-	desc := r.cursor.description(context.Background())
-	if r.cursor.Err != nil || index >= len(desc) {
+	if !r.descriptionValid {
+		r.description = r.cursor.description(r.ctx)
+		r.descriptionValid = true
+	}
+	if r.cursor.Err != nil || index >= len(r.description) {
 		return nil
 	}
-	colType := strings.TrimSuffix(strings.ToUpper(desc[index][1]), "_TYPE")
+	colType := strings.TrimSuffix(strings.ToUpper(r.description[index][1]), "_TYPE")
 	switch colType {
 	case "BOOLEAN":
 		return reflect.TypeOf(false)
@@ -241,9 +252,9 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 	case "STRING", "VARCHAR", "CHAR":
 		return reflect.TypeOf("")
 	case "TIMESTAMP":
-		return reflect.TypeOf(time.Time{})
+		return reflect.TypeOf("")
 	case "DATE":
-		return reflect.TypeOf(time.Time{})
+		return reflect.TypeOf("")
 	case "BINARY":
 		return reflect.TypeOf([]byte{})
 	default:
@@ -253,11 +264,14 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 
 // ColumnTypeDatabaseTypeName returns the database system type name.
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
-	desc := r.cursor.description(r.ctx)
-	if index >= len(desc) {
+	if !r.descriptionValid {
+		r.description = r.cursor.description(r.ctx)
+		r.descriptionValid = true
+	}
+	if index >= len(r.description) {
 		return ""
 	}
-	return strings.TrimSuffix(desc[index][1], "_TYPE")
+	return strings.TrimSuffix(r.description[index][1], "_TYPE")
 }
 
 func init() {

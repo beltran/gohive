@@ -692,17 +692,7 @@ func (c *cursor) fetchOneDriver(ctx context.Context, dests []driver.Value) {
 		return
 	}
 
-	// Get column descriptions to understand the types
-	desc := c.description(ctx)
-	if c.Err != nil {
-		return
-	}
-
 	for i := 0; i < len(c.queue); i++ {
-		colType := strings.TrimSuffix(strings.ToUpper(desc[i][1]), "_TYPE")
-		isTimestamp := colType == "TIMESTAMP"
-		isDate := colType == "DATE"
-
 		if c.queue[i].IsSetBinaryVal() {
 			if isNull(c.queue[i].BinaryVal.Nulls, c.columnIndex) {
 				dests[i] = nil
@@ -737,24 +727,7 @@ func (c *cursor) fetchOneDriver(ctx context.Context, dests []driver.Value) {
 			if isNull(c.queue[i].StringVal.Nulls, c.columnIndex) {
 				dests[i] = nil
 			} else {
-				val := c.queue[i].StringVal.Values[c.columnIndex]
-				if isTimestamp {
-					t, err := time.Parse("2006-01-02 15:04:05", val)
-					if err != nil {
-						c.Err = fmt.Errorf("failed to parse TIMESTAMP value %q: %w", val, err)
-						return
-					}
-					dests[i] = t
-				} else if isDate {
-					t, err := time.Parse("2006-01-02", val)
-					if err != nil {
-						c.Err = fmt.Errorf("failed to parse DATE value %q: %w", val, err)
-						return
-					}
-					dests[i] = t
-				} else {
-					dests[i] = val
-				}
+				dests[i] = c.queue[i].StringVal.Values[c.columnIndex]
 			}
 		} else if c.queue[i].IsSetDoubleVal() {
 			if isNull(c.queue[i].DoubleVal.Nulls, c.columnIndex) {
@@ -979,8 +952,6 @@ func (c *cursor) fetchOne(ctx context.Context, dests ...interface{}) {
 		}
 	}
 	c.columnIndex++
-
-	return
 }
 
 func isNull(nulls []byte, position int) bool {

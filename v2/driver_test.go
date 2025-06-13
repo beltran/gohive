@@ -248,8 +248,8 @@ func TestSQLTypes(t *testing.T) {
 		colDouble    float64
 		colDecimal   string
 		colString    string
-		colTimestamp time.Time
-		colDate      time.Time
+		colTimestamp string
+		colDate      string
 		colBinary    []byte
 	)
 
@@ -299,12 +299,12 @@ func TestSQLTypes(t *testing.T) {
 	if colString != "test" {
 		t.Errorf("got col_string=%s, want test", colString)
 	}
-	expectedTime := time.Date(2024, 3, 20, 12, 34, 56, 0, time.UTC)
-	if !colTimestamp.Equal(expectedTime) {
+	expectedTime := "2024-03-20 12:34:56"
+	if colTimestamp != expectedTime {
 		t.Errorf("got col_timestamp=%v, want %v", colTimestamp, expectedTime)
 	}
-	expectedDate := time.Date(2024, 3, 20, 0, 0, 0, 0, time.UTC)
-	if !colDate.Equal(expectedDate) {
+	expectedDate := "2024-03-20"
+	if colDate != expectedDate {
 		t.Errorf("got col_date=%v, want %v", colDate, expectedDate)
 	}
 	if string(colBinary) != "binary" {
@@ -493,14 +493,14 @@ func TestSQLTimestampFormatting(t *testing.T) {
 
 	// Query the data back
 	var id int
-	var ts time.Time
+	var ts string
 	err = db.QueryRow(fmt.Sprintf("SELECT * FROM %s", tableName)).Scan(&id, &ts)
 	if err != nil {
 		t.Fatalf("Failed to query timestamp: %v", err)
 	}
 
 	// Verify the timestamp was stored correctly
-	if !ts.Equal(testTime) {
+	if ts != testTime.Format("2006-01-02 15:04:05") {
 		t.Errorf("Timestamp mismatch: got %v, want %v", ts, testTime)
 	}
 }
@@ -745,8 +745,8 @@ func TestSQLDriverDataTypes(t *testing.T) {
 		colHeight    float32
 		colWeight    float64
 		colIsActive  bool
-		colCreatedAt time.Time
-		colBirthDate time.Time
+		colCreatedAt string
+		colBirthDate string
 		colNotes     string
 		colData      []byte
 	)
@@ -777,14 +777,12 @@ func TestSQLDriverDataTypes(t *testing.T) {
 	}
 
 	// Compare timestamps in UTC
-	expectedCreatedAt, _ := time.Parse("2006-01-02 15:04:05", createdAt)
-	if !colCreatedAt.Equal(expectedCreatedAt) {
-		t.Errorf("got col_created_at=%v, want %v", colCreatedAt, expectedCreatedAt)
+	if colCreatedAt != createdAt {
+		t.Errorf("got col_created_at=%v, want %v", colCreatedAt, createdAt)
 	}
 
-	expectedBirthDate, _ := time.Parse("2006-01-02", birthDate)
-	if !colBirthDate.Equal(expectedBirthDate) {
-		t.Errorf("got col_birth_date=%v, want %v", colBirthDate, expectedBirthDate)
+	if colBirthDate != birthDate {
+		t.Errorf("got col_birth_date=%v, want %v", colBirthDate, birthDate)
 	}
 
 	if colNotes != "Software Engineer" {
@@ -1113,18 +1111,18 @@ func TestSQLColumnTypeScanType(t *testing.T) {
 
 	// Expected Go types for scanning
 	expectedTypes := []reflect.Type{
-		reflect.TypeOf(false),       // BOOLEAN
-		reflect.TypeOf(int8(0)),     // TINYINT
-		reflect.TypeOf(int16(0)),    // SMALLINT
-		reflect.TypeOf(int32(0)),    // INT
-		reflect.TypeOf(int64(0)),    // BIGINT
-		reflect.TypeOf(float32(0)),  // FLOAT
-		reflect.TypeOf(float64(0)),  // DOUBLE
-		reflect.TypeOf(""),          // DECIMAL
-		reflect.TypeOf(""),          // STRING
-		reflect.TypeOf(time.Time{}), // TIMESTAMP
-		reflect.TypeOf(time.Time{}), // DATE
-		reflect.TypeOf([]byte{}),    // BINARY
+		reflect.TypeOf(false),      // BOOLEAN
+		reflect.TypeOf(int8(0)),    // TINYINT
+		reflect.TypeOf(int16(0)),   // SMALLINT
+		reflect.TypeOf(int32(0)),   // INT
+		reflect.TypeOf(int64(0)),   // BIGINT
+		reflect.TypeOf(float32(0)), // FLOAT
+		reflect.TypeOf(float64(0)), // DOUBLE
+		reflect.TypeOf(""),         // DECIMAL
+		reflect.TypeOf(""),         // STRING
+		reflect.TypeOf(""),         // TIMESTAMP
+		reflect.TypeOf(""),         // DATE
+		reflect.TypeOf([]byte{}),   // BINARY
 	}
 
 	// Verify each column's scan type
