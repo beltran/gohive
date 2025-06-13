@@ -102,6 +102,7 @@ The following features from version 1.x are no longer supported in version 2.0:
 - Connection via Zookeeper
 - Log Fetching
 - Custom dial function
+- Setting the connection timeout, socket timeout, http timeout
 
 ## Migration Steps
 

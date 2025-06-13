@@ -11,7 +11,6 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os/user"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -549,7 +548,6 @@ func (c *cursor) fetchIfEmpty(ctx context.Context) {
 		c.queue = nil
 		if !c.hasMore(ctx) {
 			// print stack trace
-			log.Printf("[DEBUG] Stack trace: %+v", string(debug.Stack()))
 			c.Err = errors.New("No more rows are left")
 			return
 		}

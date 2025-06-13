@@ -64,7 +64,7 @@ type connector struct {
 // Connect returns a connection to the database.
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	// Connect to Hive
-	conn, err := connect(context.Background(), c.host, c.port, c.auth, c.config)
+	conn, err := connect(ctx, c.host, c.port, c.auth, c.config)
 	if err != nil {
 		return nil, err
 	}
@@ -88,19 +88,6 @@ func (c *sqlConnection) Close() error {
 	return c.conn.close()
 }
 
-type tx struct {
-}
-
-// Commit implements driver.Tx.
-func (t tx) Commit() error {
-	return nil
-}
-
-// Rollback implements driver.Tx.
-func (t tx) Rollback() error {
-	return nil
-}
-
 // Begin starts and returns a new transaction.
 func (c *sqlConnection) Begin() (driver.Tx, error) {
 	return c.BeginTx(context.Background(), driver.TxOptions{})
@@ -108,7 +95,7 @@ func (c *sqlConnection) Begin() (driver.Tx, error) {
 
 // BeginTx starts and returns a new transaction.
 func (c *sqlConnection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return tx{}, nil
+	return nil, driver.ErrSkip
 }
 
 // Prepare returns a prepared statement, bound to this connection.
@@ -170,7 +157,7 @@ type result struct {
 // LastInsertId returns the database's auto-generated ID
 // after, for example, an INSERT into a table with primary key.
 func (r *result) LastInsertId() (int64, error) {
-	return -1, nil
+	return 0, driver.ErrSkip
 }
 
 // RowsAffected returns the number of rows affected by the query.
@@ -178,7 +165,7 @@ func (r *result) RowsAffected() (int64, error) {
 	if r.cursor.operationHandle != nil && r.cursor.operationHandle.ModifiedRowCount != nil {
 		return int64(*r.cursor.operationHandle.ModifiedRowCount), nil
 	}
-	return -1, nil
+	return 0, driver.ErrSkip
 }
 
 // rows implements driver.Rows
@@ -208,88 +195,127 @@ func (r *rows) Close() error {
 // Next is called to populate the next row of data into
 // the provided slice.
 func (r *rows) Next(dest []driver.Value) error {
-	// Defensive: always use a valid context
 	if r.cursor == nil {
-		return sql.ErrNoRows
+		return io.EOF
 	}
+
 	if !r.cursor.hasMore(r.ctx) {
 		return io.EOF
 	}
 
-	row := r.cursor.rowMap(r.ctx)
-	if r.cursor.error() != nil {
-		return r.cursor.error()
+	// Get column descriptions to understand the types
+	desc := r.cursor.description(r.ctx)
+	if r.cursor.Err != nil {
+		return r.cursor.Err
 	}
 
-	columns := r.Columns()
-	desc := r.cursor.description(r.ctx)
-	for i := range dest {
-		colName := columns[i]
-		val := row[colName]
-
-		// Handle NULL values
-		if val == nil {
-			dest[i] = nil
-			continue
-		}
-
-		// Use column type from description
-		var colType string
-		if i < len(desc) {
-			colType = strings.ToUpper(desc[i][1])
-		}
-
-		// Accept both TIMESTAMP and TIMESTAMP_TYPE, DATE and DATE_TYPE
-		isTimestamp := colType == "TIMESTAMP" || colType == "TIMESTAMP_TYPE"
-		isDate := colType == "DATE" || colType == "DATE_TYPE"
-
-		switch v := val.(type) {
-		case string:
-			if isTimestamp {
-				t, err := time.Parse("2006-01-02 15:04:05", v)
-				if err == nil {
-					dest[i] = t
-					continue
-				}
-			}
-			if isDate {
-				t, err := time.Parse("2006-01-02", v)
-				if err == nil {
-					dest[i] = t
-					continue
-				}
-			}
-			dest[i] = v
-		case int64:
-			dest[i] = v
-		case float64:
-			dest[i] = v
-		case bool:
-			dest[i] = v
-		case []byte:
-			dest[i] = v
-		case time.Time:
-			dest[i] = v
+	// Create temporary variables of the correct types
+	tempVars := make([]interface{}, len(desc))
+	for i, col := range desc {
+		// Remove _TYPE suffix if present
+		colType := strings.TrimSuffix(strings.ToUpper(col[1]), "_TYPE")
+		switch colType {
+		case "BOOLEAN":
+			tempVars[i] = new(bool)
+		case "TINYINT":
+			tempVars[i] = new(int8)
+		case "SMALLINT":
+			tempVars[i] = new(int16)
+		case "INT":
+			tempVars[i] = new(int32)
+		case "BIGINT":
+			tempVars[i] = new(int64)
+		case "FLOAT":
+			tempVars[i] = new(float64)
+		case "DOUBLE":
+			tempVars[i] = new(float64)
+		case "STRING", "VARCHAR", "CHAR":
+			tempVars[i] = new(string)
+		case "TIMESTAMP":
+			tempVars[i] = new(string)
+		case "DATE":
+			tempVars[i] = new(string)
+		case "BINARY":
+			tempVars[i] = new([]byte)
 		default:
-			// For any other type, convert to string
-			dest[i] = fmt.Sprintf("%v", v)
+			tempVars[i] = new(string)
+		}
+	}
+
+	// Fetch the row into temporary variables
+	r.cursor.fetchOne(r.ctx, tempVars...)
+	if r.cursor.Err != nil {
+		if r.cursor.Err.Error() == "No more rows are left" {
+			return io.EOF
+		}
+		return r.cursor.Err
+	}
+
+	// Convert the values to driver.Value
+	for i, tempVar := range tempVars {
+		if i >= len(dest) {
+			break
+		}
+		switch v := tempVar.(type) {
+		case *bool:
+			dest[i] = *v
+		case *int8:
+			dest[i] = int64(*v)
+		case *int16:
+			dest[i] = int64(*v)
+		case *int32:
+			dest[i] = int64(*v)
+		case *int64:
+			dest[i] = *v
+		case *float32:
+			dest[i] = *v
+		case *float64:
+			// If the original type was FLOAT, convert to float32
+			colType := strings.TrimSuffix(strings.ToUpper(desc[i][1]), "_TYPE")
+			if colType == "FLOAT" {
+				dest[i] = float32(*v)
+			} else {
+				dest[i] = *v
+			}
+		case *string:
+			// Handle timestamp and date types
+			colType := strings.TrimSuffix(strings.ToUpper(desc[i][1]), "_TYPE")
+			if colType == "TIMESTAMP" {
+				t, err := time.Parse("2006-01-02 15:04:05", *v)
+				if err != nil {
+					return fmt.Errorf("failed to parse TIMESTAMP value %q: %w", *v, err)
+				}
+				dest[i] = t
+			} else if colType == "DATE" {
+				t, err := time.Parse("2006-01-02", *v)
+				if err != nil {
+					return fmt.Errorf("failed to parse DATE value %q: %w", *v, err)
+				}
+				dest[i] = t
+			} else {
+				dest[i] = *v
+			}
+		case *[]byte:
+			dest[i] = *v
+		default:
+			return fmt.Errorf("unsupported type: %T", v)
 		}
 	}
 
 	return nil
 }
 
-// ColumnTypeScanType returns the Go type that should be used to scan values into.
+// ColumnTypeScanType returns the scan type for the given column index
 func (r *rows) ColumnTypeScanType(index int) reflect.Type {
-	desc := r.cursor.description(r.ctx)
-	if index >= len(desc) {
-		return reflect.TypeOf(nil)
+	if r.cursor == nil {
+		return nil
 	}
-	// Map Hive types to Go types
-	hiveType := desc[index][1]
-	// Remove _TYPE suffix if present
-	hiveType = strings.TrimSuffix(strings.ToUpper(hiveType), "_TYPE")
-	switch hiveType {
+	desc := r.cursor.description(context.Background())
+	if r.cursor.Err != nil || index >= len(desc) {
+		return nil
+	}
+	colType := strings.TrimSuffix(strings.ToUpper(desc[index][1]), "_TYPE")
+	switch colType {
 	case "BOOLEAN":
 		return reflect.TypeOf(false)
 	case "TINYINT":
@@ -301,11 +327,9 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 	case "BIGINT":
 		return reflect.TypeOf(int64(0))
 	case "FLOAT":
-		return reflect.TypeOf(float32(0))
+		return reflect.TypeOf(float32(0)) // Return float32 for FLOAT type
 	case "DOUBLE":
 		return reflect.TypeOf(float64(0))
-	case "DECIMAL":
-		return reflect.TypeOf("")
 	case "STRING", "VARCHAR", "CHAR":
 		return reflect.TypeOf("")
 	case "TIMESTAMP":
@@ -314,8 +338,6 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 		return reflect.TypeOf(time.Time{})
 	case "BINARY":
 		return reflect.TypeOf([]byte{})
-	case "ARRAY", "MAP", "STRUCT", "UNION":
-		return reflect.TypeOf("")
 	default:
 		return reflect.TypeOf("")
 	}
