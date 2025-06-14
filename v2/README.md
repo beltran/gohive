@@ -16,7 +16,7 @@ For detailed migration instructions, please see the [Migration Guide](MIGRATION.
 ## Installation
 GoHive can be installed with:
 ```
-go install github.com/beltran/gohive/v2
+go get github.com/beltran/gohive/v2
 ```
 
 To add kerberos support GoHive requires header files to build against the GSSAPI C library. They can be installed with:
@@ -26,7 +26,7 @@ To add kerberos support GoHive requires header files to build against the GSSAPI
 
 Then:
 ```
-go install -tags kerberos github.com/beltran/gohive/v2
+go get -tags kerberos github.com/beltran/gohive/v2
 ```
 
 ## Quickstart
