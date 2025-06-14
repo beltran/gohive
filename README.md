@@ -11,7 +11,7 @@ GoHive also offers support to query the Hive metastore with various authenticati
 Version 2.0 provides full support for the standard Go `database/sql` interface.
 
 ```
-go install -tags kerberos github.com/beltran/gohive/v2
+go get -tags kerberos github.com/beltran/gohive/v2
 ```
 
 > **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 branch](https://github.com/beltran/gohive/tree/v2/README.md).
@@ -19,7 +19,7 @@ go install -tags kerberos github.com/beltran/gohive/v2
 ## Installation
 GoHive can be installed with:
 ```
-go install github.com/beltran/gohive
+go get github.com/beltran/gohive
 ```
 
 To add kerberos support GoHive requires header files to build against the GSSAPI C library. They can be installed with:
