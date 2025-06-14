@@ -29,7 +29,7 @@ To add kerberos support GoHive requires header files to build against the GSSAPI
 
 Then:
 ```
-go install -tags kerberos github.com/beltran/gohive
+go get -tags kerberos github.com/beltran/gohive
 ```
 
 ## Quickstart
