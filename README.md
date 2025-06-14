@@ -14,7 +14,7 @@ Version 2.0 provides full support for the standard Go `database/sql` interface.
 go get -tags kerberos github.com/beltran/gohive/v2
 ```
 
-> **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 branch](https://github.com/beltran/gohive/tree/v2/README.md).
+> **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 folder](https://github.com/beltran/gohive/tree/v2/README.md).
 
 ## Installation
 GoHive can be installed with:
