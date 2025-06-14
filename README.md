@@ -6,18 +6,12 @@ GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark
 
 GoHive also offers support to query the Hive metastore with various authentication mechanisms, including KERBEROS.
 
-## Version 2.0 (Recommended for New Projects)
+## Version 2.0 (currently RC)
 
-We recommend using version 2.0 for all new projects. Version 2.0 provides:
-- Full support for the standard Go `database/sql` interface
-- Better integration with existing Go database code
-- Improved performance through connection pooling
-- Support for multiple cursors per connection
-- More maintainable and familiar Go code patterns
+Version 2.0 provides full support for the standard Go `database/sql` interface.
 
-To use version 2.0, install with:
 ```
-go install -tags kerberos github.com/beltran/gohive@v2
+go install -tags kerberos github.com/beltran/gohive/v2
 ```
 
 > **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 branch](https://github.com/beltran/gohive/tree/v2/README.md).
