@@ -9,7 +9,6 @@ GoHive also offers support to query the Hive metastore with various authenticati
 
 ## New Features in 2.0
 - Full support of the `database/sql` interface
-- Support for multiple cursors per connection
 
 For detailed migration instructions, please see the [Migration Guide](MIGRATION.md).
 
