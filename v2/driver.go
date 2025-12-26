@@ -38,6 +38,7 @@ func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
 	config.Database = dsn.Database
 	config.TransportMode = dsn.TransportMode
 	config.Service = dsn.Service
+	config.HiveConfiguration = dsn.HiveConfiguration
 
 	// Configure SSL if paths are provided
 	if dsn.SSLCertFile != "" && dsn.SSLKeyFile != "" {
