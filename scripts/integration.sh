@@ -12,11 +12,11 @@ function wait_for_hive () {
           break
         fi
         counter=$((counter+1))
-        if [[ "$counter" -gt 144 ]]; then
+        if [[ "$counter" -gt 18 ]]; then
           # Just fail because the port didn't open
-          echo "Waited for 24 minutes and hive didn't appear to start"
-          docker logs hs2.example
-          exit 0
+          echo "Waited for 2 minutes and hive didn't appear to start"
+          # docker logs hs2.example
+          break
         fi
         echo "Waiting for hive port to open"
         sleep 10
