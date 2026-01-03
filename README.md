@@ -6,7 +6,7 @@ GoHive is a driver for Hive and the [Spark Distributed SQL Engine](https://spark
 
 GoHive also offers support to query the Hive metastore with various authentication mechanisms, including KERBEROS.
 
-## Version 2.0 (currently RC)
+## Version 2.0
 
 Version 2.0 provides full support for the standard Go `database/sql` interface.
 
