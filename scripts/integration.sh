@@ -110,6 +110,7 @@ function  binaryKerberos() {
   go run -tags "kerberos" example/main.go
   go run -tags "kerberos" example/main_meta.go
   pushd v2
+  go run -tags "kerberos" example/main_connector.go
   go test -tags "integration kerberos" -covermode=count -coverprofile=aa.part -v -run . || { echo "Failed TRANSPORT=$TRANSPORT, AUTH=$AUTH, SSL=$SSL" ; docker logs hs2.example ; exit 2; }
   go run -tags "kerberos" example/main.go
   go run -tags "kerberos" example/main_meta.go

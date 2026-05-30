@@ -139,6 +139,95 @@ This implies setting in hive-site.xml:
 - `hive.server2.transport.mode = http`
 - `hive.server2.thrift.http.port = 10001`
 
+## Programmatic Connection (HiveConnector)
+
+Instead of building a DSN string, you can use `HiveConnector` with a structured `Config`. This is useful when integrating with GORM or when connection parameters come from application config.
+
+### Basic usage
+``` go
+import gohive "github.com/beltran/gohive/v2"
+
+db := gohive.OpenDB(gohive.Config{
+    Host:     "hs2.example.com",
+    Port:     10000,
+    Auth:     "NONE",
+    Username: "hive",
+    Password: "hive",
+    Database: "default",
+})
+defer db.Close()
+```
+
+### With CA certificate (server verification)
+``` go
+import gohive "github.com/beltran/gohive/v2"
+
+db := gohive.OpenDB(gohive.Config{
+    Host:      "hs2.example.com",
+    Port:      10000,
+    Auth:      "NONE",
+    Username:  "hive",
+    Password:  "hive",
+    Database:  "default",
+    SSLCAFile: "/path/to/ca-cert.crt",
+})
+defer db.Close()
+```
+
+### With client certificate and key (mutual TLS)
+``` go
+import gohive "github.com/beltran/gohive/v2"
+
+db := gohive.OpenDB(gohive.Config{
+    Host:            "hs2.example.com",
+    Port:            10000,
+    Auth:            "NONE",
+    Username:        "hive",
+    Password:        "hive",
+    Database:        "default",
+    SSLCertFile:     "/path/to/client-cert.pem",
+    SSLKeyFile:      "/path/to/client-key.pem",
+    SSLInsecureSkip: false,
+})
+defer db.Close()
+```
+
+### With custom TLS config
+For full control over TLS settings, provide your own `*tls.Config`:
+``` go
+import (
+    "crypto/tls"
+    "crypto/x509"
+    "os"
+
+    gohive "github.com/beltran/gohive/v2"
+)
+
+caPEM, _ := os.ReadFile("/path/to/ca-cert.crt")
+caPool := x509.NewCertPool()
+caPool.AppendCertsFromPEM(caPEM)
+
+clientCert, _ := tls.LoadX509KeyPair("/path/to/client-cert.pem", "/path/to/client-key.pem")
+
+db := gohive.OpenDB(gohive.Config{
+    Host:     "hs2.example.com",
+    Port:     10000,
+    Auth:     "NONE",
+    Username: "hive",
+    Password: "hive",
+    Database: "default",
+    TLSConfig: &tls.Config{
+        RootCAs:            caPool,
+        Certificates:       []tls.Certificate{clientCert},
+        InsecureSkipVerify: false,
+        MinVersion:         tls.VersionTLS12,
+    },
+})
+defer db.Close()
+```
+
+> **Note:** When `TLSConfig` is provided directly, `SSLCertFile`, `SSLKeyFile`, `SSLCAFile`, and `SSLInsecureSkip` are ignored.
+
 ## Connection to the Hive Metastore
 
 The thrift client is directly exposed, so the API exposed by the Hive metastore can be called directly.
