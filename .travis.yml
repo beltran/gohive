@@ -6,7 +6,7 @@ services:
   - docker
 
 go:
-  - "1.24.0"
+  - "1.26"
 
 branches:
   only:
