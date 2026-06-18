@@ -80,8 +80,6 @@ type connectConfiguration struct {
 	DisableKeepAlives    bool
 	// Maximum length of the data in bytes. Used for SASL.
 	MaxSize uint32
-	// TimeoutCloser uses goroutine + transport.Close() to enforce context timeout immediately.
-	TimeoutCloser bool
 }
 
 // newConnectConfiguration returns a connect configuration, all with empty fields
@@ -480,11 +478,7 @@ func (c *cursor) executeSync(ctx context.Context, query string) {
 	executeReq.Statement = query
 	executeReq.RunAsync = false
 
-	if c.conn.configuration.TimeoutCloser {
-		c.executeSyncWithTimeoutCloser(ctx, executeReq)
-	} else {
-		c.executeSyncBlocking(ctx, executeReq)
-	}
+	c.executeSyncBlocking(ctx, executeReq)
 }
 
 // executeSyncBlocking runs ExecuteStatement in a blocking manner.
@@ -521,67 +515,6 @@ func (c *cursor) executeSyncBlocking(ctx context.Context, executeReq *hiveserver
 	c.operationHandle = responseExecute.OperationHandle
 	if !responseExecute.OperationHandle.HasResultSet {
 		c.state = _FINISHED
-	}
-}
-
-// executeSyncWithTimeoutCloser runs ExecuteStatement in a goroutine and uses
-// transport.Close() to enforce context timeout immediately.
-// Recommended for HTTP transport mode where SocketTimeout retry is not effective.
-func (c *cursor) executeSyncWithTimeoutCloser(ctx context.Context, executeReq *hiveserver.TExecuteStatementReq) {
-	type executeResult struct {
-		resp *hiveserver.TExecuteStatementResp
-		err  error
-	}
-
-	resultCh := make(chan executeResult, 1)
-	go func() {
-		c.conn.clientMu.Lock()
-		resp, err := c.conn.client.ExecuteStatement(ctx, executeReq)
-		c.conn.clientMu.Unlock()
-		resultCh <- executeResult{resp: resp, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		// Context expired — close transport to force-unblock the blocked I/O
-		c.conn.transport.Close()
-		res := <-resultCh
-		c.state = _CONTEXT_DONE
-		c.Err = ctx.Err()
-		if res.resp != nil && res.resp.OperationHandle != nil {
-			c.operationHandle = res.resp.OperationHandle
-		}
-		return
-	case res := <-resultCh:
-		if res.err != nil {
-			c.Err = res.err
-			if strings.Contains(res.err.Error(), "context deadline exceeded") ||
-				strings.Contains(res.err.Error(), "context canceled") {
-				c.state = _CONTEXT_DONE
-				if res.resp == nil {
-					c.state = _ERROR
-				} else if res.resp.OperationHandle != nil {
-					c.operationHandle = res.resp.OperationHandle
-				}
-			}
-			return
-		}
-
-		responseExecute := res.resp
-		if !success(safeStatus(responseExecute.GetStatus())) {
-			status := safeStatus(responseExecute.GetStatus())
-			c.Err = hiveError{
-				error:     errors.New("Error while executing query: " + status.String()),
-				Message:   status.GetErrorMessage(),
-				ErrorCode: int(status.GetErrorCode()),
-			}
-			return
-		}
-
-		c.operationHandle = responseExecute.OperationHandle
-		if !responseExecute.OperationHandle.HasResultSet {
-			c.state = _FINISHED
-		}
 	}
 }
 
