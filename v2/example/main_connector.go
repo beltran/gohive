@@ -26,6 +26,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Insert some test data
+	_, err = db.Exec("INSERT INTO test_table VALUES(1, 'test1'), (2, 'test2'), (3, 'test3')")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Execute a query
 	rows, err := db.Query("SELECT * FROM test_table LIMIT 10")
 	if err != nil {

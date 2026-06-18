@@ -11,6 +11,16 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
+type errBadConn struct {
+	cause error
+}
+
+func (e *errBadConn) Error() string { return e.cause.Error() }
+func (e *errBadConn) Unwrap() error { return e.cause }
+func (e *errBadConn) Is(target error) bool {
+	return target == driver.ErrBadConn
+}
+
 // errorClassifier inspects an error and returns the appropriate sentinel error
 // if it matches, or nil if it does not match.
 type errorClassifier func(err error) error
@@ -134,6 +144,9 @@ func classifyError(err error) error {
 	}
 	for _, classify := range classifiers {
 		if sentinel := classify(err); sentinel != nil {
+			if sentinel == driver.ErrBadConn {
+				return &errBadConn{cause: err}
+			}
 			return sentinel
 		}
 	}
