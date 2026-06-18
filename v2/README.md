@@ -15,7 +15,7 @@ For detailed migration instructions, please see the [Migration Guide](MIGRATION.
 ## Installation
 GoHive can be installed with:
 ```
-go get github.com/beltran/gohive/v2
+go get github.com/ichsansaid/gohive/v2
 ```
 
 To add kerberos support GoHive requires header files to build against the GSSAPI C library. They can be installed with:
@@ -25,7 +25,7 @@ To add kerberos support GoHive requires header files to build against the GSSAPI
 
 Then:
 ```
-go get -tags kerberos github.com/beltran/gohive/v2
+go get -tags kerberos github.com/ichsansaid/gohive/v2
 ```
 
 ## Quickstart
@@ -37,7 +37,7 @@ GoHive supports the standard `database/sql` interface:
 ```go
 import (
     "database/sql"
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 // Open a connection
@@ -71,7 +71,7 @@ for rows.Next() {
 ``` go
 import (
     "database/sql"
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 db, err := sql.Open("hive", "hive://hs2.example.com:10000/default?auth=KERBEROS&service=hive")
@@ -89,7 +89,7 @@ This implies setting in hive-site.xml:
 ``` go
 import (
     "database/sql"
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 db, err := sql.Open("hive", "hive://myUsername:myPassword@hs2.example.com:10000/default?auth=NONE")
@@ -106,7 +106,7 @@ This implies setting in hive-site.xml:
 ``` go
 import (
     "database/sql"
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL")
@@ -124,7 +124,7 @@ Binary transport mode is supported for auth mechanisms PLAIN, KERBEROS and NOSAS
 ``` go
 import (
     "database/sql"
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 db, err := sql.Open("hive", "hive://@hs2.example.com:10000/default?auth=NOSASL&service=hive&transport=http&httpPath=cliservice")
@@ -145,7 +145,7 @@ Instead of building a DSN string, you can use `HiveConnector` with a structured 
 
 ### Basic usage
 ``` go
-import gohive "github.com/beltran/gohive/v2"
+import gohive "github.com/ichsansaid/gohive/v2"
 
 db := gohive.OpenDB(gohive.Config{
     Host:     "hs2.example.com",
@@ -160,7 +160,7 @@ defer db.Close()
 
 ### With CA certificate (server verification)
 ``` go
-import gohive "github.com/beltran/gohive/v2"
+import gohive "github.com/ichsansaid/gohive/v2"
 
 db := gohive.OpenDB(gohive.Config{
     Host:      "hs2.example.com",
@@ -176,7 +176,7 @@ defer db.Close()
 
 ### With client certificate and key (mutual TLS)
 ``` go
-import gohive "github.com/beltran/gohive/v2"
+import gohive "github.com/ichsansaid/gohive/v2"
 
 db := gohive.OpenDB(gohive.Config{
     Host:            "hs2.example.com",
@@ -200,7 +200,7 @@ import (
     "crypto/x509"
     "os"
 
-    gohive "github.com/beltran/gohive/v2"
+    gohive "github.com/ichsansaid/gohive/v2"
 )
 
 caPEM, _ := os.ReadFile("/path/to/ca-cert.crt")
@@ -258,4 +258,4 @@ Tests can be run with:
 ```
 ./scripts/integration
 ```
-This uses [dhive](https://github.com/beltran/dhive) and it will start three docker instances with Hive, the Hive metastore, and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` and `hm.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/beltran/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.
+This uses [dhive](https://github.com/ichsansaid/dhive) and it will start three docker instances with Hive, the Hive metastore, and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` and `hm.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/ichsansaid/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.

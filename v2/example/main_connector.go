@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	gohive "github.com/beltran/gohive/v2"
+	gohive "github.com/ichsansaid/gohive/v2"
 )
 
 func main() {
@@ -14,25 +14,15 @@ func main() {
 	db := gohive.OpenDB(gohive.Config{
 		Host:     "hs2.example.com",
 		Port:     10000,
-		Auth:     "KERBEROS",
+		Auth:     "NONE",
+		Username: "hive",
+		Password: "hive",
 		Database: "default",
 	})
 	defer db.Close()
 
 	// Test the connection
 	if err := db.Ping(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Create a test table
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Insert some test data
-	_, err = db.Exec("INSERT INTO test_table VALUES(1, 'test1'), (2, 'test2'), (3, 'test3')")
-	if err != nil {
 		log.Fatal(err)
 	}
 

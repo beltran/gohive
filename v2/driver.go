@@ -152,7 +152,7 @@ func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (drive
 }
 
 // Exec executes a query that doesn't return rows.
-// Implements driver.Execer (deprecated, kept for compatibility).
+// Implements driver.Execer (deprecated fallback)
 func (c *sqlConnection) Exec(query string, args []driver.Value) (driver.Result, error) {
 	namedArgs := make([]driver.NamedValue, len(args))
 	for i, v := range args {
@@ -162,7 +162,7 @@ func (c *sqlConnection) Exec(query string, args []driver.Value) (driver.Result, 
 }
 
 // ExecContext executes a query that doesn't return rows.
-// Implements driver.ExecerContext so that database/sql propagates the caller's context.
+// Implements driver.ExecerContext
 func (c *sqlConnection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if len(args) > 0 {
 		return nil, fmt.Errorf("query parameters are not supported by Hive")
@@ -177,7 +177,7 @@ func (c *sqlConnection) ExecContext(ctx context.Context, query string, args []dr
 }
 
 // Query executes a query that may return rows.
-// Implements driver.Queryer (deprecated, kept for compatibility).
+// Implements driver.Queryer (deprecated fallback)
 func (c *sqlConnection) Query(query string, args []driver.Value) (driver.Rows, error) {
 	namedArgs := make([]driver.NamedValue, len(args))
 	for i, v := range args {
@@ -187,7 +187,7 @@ func (c *sqlConnection) Query(query string, args []driver.Value) (driver.Rows, e
 }
 
 // QueryContext executes a query that may return rows.
-// Implements driver.QueryerContext so that database/sql propagates the caller's context.
+// Implements driver.QueryerContext
 func (c *sqlConnection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if len(args) > 0 {
 		return nil, fmt.Errorf("query parameters are not supported by Hive")

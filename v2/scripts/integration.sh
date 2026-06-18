@@ -26,7 +26,7 @@ function wait_for_hive () {
 
 function install_deps() {
     if [ ! -d "dhive" ] ; then
-        git clone https://github.com/beltran/dhive
+        git clone https://github.com/ichsansaid/dhive
     else
         cd dhive
         git fetch && git reset --hard origin/master

@@ -11,15 +11,15 @@ GoHive also offers support to query the Hive metastore with various authenticati
 Version 2.0 provides full support for the standard Go `database/sql` interface.
 
 ```
-go get -tags kerberos github.com/beltran/gohive/v2
+go get -tags kerberos github.com/ichsansaid/gohive/v2
 ```
 
-> **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 folder](https://github.com/beltran/gohive/tree/master/v2).
+> **Note:** For the most up-to-date documentation of version 2.0, please see the [README in the v2 folder](https://github.com/ichsansaid/gohive/tree/master/v2).
 
 ## Installation
 GoHive can be installed with:
 ```
-go get github.com/beltran/gohive
+go get github.com/ichsansaid/gohive
 ```
 
 To add kerberos support GoHive requires header files to build against the GSSAPI C library. They can be installed with:
@@ -29,7 +29,7 @@ To add kerberos support GoHive requires header files to build against the GSSAPI
 
 Then:
 ```
-go get -tags kerberos github.com/beltran/gohive
+go get -tags kerberos github.com/ichsansaid/gohive
 ```
 
 ## Quickstart
@@ -172,11 +172,11 @@ cursor.FetchOne(context.Background(), &i)
 ```
 Alternatively, using the rowmap API, `m := cursor.RowMap(context.Background())`,
  `m` would be `map[string]interface{}{"table_name.column_name": nil}` for a `NULL` value. It will return a map
-where the keys are `table_name.column_name`. This works fine with Hive but using [Spark Thirft SQL server](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) `table_name` is not present and the keys are `column_name` and it can [lead to problems](https://github.com/beltran/gohive/issues/120) if two tables have the same column name so the `FetchOne` API should be used in this case.
+where the keys are `table_name.column_name`. This works fine with Hive but using [Spark Thirft SQL server](https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html) `table_name` is not present and the keys are `column_name` and it can [lead to problems](https://github.com/ichsansaid/gohive/issues/120) if two tables have the same column name so the `FetchOne` API should be used in this case.
 
 ## Running tests
 Tests can be run with:
 ```
 ./scripts/integration
 ```
-This uses [dhive](https://github.com/beltran/dhive) and it will start three docker instances with Hive, the Hive metastore, and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` and `hm.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/beltran/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.
+This uses [dhive](https://github.com/ichsansaid/dhive) and it will start three docker instances with Hive, the Hive metastore, and Kerberos. `kinit`, `klist`, `kdestroy` have to be installed locally. `hs2.example.com` and `hm.example.com` will have to be an alias for 127.0.0.1 in `/etc/hosts`. The krb5 configuration file should be created with `bash scripts/create_krbconf.sh`. Overall the [steps used in the travis CI](https://github.com/ichsansaid/gohive/blob/ec69b5601829296a56ca0558693ed30c11180a94/.travis.yml#L24-L46) can be followed.
