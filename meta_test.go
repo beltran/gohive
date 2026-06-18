@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/beltran/gohive/hive_metastore"
+	"github.com/ichsansaid/gohive/hive_metastore"
 )
 
 var lettersDb = []rune("abcdefghijklmnopqrstuvwxyz")

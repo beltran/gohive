@@ -19,7 +19,7 @@ import (
     "os"
     "time"
 
-    "github.com/beltran/gohive"
+    "github.com/ichsansaid/gohive"
 )
 
 func main() {
@@ -67,7 +67,7 @@ import (
     "log"
     "os"
 
-    _ "github.com/beltran/gohive"
+    _ "github.com/ichsansaid/gohive"
 )
 
 func main() {
@@ -119,8 +119,8 @@ The following features from version 1.x are not supported at the moment in versi
 ## Need Help?
 
 If you encounter any issues during migration:
-1. Check the [GitHub Issues](https://github.com/beltran/gohive/issues)
-2. Review the [documentation](https://github.com/beltran/gohive/v2/readme.md)
+1. Check the [GitHub Issues](https://github.com/ichsansaid/gohive/issues)
+2. Review the [documentation](https://github.com/ichsansaid/gohive/v2/readme.md)
 3. Open a new issue if you find a bug
 
 ## Why These Changes?

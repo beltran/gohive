@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/beltran/gohive/v2/hiveserver"
+	"github.com/ichsansaid/gohive/v2/hiveserver"
 )
 
 // Driver is the interface that must be implemented by a database driver.
