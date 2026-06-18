@@ -8,6 +8,8 @@ import (
 	"io"
 	"reflect"
 	"strings"
+
+	"github.com/beltran/gohive/v2/hiveserver"
 )
 
 // Driver is the interface that must be implemented by a database driver.
@@ -88,6 +90,47 @@ func (c *sqlConnection) Close() error {
 	return c.conn.close()
 }
 
+// IsValid implements driver.Validator. It is called by database/sql before
+// returning a connection to the pool. If it returns false, the connection is
+// discarded instead of being pooled.
+func (c *sqlConnection) IsValid() bool {
+	return c.conn.transport != nil && c.conn.transport.IsOpen()
+}
+
+// Ping implements driver.Pinger. It sends a lightweight GetInfo RPC to
+// HiveServer2/Impala to verify the session is still alive without executing
+// a query.
+func (c *sqlConnection) Ping(ctx context.Context) error {
+	c.conn.clientMu.Lock()
+	defer c.conn.clientMu.Unlock()
+
+	req := hiveserver.NewTGetInfoReq()
+	req.SessionHandle = c.conn.sessionHandle
+	req.InfoType = hiveserver.TGetInfoType_CLI_DBMS_NAME
+
+	resp, err := c.conn.client.GetInfo(ctx, req)
+	if err != nil {
+		return classifyError(err)
+	}
+
+	status := resp.GetStatus()
+	if !success(status) {
+		return classifyError(fmt.Errorf("%s: %s", status.GetStatusCode().String(), status.GetErrorMessage()))
+	}
+
+	return nil
+}
+
+// ResetSession implements driver.SessionResetter. It is called by database/sql
+// before reusing a connection from the pool. If the transport is no longer open
+// it returns driver.ErrBadConn so that database/sql discards the connection.
+func (c *sqlConnection) ResetSession(ctx context.Context) error {
+	if c.conn.transport == nil || !c.conn.transport.IsOpen() {
+		return driver.ErrBadConn
+	}
+	return nil
+}
+
 // Begin starts and returns a new transaction.
 func (c *sqlConnection) Begin() (driver.Tx, error) {
 	return c.BeginTx(context.Background(), driver.TxOptions{})
@@ -109,41 +152,51 @@ func (c *sqlConnection) PrepareContext(ctx context.Context, query string) (drive
 }
 
 // Exec executes a query that doesn't return rows.
-// Implements driver.Execer
+// Implements driver.Execer (deprecated, kept for compatibility).
 func (c *sqlConnection) Exec(query string, args []driver.Value) (driver.Result, error) {
-	return c.ExecContext(context.Background(), query, args)
+	namedArgs := make([]driver.NamedValue, len(args))
+	for i, v := range args {
+		namedArgs[i] = driver.NamedValue{Ordinal: i + 1, Value: v}
+	}
+	return c.ExecContext(context.Background(), query, namedArgs)
 }
 
 // ExecContext executes a query that doesn't return rows.
-func (c *sqlConnection) ExecContext(ctx context.Context, query string, args []driver.Value) (driver.Result, error) {
+// Implements driver.ExecerContext so that database/sql propagates the caller's context.
+func (c *sqlConnection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if len(args) > 0 {
 		return nil, fmt.Errorf("query parameters are not supported by Hive")
 	}
 
 	cursor := c.conn.cursor()
 	cursor.exec(ctx, query)
-	if cursor.error() != nil {
-		return nil, cursor.error()
+	if err := cursor.error(); err != nil {
+		return nil, classifyError(err)
 	}
 	return &result{cursor: cursor, query: query}, nil
 }
 
 // Query executes a query that may return rows.
-// Implements driver.Queryer
+// Implements driver.Queryer (deprecated, kept for compatibility).
 func (c *sqlConnection) Query(query string, args []driver.Value) (driver.Rows, error) {
-	return c.QueryContext(context.Background(), query, args)
+	namedArgs := make([]driver.NamedValue, len(args))
+	for i, v := range args {
+		namedArgs[i] = driver.NamedValue{Ordinal: i + 1, Value: v}
+	}
+	return c.QueryContext(context.Background(), query, namedArgs)
 }
 
 // QueryContext executes a query that may return rows.
-func (c *sqlConnection) QueryContext(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
+// Implements driver.QueryerContext so that database/sql propagates the caller's context.
+func (c *sqlConnection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if len(args) > 0 {
 		return nil, fmt.Errorf("query parameters are not supported by Hive")
 	}
 
 	cursor := c.conn.cursor()
 	cursor.exec(ctx, query)
-	if cursor.error() != nil {
-		return nil, cursor.error()
+	if err := cursor.error(); err != nil {
+		return nil, classifyError(err)
 	}
 	return &rows{cursor: cursor, ctx: ctx, descriptionValid: false}, nil
 }

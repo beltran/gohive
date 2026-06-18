@@ -1073,7 +1073,7 @@ func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		// Wait for goroutine to finish
 		case <-rowsAvailable:
 		}
-		err = errors.New("Context is done")
+		err = ctx.Err()
 	}
 
 	if err != nil {
