@@ -29,6 +29,7 @@ type Config struct {
 	SSLInsecureSkip   bool
 	HiveConfiguration map[string]string
 	ConnectTimeout    time.Duration // Timeout for establishing TCP connection
+	HttpTimeout       time.Duration // Timeout for http calls
 	SocketTimeout     time.Duration // Timeout for individual socket read/write operations. Keep this low (e.g. 2s) so context deadlines are respected promptly (see THRIFT-5233).
 }
 
@@ -73,6 +74,9 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		connCfg.SocketTimeout = c.cfg.SocketTimeout
 	} else {
 		connCfg.SocketTimeout = 1 * time.Second // default: enables THRIFT-5233 context deadline retry
+	}
+	if c.cfg.HttpTimeout > 0 {
+		connCfg.HttpTimeout = c.cfg.HttpTimeout
 	}
 
 	// Fallback: build TLS config from cert/key files if TLSConfig not provided directly
