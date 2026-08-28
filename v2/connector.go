@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"os"
+	"time"
 )
 
 // Config holds everything needed to connect to Hive/Impala via gohive v2.
@@ -27,6 +28,9 @@ type Config struct {
 	SSLCAFile         string
 	SSLInsecureSkip   bool
 	HiveConfiguration map[string]string
+	ConnectTimeout    time.Duration // Timeout for establishing TCP connection
+	HttpTimeout       time.Duration // Timeout for http calls
+	SocketTimeout     time.Duration // Timeout for individual socket read/write operations. Keep this low (e.g. 2s) so context deadlines are respected promptly (see THRIFT-5233).
 }
 
 var _ driver.Connector = (*HiveConnector)(nil)
@@ -53,7 +57,7 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	connCfg.Password = c.cfg.Password
 	connCfg.Database = c.cfg.Database
 	if c.cfg.TransportMode != "" {
-	    connCfg.TransportMode = c.cfg.TransportMode
+		connCfg.TransportMode = c.cfg.TransportMode
 	}
 	if c.cfg.HTTPPath != "" {
 		connCfg.HTTPPath = c.cfg.HTTPPath
@@ -64,6 +68,15 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 	connCfg.TLSConfig = c.cfg.TLSConfig
 	connCfg.HiveConfiguration = c.cfg.HiveConfiguration
+	connCfg.ConnectTimeout = c.cfg.ConnectTimeout
+	if c.cfg.SocketTimeout > 0 {
+		connCfg.SocketTimeout = c.cfg.SocketTimeout
+	} else {
+		connCfg.SocketTimeout = 1 * time.Second // default: enables THRIFT-5233 context deadline retry
+	}
+	if c.cfg.HttpTimeout > 0 {
+		connCfg.HttpTimeout = c.cfg.HttpTimeout
+	}
 
 	// Fallback: build TLS config from cert/key files if TLSConfig not provided directly
 	if connCfg.TLSConfig == nil {

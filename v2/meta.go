@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/v2/hive_metastore"
+	"github.com/ichsansaid/gohive/v2/hive_metastore"
 )
 
 type HiveMetastoreClient struct {

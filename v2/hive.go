@@ -18,8 +18,8 @@ import (
 	"database/sql/driver"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/v2/hiveserver"
 	"github.com/beltran/gosasl"
+	"github.com/ichsansaid/gohive/v2/hiveserver"
 	"github.com/pkg/errors"
 	"golang.org/x/net/publicsuffix"
 )
@@ -474,22 +474,29 @@ func (c *cursor) executeSync(ctx context.Context, query string) {
 
 	c.state = _RUNNING
 	executeReq := hiveserver.NewTExecuteStatementReq()
-	c.conn.clientMu.Lock()
 	executeReq.SessionHandle = c.conn.sessionHandle
 	executeReq.Statement = query
 	executeReq.RunAsync = false
+
+	c.executeSyncBlocking(ctx, executeReq)
+}
+
+// executeSyncBlocking runs ExecuteStatement in a blocking manner.
+// Relies on SocketTimeout + THRIFT-5233 retry for context deadline enforcement.
+func (c *cursor) executeSyncBlocking(ctx context.Context, executeReq *hiveserver.TExecuteStatementReq) {
+	c.conn.clientMu.Lock()
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
 	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
 	c.conn.clientMu.Unlock()
 
 	if c.Err != nil {
-		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
+		if strings.Contains(c.Err.Error(), "context deadline exceeded") ||
+			strings.Contains(c.Err.Error(), "context canceled") {
 			c.state = _CONTEXT_DONE
 			if responseExecute == nil {
 				c.state = _ERROR
 			} else if responseExecute != nil {
-				// We may need this to cancel the operation
 				c.operationHandle = responseExecute.OperationHandle
 			}
 		}
@@ -1073,7 +1080,7 @@ func (c *cursor) pollUntilData(ctx context.Context, n int) (err error) {
 		// Wait for goroutine to finish
 		case <-rowsAvailable:
 		}
-		err = errors.New("Context is done")
+		err = ctx.Err()
 	}
 
 	if err != nil {
