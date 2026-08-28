@@ -63,7 +63,6 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		connCfg.HTTPPath = c.cfg.HTTPPath
 	}
 	connCfg.Service = c.cfg.Service
-
 	if connCfg.Service == "" {
 		connCfg.Service = "hive"
 	}

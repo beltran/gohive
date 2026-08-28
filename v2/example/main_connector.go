@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	gohive "github.com/beltran/gohive/v2"
+	gohive "github.com/ichsansaid/gohive/v2"
 )
 
 func main() {
@@ -24,6 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Create a test table
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS test_table (id INT, name STRING)")
 	if err != nil {
 		log.Fatal(err)

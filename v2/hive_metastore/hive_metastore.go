@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/v2/gohivemeta/fb303"
+	"github.com/ichsansaid/gohive/v2/gohivemeta/fb303"
 	"time"
 )
 
