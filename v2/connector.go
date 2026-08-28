@@ -32,6 +32,8 @@ type Config struct {
 	SocketTimeout     time.Duration // Timeout for individual socket read/write operations. Keep this low (e.g. 2s) so context deadlines are respected promptly (see THRIFT-5233).
 }
 
+var _ driver.Connector = (*HiveConnector)(nil)
+
 // HiveConnector implements driver.Connector using gohive v2 under the hood.
 type HiveConnector struct {
 	cfg Config
@@ -53,11 +55,16 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	connCfg.Username = c.cfg.Username
 	connCfg.Password = c.cfg.Password
 	connCfg.Database = c.cfg.Database
-	connCfg.TransportMode = c.cfg.TransportMode
+	if c.cfg.TransportMode != "" {
+	    connCfg.TransportMode = c.cfg.TransportMode
+	}
 	if c.cfg.HTTPPath != "" {
 		connCfg.HTTPPath = c.cfg.HTTPPath
 	}
 	connCfg.Service = c.cfg.Service
+	if connCfg.Service == "" {
+		connCfg.Service = "hive"
+	}
 	connCfg.TLSConfig = c.cfg.TLSConfig
 	connCfg.HiveConfiguration = c.cfg.HiveConfiguration
 	connCfg.ConnectTimeout = c.cfg.ConnectTimeout
@@ -89,8 +96,10 @@ func (c *HiveConnector) Connect(ctx context.Context) (driver.Conn, error) {
 			}
 			connCfg.TLSConfig = &tls.Config{
 				RootCAs:            pool,
-				InsecureSkipVerify: false,
+				InsecureSkipVerify: c.cfg.SSLInsecureSkip,
 			}
+		} else if c.cfg.SSLInsecureSkip {
+			connCfg.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 	}
 
