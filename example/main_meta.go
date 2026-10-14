@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/beltran/gohive"
-	"github.com/beltran/gohive/hive_metastore"
+	"github.com/ichsansaid/gohive"
+	"github.com/ichsansaid/gohive/hive_metastore"
 )
 
 func main() {

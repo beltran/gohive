@@ -2,12 +2,13 @@ package gohive
 
 import (
 	"context"
-	"github.com/beltran/gohive/hive_metastore"
-	"log"
-	"os"
 	"fmt"
-	"testing"
+	"log"
 	"math/rand"
+	"os"
+	"testing"
+
+	"github.com/ichsansaid/gohive/hive_metastore"
 )
 
 var lettersDb = []rune("abcdefghijklmnopqrstuvwxyz")
@@ -25,7 +26,7 @@ var randNameDb = randSeqDb(10)
 
 func GetDatabaseName() string {
 	tableName := fmt.Sprintf("db_pokes_%s%d", randNameDb, tableIdDb)
-	tableIdDb+= 1
+	tableIdDb += 1
 	return tableName
 }
 
@@ -41,7 +42,6 @@ func TestConnectDefaultMeta(t *testing.T) {
 	}
 	client.Close()
 }
-
 
 func TestConnectNoneMetaFails(t *testing.T) {
 	if os.Getenv("METASTORE_SKIP") == "1" {

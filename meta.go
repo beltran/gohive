@@ -2,10 +2,11 @@ package gohive
 
 import (
 	"fmt"
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/hive_metastore"
 	"os/user"
 	"strings"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/ichsansaid/gohive/hive_metastore"
 )
 
 type HiveMetastoreClient struct {
